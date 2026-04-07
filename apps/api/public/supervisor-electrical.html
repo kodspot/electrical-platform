@@ -1,0 +1,523 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
+<link rel="manifest" href="/site.webmanifest">
+<meta name="theme-color" content="#d97706">
+<title>Electrical Inspection — Kodspot</title>
+<link rel="stylesheet" href="/css/design-system.css?v=9">
+<style>
+.sv-shell{max-width:540px;margin:0 auto;padding:1.25rem .75rem;min-height:calc(100dvh - 56px)}
+.loc-header{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:1rem;margin-bottom:1.15rem;display:flex;align-items:center;gap:.6rem}
+.loc-icon{font-size:1.3rem;flex-shrink:0}
+.loc-info h2{font-size:1rem;font-weight:700;line-height:1.25;margin:0}
+.loc-info p{font-size:.72rem;color:var(--text-muted);margin:.1rem 0 0}
+.form-section{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:1rem;margin-bottom:.85rem}
+.form-section-title{display:flex;align-items:center;gap:.35rem;font-size:.82rem;font-weight:700;margin-bottom:.65rem;color:var(--text)}
+
+/* Checklist */
+.checklist{display:flex;flex-direction:column;gap:.4rem}
+.check-row{display:flex;align-items:center;gap:.5rem;background:var(--bg);padding:.55rem .7rem;border-radius:var(--radius);border:1px solid transparent;transition:border-color .1s}
+.check-row.faulty{border-color:var(--danger);background:rgba(239,68,68,.04)}
+.check-row .check-icon{font-size:1.1rem;flex-shrink:0;width:24px;text-align:center}
+.check-row .check-label{flex:1;font-size:.82rem;font-weight:500}
+.check-row .check-btns{display:flex;gap:.25rem}
+.check-btn{border:1px solid var(--border);background:var(--surface);border-radius:var(--radius-sm);padding:.25rem .55rem;font-size:.68rem;font-weight:600;cursor:pointer;transition:all .12s;min-height:var(--touch-min,36px);min-width:36px;display:flex;align-items:center;justify-content:center}
+.check-btn:hover{border-color:var(--primary)}
+.check-btn.sel-ok{border-color:var(--success);background:rgba(16,185,129,.1);color:var(--success)}
+.check-btn.sel-faulty{border-color:var(--danger);background:rgba(239,68,68,.1);color:var(--danger)}
+.check-btn.sel-na{border-color:var(--text-muted);background:rgba(120,120,120,.08);color:var(--text-muted)}
+.check-remarks{width:100%;margin-top:.35rem;padding:.35rem .5rem;font-size:.75rem;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--bg);color:var(--text);resize:none}
+.check-summary{font-size:.68rem;color:var(--text-muted);margin-top:.4rem}
+.check-summary .fault-count{color:var(--danger);font-weight:600}
+
+/* Photo area */
+.photo-area{border:2px dashed var(--border);border-radius:var(--radius);padding:1rem;text-align:center;transition:border-color .15s}
+.photo-area.has-photos{border-color:var(--primary)}
+.photo-grid{display:flex;gap:.4rem;flex-wrap:wrap;margin-bottom:.6rem}
+.photo-thumb{position:relative;width:58px;height:58px;border-radius:var(--radius-sm);overflow:hidden}
+.photo-thumb img{width:100%;height:100%;object-fit:cover}
+.photo-thumb button{position:absolute;top:2px;right:2px;background:rgba(0,0,0,.6);color:#fff;border:none;border-radius:50%;width:18px;height:18px;font-size:10px;cursor:pointer;display:flex;align-items:center;justify-content:center;line-height:1}
+.add-photo-btn{display:inline-flex;align-items:center;gap:.3rem;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);padding:.45rem .85rem;font-size:.82rem;cursor:pointer;color:var(--text);transition:border-color .15s;min-height:var(--touch-min)}
+.add-photo-btn:hover{border-color:var(--primary)}
+.photo-count{font-size:.68rem;color:var(--text-muted);margin-top:.35rem}
+
+/* Worker list */
+.worker-list{display:flex;flex-direction:column;gap:.35rem;max-height:260px;overflow-y:auto}
+.worker-item{display:flex;align-items:center;gap:.55rem;background:var(--bg);padding:.55rem .7rem;border-radius:var(--radius);cursor:pointer;font-size:.85rem;border:1px solid transparent;transition:border-color .1s}
+.worker-item:hover{border-color:var(--border)}
+.worker-item input[type=checkbox]{width:20px;height:20px;accent-color:var(--primary);flex-shrink:0}
+.worker-item-name{flex:1}
+.worker-item-id{font-size:.68rem;color:var(--text-muted)}
+.worker-count{font-size:.68rem;color:var(--text-muted);margin-top:.35rem}
+
+.submit-section{position:sticky;bottom:0;background:var(--bg);padding:.75rem 0 .25rem;z-index:5}
+.success-screen{text-align:center;padding:3rem 1rem;display:none}
+.success-check{width:76px;height:76px;border-radius:50%;background:var(--success);display:flex;align-items:center;justify-content:center;margin:0 auto 1.25rem;font-size:2.2rem;color:#fff;box-shadow:0 4px 16px rgba(16,185,129,.25)}
+.success-title{font-size:1.2rem;font-weight:700;margin-bottom:.35rem}
+.success-sub{font-size:.82rem;color:var(--text-muted);margin-bottom:1.5rem}
+
+@media(max-width:480px){
+  .sv-shell{padding:.85rem .5rem}
+  .form-section{padding:.85rem}
+  .loc-header{padding:.85rem}
+  .photo-thumb{width:52px;height:52px}
+  .check-btn{padding:.2rem .4rem;font-size:.62rem;min-width:30px}
+}
+</style>
+</head>
+<body>
+<nav class="topbar">
+  <div class="topbar-left">
+    <span class="topbar-brand">⚡ Kodspot Electrical</span>
+    <div class="sv-nav" id="sv-nav">
+      <a href="/supervisor-scan" class="sv-nav-link">Scan</a>
+      <a href="/supervisor-electrical" class="sv-nav-link active" data-mod="ele">Electrical</a>
+      <a href="/supervisor-tickets" class="sv-nav-link">Tickets</a>
+      <a href="/supervisor-attendance" class="sv-nav-link">Attendance</a>
+    </div>
+  </div>
+  <div class="topbar-right">
+    <span class="topbar-user" id="userName"></span>
+    <button class="btn btn-sm btn-ghost" onclick="App.logoutSup()">Logout</button>
+  </div>
+</nav>
+
+<div class="sv-shell" id="formView">
+  <div class="loc-header">
+    <span class="loc-icon">⚡</span>
+    <div class="loc-info">
+      <h2 id="locName">Loading…</h2>
+      <p>Electrical inspection submission</p>
+    </div>
+  </div>
+
+  <form id="inspectionForm">
+    <!-- Shift -->
+    <div class="form-section">
+      <div class="form-section-title">🕐 Shift</div>
+      <select class="form-select" id="shift" required onchange="checkShiftMismatch()">
+        <option value="">Loading shifts…</option>
+      </select>
+      <div id="shiftWarning" style="display:none;margin-top:.5rem;padding:.55rem .7rem;background:var(--warning-bg);border:1px solid var(--warning);border-radius:var(--radius-sm);font-size:.78rem;color:var(--warning-text)">
+        <b>⚠ Cross-shift submission:</b> <span id="shiftWarningText"></span>
+      </div>
+      <div id="lateReasonWrap" style="display:none;margin-top:.45rem">
+        <label class="form-label" style="font-size:.78rem;margin-bottom:.2rem">Reason for late / cross-shift submission <span style="color:var(--danger)">*</span></label>
+        <textarea class="form-textarea" id="lateReason" rows="2" placeholder="Explain why you are submitting outside the shift window…" maxlength="500" style="font-size:.82rem"></textarea>
+      </div>
+    </div>
+
+    <!-- Electrical Checklist -->
+    <div class="form-section">
+      <div class="form-section-title">⚡ Inspection Checklist</div>
+      <div class="checklist" id="checklist"></div>
+      <div class="check-summary"><span id="checkSummary">0 checked</span></div>
+    </div>
+
+    <!-- Photos (optional — of faults) -->
+    <div class="form-section">
+      <div class="form-section-title">📷 Photos <span style="font-weight:400;color:var(--text-muted);font-size:.72rem">(optional — capture faults)</span></div>
+      <div class="photo-area" id="photoArea">
+        <div class="photo-grid" id="photoThumbs"></div>
+        <label class="add-photo-btn" id="addPhotoBtn">
+          📷 Add Photo
+          <input type="file" accept="image/*" capture="environment" multiple hidden id="photoInput">
+        </label>
+        <div class="photo-count"><span id="photoCount">0</span>/5 photos</div>
+      </div>
+    </div>
+
+    <!-- Workers -->
+    <div class="form-section">
+      <div class="form-section-title">👷 Workers Present</div>
+      <div class="worker-list" id="workerList"><div style="text-align:center;padding:1rem;color:var(--text-muted);font-size:.82rem">Loading workers…</div></div>
+      <div class="worker-count"><span id="workerCount">0</span> selected</div>
+    </div>
+
+    <!-- Notes -->
+    <div class="form-section">
+      <div class="form-section-title">📝 Notes</div>
+      <textarea class="form-textarea" id="notes" rows="2" placeholder="Any additional observations…" maxlength="500" style="font-size:.82rem"></textarea>
+    </div>
+
+    <div id="formError" class="error-msg"></div>
+
+    <div class="submit-section">
+      <button type="submit" class="btn btn-success btn-block" id="submitBtn" style="font-size:.92rem">⚡ Submit Electrical Inspection</button>
+    </div>
+  </form>
+</div>
+
+<div class="sv-shell success-screen" id="successView">
+  <div class="success-check">✓</div>
+  <div class="success-title">Inspection Submitted!</div>
+  <p class="success-sub" id="successSub">Record has been saved successfully.</p>
+  <a id="scanNextLink" href="/supervisor-scan" class="btn btn-primary btn-block" style="text-decoration:none">Scan Next Location</a>
+</div>
+
+<script src="/js/offline-sync.js?v=1"></script>
+<script src="/js/app.js?v=11"></script>
+<script src="/js/custom-select.js"></script>
+<script>
+if (!App.initSupervisor()) throw '';
+App.initNotifications(App.supFetch, 'supervisor');
+var esc = App.esc, $ = App.$;
+document.querySelectorAll('#sv-nav a').forEach(function(a){ var pg = a.getAttribute('href').replace(/^\//, ''); a.href = App.orgPath(pg); });
+$('scanNextLink').href = App.orgPath('supervisor-scan');
+var locationId = null, photos = [];
+var _submitLabel = $('submitBtn').innerHTML;
+
+// Default CHECK_TYPES (fallback when no template)
+var CHECK_TYPES = [
+  { key: 'LIGHTING',         icon: '💡', label: 'Lighting', responseType: 'STATUS', isRequired: true },
+  { key: 'FAN',              icon: '🌀', label: 'Fan', responseType: 'STATUS', isRequired: true },
+  { key: 'AC',               icon: '❄️', label: 'AC', responseType: 'STATUS', isRequired: true },
+  { key: 'SWITCH_BOARD',     icon: '🔘', label: 'Switch Board', responseType: 'STATUS', isRequired: true },
+  { key: 'SOCKET',           icon: '🔌', label: 'Socket', responseType: 'STATUS', isRequired: true },
+  { key: 'WIRING',           icon: '🪛', label: 'Wiring', responseType: 'STATUS', isRequired: true },
+  { key: 'MCB_PANEL',        icon: '⚙️', label: 'MCB Panel', responseType: 'STATUS', isRequired: true },
+  { key: 'EARTHING',         icon: '🔗', label: 'Earthing', responseType: 'STATUS', isRequired: true },
+  { key: 'EMERGENCY_LIGHT',  icon: '🚨', label: 'Emergency Light', responseType: 'STATUS', isRequired: true }
+];
+
+var activeTemplateId = null; // Template ID — null means legacy mode
+
+// State: track status for each check type
+var checkState = {}; // { LIGHTING: { status: 'OK'|'FAULTY'|'NA', remarks: '', reading: null }, ... }
+CHECK_TYPES.forEach(function(c) { checkState[c.key] = { status: null, remarks: '', reading: null }; });
+
+// URL params
+var params = new URLSearchParams(location.search);
+locationId = params.get('locationId');
+var locName = params.get('name') || '';
+var qrParam = params.get('qr');
+
+if (!locationId && qrParam) {
+  (async function() {
+    try {
+      var res = await App.supFetch('/locations/qr/' + encodeURIComponent(qrParam));
+      if (!res || !res.ok) { App.toast('Location not found', 'error'); location.href = App.orgPath('supervisor-scan'); return; }
+      var loc = await res.json();
+      location.replace(App.orgPath('supervisor-electrical') + '?locationId=' + loc.id + '&name=' + encodeURIComponent(loc.name));
+    } catch(e) { location.href = App.orgPath('supervisor-scan'); }
+  })();
+  throw '';
+}
+
+if (!locationId) { location.href = App.orgPath('supervisor-scan'); throw ''; }
+$('locName').textContent = decodeURIComponent(locName);
+
+// ── Resolve inspection template for this location ──
+async function resolveTemplate() {
+  try {
+    var res = await App.supFetch('/inspection-templates/resolve?locationId=' + encodeURIComponent(locationId));
+    if (res && res.ok) {
+      var tpl = await res.json();
+      activeTemplateId = tpl.id;
+      // Build CHECK_TYPES from template items
+      var ITEM_ICONS = { LIGHTING:'💡', FAN:'🌀', AC:'❄️', SWITCH_BOARD:'🔘', SOCKET:'🔌', WIRING:'🪛', MCB_PANEL:'⚙️', EARTHING:'🔗', EMERGENCY_LIGHT:'🚨' };
+      CHECK_TYPES = tpl.items.map(function(item) {
+        return {
+          key: item.checkKey,
+          icon: ITEM_ICONS[item.checkKey] || '🔧',
+          label: item.label,
+          responseType: item.responseType || 'STATUS',
+          isRequired: item.isRequired !== false,
+          unit: item.unit || null,
+          minValue: item.minValue,
+          maxValue: item.maxValue
+        };
+      });
+      // Reset check state for new items
+      checkState = {};
+      CHECK_TYPES.forEach(function(c) { checkState[c.key] = { status: null, remarks: '', reading: null }; });
+      // Show template name
+      var locSub = document.querySelector('.loc-info p');
+      if (locSub) locSub.textContent = 'Template: ' + tpl.name + (tpl.version > 1 ? ' (v' + tpl.version + ')' : '');
+    }
+  } catch(e) { /* Use default CHECK_TYPES */ }
+  renderChecklist();
+}
+resolveTemplate();
+
+// ── Shift logic ──
+var _shiftConfigs = {};
+var shiftLabels = {};
+
+function fmtTime(h, m) { var ap = h >= 12 ? 'PM' : 'AM'; var hh = h % 12 || 12; return hh + (m > 0 ? ':' + ('0'+m).slice(-2) : '') + ap; }
+function buildShiftLabel(shift) {
+  var c = _shiftConfigs[shift];
+  if (!c || shift === 'GENERAL') return 'General';
+  return shift.charAt(0) + shift.slice(1).toLowerCase() + ' (' + fmtTime(c.startHour, c.startMin) + ' – ' + fmtTime(c.endHour, c.endMin) + ')';
+}
+function timeInMinutes(h, m) { return h * 60 + m; }
+function getExpectedShift() {
+  var now = new Date(), nowMins = timeInMinutes(now.getHours(), now.getMinutes());
+  var checks = ['MORNING', 'AFTERNOON', 'NIGHT'];
+  for (var i = 0; i < checks.length; i++) {
+    var c = _shiftConfigs[checks[i]];
+    if (!c) continue;
+    var s = timeInMinutes(c.startHour, c.startMin), e = timeInMinutes(c.endHour, c.endMin);
+    if (e > s) { if (nowMins >= s && nowMins < e) return checks[i]; }
+    else if (e < s) { if (nowMins >= s || nowMins < e) return checks[i]; }
+  }
+  return 'GENERAL';
+}
+function hasShiftStarted(shift) {
+  if (shift === 'GENERAL') return true;
+  var c = _shiftConfigs[shift]; if (!c) return true;
+  var now = new Date(), nowMins = timeInMinutes(now.getHours(), now.getMinutes());
+  var startMins = timeInMinutes(c.startHour, c.startMin), endMins = timeInMinutes(c.endHour, c.endMin);
+  if (endMins > startMins) return nowMins >= startMins;
+  return nowMins >= startMins || nowMins < endMins;
+}
+function checkShiftMismatch() {
+  var selected = $('shift').value, expected = getExpectedShift();
+  var isMismatch = selected !== 'GENERAL' && selected !== expected;
+  $('shiftWarning').style.display = isMismatch ? '' : 'none';
+  $('lateReasonWrap').style.display = isMismatch ? '' : 'none';
+  if (isMismatch) $('shiftWarningText').textContent = 'You selected ' + (shiftLabels[selected] || selected) + ' but current time is ' + (shiftLabels[expected] || expected) + '.';
+  var pi = $('photoInput');
+  if (isMismatch) pi.removeAttribute('capture'); else pi.setAttribute('capture', 'environment');
+}
+
+async function loadShiftConfig() {
+  var defaults = { MORNING:{startHour:6,startMin:0,endHour:14,endMin:0}, AFTERNOON:{startHour:14,startMin:0,endHour:22,endMin:0}, NIGHT:{startHour:22,startMin:0,endHour:6,endMin:0}, GENERAL:{startHour:0,startMin:0,endHour:0,endMin:0} };
+  _shiftConfigs = Object.assign({}, defaults);
+  try {
+    var res = await App.supFetch('/shift-config');
+    if (res && res.ok) {
+      var configs = await res.json();
+      for (var i = 0; i < configs.length; i++) { var c = configs[i]; _shiftConfigs[c.shift] = { startHour:c.startHour, startMin:c.startMin, endHour:c.endHour, endMin:c.endMin }; }
+    }
+  } catch(e) {}
+  shiftLabels = { MORNING: buildShiftLabel('MORNING'), AFTERNOON: buildShiftLabel('AFTERNOON'), NIGHT: buildShiftLabel('NIGHT'), GENERAL: 'General' };
+  var allShifts = ['MORNING','AFTERNOON','NIGHT','GENERAL'];
+  var show = allShifts.filter(function(s) { return hasShiftStarted(s); });
+  var sel = $('shift'); sel.innerHTML = '';
+  for (var j = 0; j < show.length; j++) { var o = document.createElement('option'); o.value = show[j]; o.textContent = shiftLabels[show[j]] || show[j]; sel.appendChild(o); }
+  var expected = getExpectedShift();
+  if (show.indexOf(expected) !== -1) sel.value = expected; else if (show.length) sel.value = show[0];
+  checkShiftMismatch();
+}
+loadShiftConfig();
+
+// ── Checklist rendering ──
+function renderChecklist() {
+  $('checklist').innerHTML = CHECK_TYPES.map(function(c) {
+    var st = checkState[c.key];
+    var rowCls = st.status === 'FAULTY' ? ' faulty' : '';
+    var btns = '';
+    if (c.responseType === 'YES_NO') {
+      btns = '<button type="button" class="check-btn' + (st.status === 'YES' ? ' sel-ok' : '') + '" onclick="setCheck(\'' + c.key + '\',\'YES\')">Yes</button>' +
+        '<button type="button" class="check-btn' + (st.status === 'NO' ? ' sel-faulty' : '') + '" onclick="setCheck(\'' + c.key + '\',\'NO\')">No</button>' +
+        '<button type="button" class="check-btn' + (st.status === 'NA' ? ' sel-na' : '') + '" onclick="setCheck(\'' + c.key + '\',\'NA\')">N/A</button>';
+    } else if (c.responseType === 'READING') {
+      btns = '<input type="number" step="any" class="form-input" style="width:90px;height:32px;font-size:.78rem;padding:.2rem .4rem" placeholder="' + (c.unit || 'Value') + '" id="rdg_' + c.key + '" oninput="setReading(\'' + c.key + '\',this.value)" value="' + (st.reading != null ? st.reading : '') + '">';
+      if (c.unit) btns += '<span style="font-size:.68rem;color:var(--text-muted);margin-left:2px">' + esc(c.unit) + '</span>';
+    } else {
+      btns = '<button type="button" class="check-btn' + (st.status === 'OK' ? ' sel-ok' : '') + '" onclick="setCheck(\'' + c.key + '\',\'OK\')">OK</button>' +
+        '<button type="button" class="check-btn' + (st.status === 'FAULTY' ? ' sel-faulty' : '') + '" onclick="setCheck(\'' + c.key + '\',\'FAULTY\')">Fault</button>' +
+        '<button type="button" class="check-btn' + (st.status === 'NA' ? ' sel-na' : '') + '" onclick="setCheck(\'' + c.key + '\',\'NA\')">N/A</button>';
+    }
+    var reqBadge = c.isRequired ? '' : '<span style="font-size:.6rem;color:var(--text-light);margin-left:4px">(opt)</span>';
+    return '<div class="check-row' + rowCls + '" id="row_' + c.key + '">' +
+      '<span class="check-icon">' + c.icon + '</span>' +
+      '<span class="check-label">' + esc(c.label) + reqBadge + '</span>' +
+      '<div class="check-btns">' + btns + '</div>' +
+    '</div>' +
+    (st.status === 'FAULTY' ? '<textarea class="check-remarks" id="rem_' + c.key + '" placeholder="Describe the fault…" maxlength="500" oninput="setRemarks(\'' + c.key + '\',this.value)">' + esc(st.remarks) + '</textarea>' : '');
+  }).join('');
+  updateCheckSummary();
+}
+
+window.setCheck = function(key, status) {
+  checkState[key].status = status;
+  if (status !== 'FAULTY') checkState[key].remarks = '';
+  renderChecklist();
+};
+window.setRemarks = function(key, val) { checkState[key].remarks = val; };
+window.setReading = function(key, val) {
+  var num = parseFloat(val);
+  checkState[key].reading = isNaN(num) ? null : num;
+  // Auto-determine status from reading bounds
+  var ct = CHECK_TYPES.find(function(c){ return c.key === key; });
+  if (ct && !isNaN(num)) {
+    if ((ct.minValue != null && num < ct.minValue) || (ct.maxValue != null && num > ct.maxValue)) {
+      checkState[key].status = 'FAULTY';
+    } else {
+      checkState[key].status = 'OK';
+    }
+  }
+  // Update row styling without full re-render (preserves input focus)
+  var row = document.getElementById('row_' + key);
+  if (row) row.classList.toggle('faulty', checkState[key].status === 'FAULTY');
+  updateCheckSummary();
+};
+
+function updateCheckSummary() {
+  var total = 0, ok = 0, faulty = 0, na = 0;
+  CHECK_TYPES.forEach(function(c) {
+    var s = checkState[c.key].status;
+    if (s) { total++; if (s === 'OK' || s === 'YES') ok++; if (s === 'FAULTY' || s === 'NO') faulty++; if (s === 'NA') na++; }
+  });
+  var txt = total + '/' + CHECK_TYPES.length + ' checked';
+  if (faulty > 0) txt += ' · <span class="fault-count">' + faulty + ' fault(s)</span>';
+  if (ok > 0) txt += ' · ' + ok + ' OK';
+  $('checkSummary').innerHTML = txt;
+}
+renderChecklist();
+
+// ── Workers ──
+async function loadWorkers() {
+  $('workerList').innerHTML = '<div style="padding:.75rem;text-align:center;color:var(--text-muted);font-size:.82rem">Loading…</div>';
+  var res = await App.supFetch('/workers?limit=100&active=true');
+  if (!res) { $('workerList').innerHTML = '<div style="padding:.75rem;text-align:center;color:var(--text-muted)">Failed to load</div>'; return; }
+  var data = await res.json();
+  var workers = data.workers || [];
+  if (!workers.length) { $('workerList').innerHTML = '<div style="text-align:center;padding:1rem;color:var(--text-muted)">No workers</div>'; return; }
+  $('workerList').innerHTML = workers.filter(function(w) { return w.isActive !== false; }).map(function(w) {
+    return '<label class="worker-item"><input type="checkbox" name="workers" value="' + w.id + '" onchange="updateWorkerCount()"><span class="worker-item-name">' + esc(w.name) + '</span>' + (w.employeeId ? '<span class="worker-item-id">' + esc(w.employeeId) + '</span>' : '') + '</label>';
+  }).join('');
+}
+loadWorkers();
+
+function updateWorkerCount() {
+  $('workerCount').textContent = document.querySelectorAll('input[name=workers]:checked').length;
+}
+
+// ── Photos ──
+var _allowedTypes = ['image/jpeg', 'image/png', 'image/webp'];
+$('photoInput').addEventListener('change', function(e) {
+  var files = Array.from(e.target.files);
+  for (var i = 0; i < files.length && photos.length < 5; i++) {
+    if (_allowedTypes.indexOf(files[i].type) === -1) { App.toast('Only JPEG, PNG, WebP allowed', 'error'); continue; }
+    if (files[i].size > 5*1024*1024) { App.toast('Photo too large (max 5MB)', 'error'); continue; }
+    photos.push(files[i]);
+  }
+  renderPhotos(); e.target.value = '';
+});
+
+function renderPhotos() {
+  $('photoCount').textContent = photos.length;
+  $('addPhotoBtn').style.display = photos.length >= 5 ? 'none' : '';
+  $('photoArea').classList.toggle('has-photos', photos.length > 0);
+  $('photoThumbs').innerHTML = photos.map(function(f, i) {
+    return '<div class="photo-thumb"><img src="' + URL.createObjectURL(f) + '"><button type="button" onclick="removePhoto(' + i + ')">×</button></div>';
+  }).join('');
+}
+window.removePhoto = function(idx) { photos.splice(idx, 1); renderPhotos(); };
+
+// ── Submit ──
+$('inspectionForm').addEventListener('submit', async function(e) {
+  e.preventDefault();
+  App.hideError('formError');
+
+  // Validate checklist — required items must be checked
+  var unchecked = CHECK_TYPES.filter(function(c) {
+    if (!c.isRequired) return false;
+    if (c.responseType === 'READING') return checkState[c.key].reading == null;
+    return !checkState[c.key].status;
+  });
+  if (unchecked.length > 0) {
+    App.showError('formError', 'Please complete all required items: ' + unchecked.map(function(c) { return c.label; }).join(', '));
+    return;
+  }
+
+  // Late reason
+  var isShiftMismatch = $('shiftWarning').style.display !== 'none';
+  var lateVal = $('lateReason').value.trim();
+  if (isShiftMismatch && !lateVal) {
+    App.showError('formError', 'Please provide a reason for cross-shift submission.');
+    $('lateReason').focus();
+    return;
+  }
+
+  var workerIds = Array.from(document.querySelectorAll('input[name=workers]:checked')).map(function(el) { return el.value; });
+  if (workerIds.length === 0) {
+    App.showError('formError', 'Please select at least one worker.');
+    return;
+  }
+
+  // Build items array
+  var items = CHECK_TYPES.map(function(c) {
+    var s = checkState[c.key];
+    var item = { checkType: c.key, status: s.status || 'OK', remarks: s.status === 'FAULTY' ? s.remarks || '' : '' };
+    if (c.responseType === 'READING' && s.reading != null) item.reading = s.reading;
+    return item;
+  }).filter(function(item) {
+    // Include items that have been interacted with
+    var ct = CHECK_TYPES.find(function(c){ return c.key === item.checkType; });
+    if (ct && ct.responseType === 'READING') return checkState[item.checkType].reading != null;
+    return checkState[item.checkType].status != null;
+  });
+
+  var fd = new FormData();
+  fd.append('locationId', locationId);
+  if (activeTemplateId) fd.append('templateId', activeTemplateId);
+  fd.append('shift', $('shift').value);
+  fd.append('notes', $('notes').value.trim());
+  fd.append('workerIds', JSON.stringify(workerIds));
+  fd.append('items', JSON.stringify(items));
+  if (lateVal) fd.append('lateReason', lateVal);
+  for (var j = 0; j < photos.length; j++) fd.append('image', photos[j]);
+
+  $('submitBtn').disabled = true;
+  $('submitBtn').textContent = 'Submitting…';
+  try {
+    var res = await App.supFetch('/electrical-inspections', { method: 'POST', body: fd });
+    if (!res) { $('submitBtn').disabled = false; $('submitBtn').innerHTML = _submitLabel; return; }
+    if (!res.ok) {
+      var d = await res.json().catch(function() { return {}; });
+      App.showError('formError', d.error || 'Failed to submit');
+      $('submitBtn').disabled = false;
+      $('submitBtn').innerHTML = _submitLabel;
+      return;
+    }
+    var result = await res.json();
+    var faults = result.faultyCount || 0;
+    App.toast('Inspection submitted!', 'success');
+    $('formView').style.display = 'none';
+    $('successView').style.display = '';
+    $('successSub').textContent = faults > 0
+      ? 'Inspection saved with ' + faults + ' fault(s) reported.'
+      : 'All checks passed — no faults detected.';
+  } catch(err) {
+    // Network error — queue for offline submission (photos excluded)
+    if (!navigator.onLine && window.KodspotSync) {
+      var offlinePayload = {
+        locationId: locationId,
+        shift: $('shift').value,
+        notes: $('notes').value.trim(),
+        workerIds: workerIds,
+        items: items
+      };
+      if (activeTemplateId) offlinePayload.templateId = activeTemplateId;
+      if (lateVal) offlinePayload.lateReason = lateVal;
+
+      var apiBase = (window.location.origin);
+      App.enqueueRetry(null, {
+        url: apiBase + '/api/electrical-inspections',
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(offlinePayload)
+      });
+
+      $('formView').style.display = 'none';
+      $('successView').style.display = '';
+      $('successSub').textContent = 'Inspection saved offline. It will be submitted automatically when you are back online.' + (photos.length > 0 ? ' Note: photos will not be included in the offline submission.' : '');
+      return;
+    }
+    App.showError('formError', 'Network error. Please try again.');
+    $('submitBtn').disabled = false;
+    $('submitBtn').innerHTML = _submitLabel;
+  }
+});
+</script>
+</body>
+</html>

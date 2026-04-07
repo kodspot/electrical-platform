@@ -1,0 +1,505 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
+<link rel="manifest" href="/site.webmanifest">
+<meta name="theme-color" content="#1a7f64">
+<title>Inspection Templates — Kodspot</title>
+<link rel="stylesheet" href="/css/design-system.css?v=9">
+<style>
+/* ── Summary ── */
+.tpl-summary{display:flex;gap:1rem;flex-wrap:wrap;padding:.6rem 0 .5rem;border-bottom:1px solid var(--border-light);margin-bottom:.75rem}
+.tpl-summary-item{font-size:.78rem;color:var(--text-muted)}
+.tpl-summary-item b{color:var(--text);font-weight:700}
+/* ── Template cards ── */
+.tpl-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:1rem;margin-top:.5rem}
+.tpl-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:1rem;transition:box-shadow .15s,border-color .15s;position:relative}
+.tpl-card:hover{border-color:var(--primary);box-shadow:var(--shadow-md)}
+.tpl-card.inactive{opacity:.6}
+.tpl-card-head{display:flex;justify-content:space-between;align-items:flex-start;gap:.5rem;margin-bottom:.5rem}
+.tpl-card-title{font-weight:700;font-size:.95rem;color:var(--text);line-height:1.3}
+.tpl-card-badges{display:flex;gap:.3rem;flex-shrink:0;flex-wrap:wrap}
+.tpl-badge{font-size:.6rem;padding:.1rem .4rem;border-radius:99px;font-weight:600;text-transform:uppercase;letter-spacing:.3px}
+.tpl-badge-default{background:var(--primary-light);color:var(--primary-dark)}
+.tpl-badge-inactive{background:var(--danger-bg);color:var(--danger-text)}
+.tpl-badge-ver{background:var(--info-bg);color:var(--info-text)}
+.tpl-card-desc{font-size:.78rem;color:var(--text-muted);margin-bottom:.5rem;line-height:1.4}
+.tpl-card-meta{display:flex;gap:.6rem;flex-wrap:wrap;font-size:.72rem;color:var(--text-light);margin-bottom:.6rem}
+.tpl-card-meta span{display:flex;align-items:center;gap:.2rem}
+.tpl-card-items{display:flex;flex-wrap:wrap;gap:.25rem;margin-bottom:.6rem}
+.tpl-item-chip{font-size:.68rem;padding:.15rem .45rem;border-radius:var(--radius-sm);background:#f1f5f9;color:#475569;font-weight:500}
+.tpl-item-chip.required{background:#eff6ff;color:#2563eb}
+.tpl-item-chip.reading{background:#fef3c7;color:#92400e}
+.tpl-card-actions{display:flex;gap:.35rem;flex-wrap:wrap;border-top:1px solid var(--border-light);padding-top:.5rem}
+/* ── Empty state ── */
+.tpl-empty{text-align:center;padding:3rem 1rem;color:var(--text-muted)}
+.tpl-empty-icon{font-size:2.5rem;margin-bottom:.5rem}
+.tpl-empty-text{font-size:.92rem;font-weight:600;color:var(--text);margin-bottom:.25rem}
+.tpl-empty-sub{font-size:.78rem}
+/* ── Modal items list ── */
+.tpl-items-list{list-style:none;padding:0;margin:0}
+.tpl-items-list li{display:flex;gap:.5rem;align-items:center;padding:.45rem .5rem;border:1px solid var(--border-light);border-radius:var(--radius);margin-bottom:.35rem;background:var(--surface);transition:background .1s}
+.tpl-items-list li:hover{background:#f8fffe}
+.tpl-items-list .drag-handle{cursor:grab;color:var(--text-light);flex-shrink:0;font-size:1rem;user-select:none}
+.tpl-items-list .item-fields{flex:1;display:grid;grid-template-columns:1fr 120px 80px 80px;gap:.35rem;align-items:center}
+.tpl-items-list .item-label-input{font-size:.82rem;padding:.3rem .5rem;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--surface);color:var(--text)}
+.tpl-items-list .item-key-input{font-size:.72rem;padding:.3rem .4rem;border:1px solid var(--border);border-radius:var(--radius-sm);font-family:var(--font-mono);text-transform:uppercase;background:var(--bg);color:var(--text-muted)}
+.tpl-items-list .item-type-select{font-size:.75rem;padding:.25rem .3rem;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--surface)}
+.tpl-items-list .item-req-cb{width:16px;height:16px;accent-color:var(--primary)}
+.tpl-items-list .item-remove{background:none;border:none;color:var(--danger);cursor:pointer;font-size:1rem;padding:.2rem;flex-shrink:0}
+.tpl-items-list .item-remove:hover{background:var(--danger-bg);border-radius:var(--radius-sm)}
+.item-reading-extras{display:grid;grid-template-columns:1fr 1fr 1fr;gap:.3rem;padding:.2rem .5rem .3rem 2.2rem;font-size:.72rem}
+.item-reading-extras input{font-size:.72rem;padding:.2rem .3rem;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--bg)}
+.item-reading-extras label{color:var(--text-muted);font-size:.65rem}
+/* ── Location type pills ── */
+.loc-type-pills{display:flex;flex-wrap:wrap;gap:.3rem;margin-top:.25rem}
+.loc-type-pill{font-size:.72rem;padding:.2rem .5rem;border-radius:99px;border:1px solid var(--border);cursor:pointer;transition:all .15s;user-select:none;background:var(--surface);color:var(--text-muted)}
+.loc-type-pill.selected{background:var(--primary-light);border-color:var(--primary);color:var(--primary-dark);font-weight:600}
+/* ── Responsive ── */
+@media(max-width:600px){
+  .tpl-grid{grid-template-columns:1fr}
+  .tpl-items-list .item-fields{grid-template-columns:1fr 1fr;gap:.25rem}
+}
+</style>
+</head>
+<body>
+<nav class="topbar">
+  <div class="topbar-left">
+    <button class="nav-toggle" id="nav-toggle"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"/></svg></button>
+    <span class="topbar-brand">Kodspot</span>
+    <div class="topbar-nav" id="topbar-nav"></div>
+  </div>
+  <div class="topbar-right">
+    <span class="topbar-user" id="userName"></span>
+    <button class="btn btn-sm btn-ghost" onclick="App.logout()">Logout</button>
+  </div>
+</nav>
+<div class="sa-banner" id="sa-banner"></div>
+
+<main class="container">
+  <div class="toolbar">
+    <h2 class="toolbar-title">Inspection Templates</h2>
+    <button class="btn btn-primary" onclick="openCreateModal()">+ New Template</button>
+  </div>
+
+  <div id="summaryBar" class="tpl-summary"></div>
+  <div id="templateGrid" class="tpl-grid"></div>
+</main>
+
+<!-- ── Create/Edit Modal ── -->
+<div class="modal-overlay" id="tplModal">
+  <div class="modal" style="max-width:720px;max-height:90vh;overflow-y:auto">
+    <div class="modal-title" id="tplModalTitle">New Template</div>
+    <div id="tplError" class="alert alert-danger" style="display:none"></div>
+
+    <div class="form-group">
+      <label class="form-label">Template Name</label>
+      <input type="text" class="form-input" id="tplName" placeholder="e.g. Standard Room Inspection" maxlength="200">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Description <span style="font-weight:400;color:var(--text-light)">(optional)</span></label>
+      <textarea class="form-input" id="tplDesc" rows="2" placeholder="Brief description of this template" maxlength="1000" style="resize:vertical"></textarea>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Location Types <span style="font-weight:400;color:var(--text-light)">(leave empty = all types)</span></label>
+      <div class="loc-type-pills" id="locTypePills"></div>
+    </div>
+    <div class="form-group">
+      <label class="form-check"><input type="checkbox" id="tplDefault"> Set as default template</label>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">Checklist Items</label>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.35rem">
+        <span style="font-size:.7rem;color:var(--text-muted)">Drag to reorder • checkKey is auto-generated from label</span>
+        <button class="btn btn-sm btn-outline" onclick="addItem()">+ Add Item</button>
+      </div>
+      <ul class="tpl-items-list" id="itemsList"></ul>
+    </div>
+
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="App.closeModal('tplModal')">Cancel</button>
+      <button class="btn btn-primary" id="tplSaveBtn" onclick="saveTemplate()">Create Template</button>
+    </div>
+  </div>
+</div>
+
+<script src="/js/offline-sync.js?v=1"></script>
+<script src="/js/app.js?v=11"></script>
+<script>
+if (!App.initAdmin('templates')) throw '';
+App.initNotifications(App.apiFetch);
+var esc = App.esc, $ = App.$;
+
+var templates = [];
+var editingId = null;
+
+var LOCATION_TYPES = ['BUILDING','FLOOR','ROOM','CORRIDOR','WASHROOM','ICU','LOBBY','KITCHEN','WARD','MEETING_ROOM','OTHER'];
+var RESPONSE_TYPES = [
+  { value: 'STATUS', label: 'OK / Faulty / NA' },
+  { value: 'READING', label: 'Numeric Reading' },
+  { value: 'YES_NO', label: 'Yes / No' }
+];
+
+// ── Load templates ──
+async function loadTemplates() {
+  try {
+    var res = await App.apiFetch('/inspection-templates');
+    if (!res.ok) throw new Error('Failed to load');
+    templates = await res.json();
+    renderSummary();
+    renderGrid();
+  } catch (err) {
+    App.toast('Failed to load templates', 'error');
+  }
+}
+
+function renderSummary() {
+  var active = templates.filter(function(t){ return t.isActive; }).length;
+  var inactive = templates.filter(function(t){ return !t.isActive; }).length;
+  var total = templates.length;
+  var totalItems = templates.reduce(function(s,t){ return s + (t.items ? t.items.length : 0); }, 0);
+  $('summaryBar').innerHTML =
+    '<span class="tpl-summary-item">Total: <b>' + total + '</b></span>' +
+    '<span class="tpl-summary-item">Active: <b>' + active + '</b></span>' +
+    (inactive > 0 ? '<span class="tpl-summary-item" style="color:var(--danger)">Inactive: <b>' + inactive + '</b></span>' : '') +
+    '<span class="tpl-summary-item">Total Items: <b>' + totalItems + '</b></span>';
+}
+
+function renderGrid() {
+  if (templates.length === 0) {
+    $('templateGrid').innerHTML =
+      '<div class="tpl-empty"><div class="tpl-empty-icon">📋</div>' +
+      '<div class="tpl-empty-text">No inspection templates yet</div>' +
+      '<div class="tpl-empty-sub">Create your first template to define custom checklists for inspections</div></div>';
+    return;
+  }
+  var html = '';
+  for (var i = 0; i < templates.length; i++) {
+    var t = templates[i];
+    var badges = '';
+    if (t.isDefault) badges += '<span class="tpl-badge tpl-badge-default">Default</span>';
+    if (!t.isActive) badges += '<span class="tpl-badge tpl-badge-inactive">Inactive</span>';
+    if (t.version > 1) badges += '<span class="tpl-badge tpl-badge-ver">v' + t.version + '</span>';
+
+    var items = '';
+    if (t.items) {
+      for (var j = 0; j < t.items.length; j++) {
+        var it = t.items[j];
+        var cls = 'tpl-item-chip';
+        if (it.isRequired) cls += ' required';
+        if (it.responseType === 'READING') cls += ' reading';
+        items += '<span class="' + cls + '">' + esc(it.label);
+        if (it.responseType === 'READING' && it.unit) items += ' (' + esc(it.unit) + ')';
+        items += '</span>';
+      }
+    }
+
+    var locTypes = '';
+    if (t.locationTypes && t.locationTypes.length > 0) {
+      locTypes = t.locationTypes.join(', ');
+    } else {
+      locTypes = 'All types';
+    }
+
+    var usageCount = t._count ? t._count.inspections : 0;
+
+    html += '<div class="tpl-card' + (!t.isActive ? ' inactive' : '') + '">' +
+      '<div class="tpl-card-head"><span class="tpl-card-title">' + esc(t.name) + '</span><div class="tpl-card-badges">' + badges + '</div></div>' +
+      (t.description ? '<div class="tpl-card-desc">' + esc(t.description) + '</div>' : '') +
+      '<div class="tpl-card-meta"><span>📍 ' + esc(locTypes) + '</span><span>📝 ' + (t.items ? t.items.length : 0) + ' items</span><span>📊 ' + usageCount + ' inspections</span></div>' +
+      '<div class="tpl-card-items">' + items + '</div>' +
+      '<div class="tpl-card-actions">' +
+        '<button class="btn btn-sm btn-outline" onclick="openEditModal(\'' + t.id + '\')">Edit</button>' +
+        '<button class="btn btn-sm btn-outline" onclick="duplicateTemplate(\'' + t.id + '\')">Duplicate</button>' +
+        (t.isActive ? '<button class="btn btn-sm btn-ghost" style="color:var(--danger)" onclick="deleteTemplate(\'' + t.id + '\',\'' + esc(t.name).replace(/'/g, "\\'") + '\')">Delete</button>' : '<button class="btn btn-sm btn-outline" onclick="reactivateTemplate(\'' + t.id + '\')">Reactivate</button>') +
+      '</div></div>';
+  }
+  $('templateGrid').innerHTML = html;
+}
+
+// ── Location type pills ──
+var selectedLocTypes = [];
+
+function renderLocTypePills() {
+  var html = '';
+  for (var i = 0; i < LOCATION_TYPES.length; i++) {
+    var lt = LOCATION_TYPES[i];
+    var sel = selectedLocTypes.indexOf(lt) !== -1 ? ' selected' : '';
+    html += '<span class="loc-type-pill' + sel + '" onclick="toggleLocType(\'' + lt + '\')">' + lt + '</span>';
+  }
+  $('locTypePills').innerHTML = html;
+}
+
+function toggleLocType(lt) {
+  var idx = selectedLocTypes.indexOf(lt);
+  if (idx === -1) selectedLocTypes.push(lt);
+  else selectedLocTypes.splice(idx, 1);
+  renderLocTypePills();
+}
+
+// ── Item management ──
+var itemCounter = 0;
+
+function labelToKey(label) {
+  return label.trim().toUpperCase().replace(/[^A-Z0-9]+/g, '_').replace(/^_|_$/g, '').substring(0, 50) || 'ITEM_' + itemCounter;
+}
+
+function addItem(data) {
+  itemCounter++;
+  var list = $('itemsList');
+  var li = document.createElement('li');
+  li.setAttribute('draggable', 'true');
+  li.setAttribute('data-idx', itemCounter);
+
+  var label = (data && data.label) || '';
+  var checkKey = (data && data.checkKey) || '';
+  var responseType = (data && data.responseType) || 'STATUS';
+  var isRequired = data ? (data.isRequired !== false) : true;
+  var unit = (data && data.unit) || '';
+  var minVal = (data && data.minValue != null) ? data.minValue : '';
+  var maxVal = (data && data.maxValue != null) ? data.maxValue : '';
+
+  var typeOpts = '';
+  for (var i = 0; i < RESPONSE_TYPES.length; i++) {
+    var r = RESPONSE_TYPES[i];
+    typeOpts += '<option value="' + r.value + '"' + (r.value === responseType ? ' selected' : '') + '>' + r.label + '</option>';
+  }
+
+  li.innerHTML =
+    '<span class="drag-handle" title="Drag to reorder">⠿</span>' +
+    '<div class="item-fields">' +
+      '<input type="text" class="item-label-input" placeholder="Item label" value="' + esc(label) + '" oninput="autoKey(this)" maxlength="100">' +
+      '<input type="text" class="item-key-input" placeholder="CHECK_KEY" value="' + esc(checkKey) + '" maxlength="50" readonly title="Auto-generated from label">' +
+      '<select class="item-type-select" onchange="toggleReadingExtras(this)">' + typeOpts + '</select>' +
+      '<label style="display:flex;align-items:center;gap:4px;font-size:.72rem;color:var(--text-muted);white-space:nowrap"><input type="checkbox" class="item-req-cb"' + (isRequired ? ' checked' : '') + '>Req</label>' +
+    '</div>' +
+    '<button class="item-remove" onclick="removeItem(this)" title="Remove">✕</button>';
+
+  list.appendChild(li);
+
+  // Add reading extras if type is READING
+  if (responseType === 'READING') {
+    var extras = document.createElement('div');
+    extras.className = 'item-reading-extras';
+    extras.innerHTML =
+      '<div><label>Unit</label><input type="text" class="reading-unit" placeholder="V, Ω, A..." value="' + esc(unit) + '" maxlength="20"></div>' +
+      '<div><label>Min</label><input type="number" class="reading-min" placeholder="Min" value="' + minVal + '" step="any"></div>' +
+      '<div><label>Max</label><input type="number" class="reading-max" placeholder="Max" value="' + maxVal + '" step="any"></div>';
+    li.appendChild(extras);
+  }
+
+  setupDragDrop();
+}
+
+function autoKey(input) {
+  var keyInput = input.parentElement.querySelector('.item-key-input');
+  keyInput.value = labelToKey(input.value);
+}
+
+function removeItem(btn) {
+  var li = btn.closest('li');
+  li.remove();
+}
+
+function toggleReadingExtras(select) {
+  var li = select.closest('li');
+  var existing = li.querySelector('.item-reading-extras');
+  if (existing) existing.remove();
+  if (select.value === 'READING') {
+    var extras = document.createElement('div');
+    extras.className = 'item-reading-extras';
+    extras.innerHTML =
+      '<div><label>Unit</label><input type="text" class="reading-unit" placeholder="V, Ω, A..." maxlength="20"></div>' +
+      '<div><label>Min</label><input type="number" class="reading-min" placeholder="Min" step="any"></div>' +
+      '<div><label>Max</label><input type="number" class="reading-max" placeholder="Max" step="any"></div>';
+    li.appendChild(extras);
+  }
+}
+
+function collectItems() {
+  var lis = $('itemsList').querySelectorAll('li');
+  var items = [];
+  for (var i = 0; i < lis.length; i++) {
+    var li = lis[i];
+    var label = li.querySelector('.item-label-input').value.trim();
+    var checkKey = li.querySelector('.item-key-input').value.trim();
+    var responseType = li.querySelector('.item-type-select').value;
+    var isRequired = li.querySelector('.item-req-cb').checked;
+    if (!label || !checkKey) continue;
+    var item = { label: label, checkKey: checkKey, responseType: responseType, isRequired: isRequired, sortOrder: i };
+    if (responseType === 'READING') {
+      var unitEl = li.querySelector('.reading-unit');
+      var minEl = li.querySelector('.reading-min');
+      var maxEl = li.querySelector('.reading-max');
+      if (unitEl && unitEl.value.trim()) item.unit = unitEl.value.trim();
+      if (minEl && minEl.value !== '') item.minValue = parseFloat(minEl.value);
+      if (maxEl && maxEl.value !== '') item.maxValue = parseFloat(maxEl.value);
+    }
+    items.push(item);
+  }
+  return items;
+}
+
+// ── Drag & drop ──
+function setupDragDrop() {
+  var list = $('itemsList');
+  var items = list.querySelectorAll('li');
+  var dragSrc = null;
+  items.forEach(function(item) {
+    item.addEventListener('dragstart', function(e) {
+      dragSrc = this;
+      this.style.opacity = '0.4';
+      e.dataTransfer.effectAllowed = 'move';
+    });
+    item.addEventListener('dragover', function(e) {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+      this.style.borderTop = '2px solid var(--primary)';
+    });
+    item.addEventListener('dragleave', function() {
+      this.style.borderTop = '';
+    });
+    item.addEventListener('drop', function(e) {
+      e.preventDefault();
+      this.style.borderTop = '';
+      if (dragSrc !== this) {
+        list.insertBefore(dragSrc, this);
+      }
+    });
+    item.addEventListener('dragend', function() {
+      this.style.opacity = '1';
+      list.querySelectorAll('li').forEach(function(li) { li.style.borderTop = ''; });
+    });
+  });
+}
+
+// ── Modals ──
+function openCreateModal() {
+  editingId = null;
+  $('tplModalTitle').textContent = 'New Template';
+  $('tplSaveBtn').textContent = 'Create Template';
+  $('tplName').value = '';
+  $('tplDesc').value = '';
+  $('tplDefault').checked = false;
+  selectedLocTypes = [];
+  renderLocTypePills();
+  $('itemsList').innerHTML = '';
+  App.hideError('tplError');
+  App.openModal('tplModal');
+}
+
+function openEditModal(id) {
+  var t = templates.find(function(x){ return x.id === id; });
+  if (!t) return;
+  editingId = id;
+  $('tplModalTitle').textContent = 'Edit Template';
+  $('tplSaveBtn').textContent = 'Save Changes';
+  $('tplName').value = t.name;
+  $('tplDesc').value = t.description || '';
+  $('tplDefault').checked = t.isDefault;
+  selectedLocTypes = (t.locationTypes || []).slice();
+  renderLocTypePills();
+  $('itemsList').innerHTML = '';
+  itemCounter = 0;
+  if (t.items) {
+    for (var i = 0; i < t.items.length; i++) {
+      addItem(t.items[i]);
+    }
+  }
+  App.hideError('tplError');
+  App.openModal('tplModal');
+}
+
+async function saveTemplate() {
+  var name = $('tplName').value.trim();
+  if (!name) { App.showError('tplError', 'Template name is required'); return; }
+
+  var items = collectItems();
+  if (items.length === 0) { App.showError('tplError', 'At least one checklist item is required'); return; }
+
+  // Check duplicate keys
+  var keys = items.map(function(i){ return i.checkKey; });
+  var uniqueKeys = keys.filter(function(k,i){ return keys.indexOf(k) === i; });
+  if (uniqueKeys.length !== keys.length) {
+    App.showError('tplError', 'Duplicate checkKey values found. Each item must have a unique key.');
+    return;
+  }
+
+  var payload = {
+    name: name,
+    description: $('tplDesc').value.trim() || null,
+    locationTypes: selectedLocTypes,
+    isDefault: $('tplDefault').checked,
+    items: items
+  };
+
+  var btn = $('tplSaveBtn');
+  btn.disabled = true;
+  btn.textContent = 'Saving...';
+
+  try {
+    var url = editingId ? '/inspection-templates/' + editingId : '/inspection-templates';
+    var method = editingId ? 'PATCH' : 'POST';
+    var res = await App.apiFetch(url, { method: method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+    var data = await res.json();
+    if (!res.ok) { App.showError('tplError', data.error || 'Failed to save'); btn.disabled = false; btn.textContent = editingId ? 'Save Changes' : 'Create Template'; return; }
+    App.closeModal('tplModal');
+    App.toast(editingId ? 'Template updated' : 'Template created', 'success');
+    loadTemplates();
+  } catch (err) {
+    App.showError('tplError', 'Network error');
+  }
+  btn.disabled = false;
+  btn.textContent = editingId ? 'Save Changes' : 'Create Template';
+}
+
+async function duplicateTemplate(id) {
+  try {
+    var res = await App.apiFetch('/inspection-templates/' + id + '/duplicate', { method: 'POST' });
+    if (!res.ok) { var d = await res.json(); App.toast(d.error || 'Failed to duplicate', 'error'); return; }
+    App.toast('Template duplicated', 'success');
+    loadTemplates();
+  } catch (err) {
+    App.toast('Network error', 'error');
+  }
+}
+
+async function deleteTemplate(id, name) {
+  var confirmed = await App.confirmDialog('Delete "' + name + '"?', 'This will deactivate it if it has been used in inspections, or permanently delete it otherwise.');
+  if (!confirmed) return;
+  try {
+    var res = await App.apiFetch('/inspection-templates/' + id, { method: 'DELETE' });
+    var data = await res.json();
+    if (!res.ok) { App.toast(data.error || 'Failed to delete', 'error'); return; }
+    App.toast(data.message, 'success');
+    loadTemplates();
+  } catch (err) {
+    App.toast('Network error', 'error');
+  }
+}
+
+async function reactivateTemplate(id) {
+  try {
+    var res = await App.apiFetch('/inspection-templates/' + id, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ isActive: true })
+    });
+    if (!res.ok) { App.toast('Failed to reactivate', 'error'); return; }
+    App.toast('Template reactivated', 'success');
+    loadTemplates();
+  } catch (err) {
+    App.toast('Network error', 'error');
+  }
+}
+
+// ── Init ──
+loadTemplates();
+</script>
+</body>
+</html>

@@ -1,0 +1,1090 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
+<link rel="manifest" href="/site.webmanifest">
+<meta name="theme-color" content="#1a7f64">
+<title>Dashboard — Kodspot</title>
+<link rel="stylesheet" href="/css/design-system.css?v=9">
+<style>
+/* ── Dashboard KPI Cards ── */
+.kpi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:.75rem;margin-bottom:1.25rem}
+.kpi-card{background:var(--surface);border-radius:var(--radius-lg);padding:1rem 1.15rem;border:1px solid var(--border);box-shadow:var(--shadow-sm);position:relative;overflow:hidden;transition:box-shadow .15s}
+.kpi-card:hover{box-shadow:var(--shadow)}
+.kpi-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;border-radius:var(--radius-lg) var(--radius-lg) 0 0}
+.kpi-card.kpi-rooms::before{background:linear-gradient(90deg,#0ea5a4,#14b8a6)}
+.kpi-card.kpi-cleaned::before{background:linear-gradient(90deg,#10b981,#34d399)}
+.kpi-card.kpi-tickets::before{background:linear-gradient(90deg,#f59e0b,#fbbf24)}
+.kpi-card.kpi-workers::before{background:linear-gradient(90deg,#6366f1,#818cf8)}
+.kpi-card.kpi-supervisors::before{background:linear-gradient(90deg,#8b5cf6,#a78bfa)}
+.kpi-card.kpi-records::before{background:linear-gradient(90deg,#3b82f6,#60a5fa)}
+.kpi-label{font-size:.7rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.04em;font-weight:600}
+.kpi-value{font-size:1.75rem;font-weight:700;line-height:1.2;margin-top:.1rem;color:var(--text)}
+.kpi-sub{font-size:.68rem;color:var(--text-muted);margin-top:.2rem}
+.kpi-sub b{color:var(--text);font-weight:600}
+
+/* ── Dashboard Grid ── */
+.dash-grid{display:grid;gap:1rem}
+.dash-grid-2{grid-template-columns:1fr 1fr}
+.dash-section{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:1.15rem;box-shadow:var(--shadow-sm);transition:box-shadow .15s}
+.dash-section-title{font-size:.95rem;font-weight:600;color:var(--text);margin-bottom:.75rem;display:flex;align-items:center;gap:.5rem;flex-wrap:wrap}
+.dash-section-title .badge{font-size:.65rem}
+.dash-scroll{max-height:360px;overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch}
+
+/* ── Room Status Board ── */
+.status-summary{display:flex;gap:1.5rem;flex-wrap:wrap;margin-bottom:.75rem;font-size:.78rem;color:var(--text-muted)}
+.status-summary b{color:var(--text);font-weight:600}
+.room-status-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:.45rem}
+.rs-card{padding:.5rem .65rem;border-radius:var(--radius);border:1px solid var(--border);font-size:.78rem;position:relative;cursor:pointer;transition:transform .1s,box-shadow .15s}
+.rs-card:hover{transform:translateY(-1px);box-shadow:var(--shadow)}
+.rs-name{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:.1rem;padding-right:14px}
+.rs-meta{font-size:.62rem;color:var(--text-muted)}
+.rs-dot{position:absolute;top:.5rem;right:.5rem;width:9px;height:9px;border-radius:50%}
+.rs-cleaned{background:#f0fdf4;border-color:#bbf7d0}.rs-cleaned .rs-dot{background:#16a34a}
+.rs-partial{background:#fffbeb;border-color:#fde68a}.rs-partial .rs-dot{background:#f59e0b}
+.rs-dirty{background:#fef2f2;border-color:#fecaca}.rs-dirty .rs-dot{background:#ef4444}
+.rs-nosched{background:var(--bg);border-color:var(--border)}.rs-nosched .rs-dot{background:#cbd5e1}
+.rs-upcoming{background:#eff6ff;border-color:#bfdbfe}.rs-upcoming .rs-dot{background:#3b82f6}
+
+/* ── Trend/Bar Chart ── */
+.trend-wrap{display:flex;align-items:flex-end;gap:0;height:140px;padding-top:.5rem}
+.trend-col{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:.25rem;height:100%}
+.trend-val{font-size:.68rem;font-weight:600;color:var(--text)}
+.trend-fill{width:60%;min-width:18px;max-width:40px;border-radius:6px 6px 0 0;background:linear-gradient(180deg,#0ea5a4,#14b8a6);transition:height .3s ease;min-height:2px}
+.trend-day{font-size:.62rem;color:var(--text-muted);font-weight:500;white-space:nowrap}
+.trend-empty{text-align:center;color:var(--text-muted);padding:2.5rem 1rem;font-size:.85rem}
+
+/* ── Dashboard tables ── */
+.dash-table{width:100%;border-collapse:collapse;font-size:.8rem}
+.dash-table th{text-align:left;padding:.45rem .5rem;color:var(--text-muted);border-bottom:1px solid var(--border);font-size:.68rem;font-weight:600;text-transform:uppercase;letter-spacing:.03em;white-space:nowrap}
+.dash-table td{padding:.45rem .5rem;border-bottom:1px solid var(--border-light);vertical-align:middle}
+.dash-table tr:last-child td{border-bottom:none}
+.dash-table tr:hover td{background:rgba(14,165,164,.015)}
+
+/* ── Empty states ── */
+.dash-empty{text-align:center;padding:2rem 1rem;color:var(--text-muted)}
+.dash-empty-icon{font-size:1.5rem;margin-bottom:.4rem;display:block;opacity:.5}
+.dash-empty-text{font-size:.85rem}
+.dash-empty-sub{font-size:.72rem;margin-top:.2rem}
+
+/* ── Worker Performance ── */
+.perf-bars{display:flex;flex-direction:column;gap:.4rem}
+.perf-row{display:flex;align-items:center;gap:.6rem}
+.perf-name{font-size:.82rem;font-weight:500;min-width:80px;max-width:140px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--text)}
+.perf-bar-wrap{flex:1;height:24px;background:var(--bg);border-radius:6px;overflow:hidden;position:relative}
+.perf-bar-fill{height:100%;border-radius:6px;background:linear-gradient(90deg,#0ea5a4,#14b8a6);transition:width .4s ease;display:flex;align-items:center;padding:0 .5rem;min-width:fit-content}
+.perf-bar-label{font-size:.68rem;font-weight:600;color:#fff;white-space:nowrap}
+.perf-meta{font-size:.68rem;color:var(--text-muted);min-width:60px;text-align:right;flex-shrink:0}
+.perf-inactive{opacity:.45}
+
+/* ── Shift badge ── */
+.shift-badge{font-size:.62rem;padding:.12rem .4rem;border-radius:3px;font-weight:600;text-transform:uppercase;letter-spacing:.3px;display:inline-block}
+.shift-morning{background:#fff7ed;color:#ea580c}
+.shift-afternoon{background:#eff6ff;color:#2563eb}
+.shift-night{background:#f5f3ff;color:#7c3aed}
+.shift-general{background:#f0fdf4;color:#16a34a}
+.shift-badges{display:flex;gap:.3rem;flex-wrap:wrap}
+
+/* ── Shift Progress Bars ── */
+.sp-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:.65rem}
+.sp-item{display:flex;flex-direction:column;gap:.25rem}
+.sp-label{display:flex;justify-content:space-between;align-items:center;font-size:.78rem}
+.sp-label b{font-weight:600;color:var(--text)}
+.sp-label span{font-size:.68rem;color:var(--text-muted)}
+.sp-bar{height:22px;background:var(--bg);border-radius:6px;overflow:hidden;position:relative}
+.sp-fill{height:100%;border-radius:6px;transition:width .5s ease;display:flex;align-items:center;justify-content:center;min-width:fit-content}
+.sp-fill-label{font-size:.62rem;font-weight:700;color:#fff;padding:0 .4rem}
+.sp-fill.sp-morning{background:linear-gradient(90deg,#f97316,#fb923c)}
+.sp-fill.sp-afternoon{background:linear-gradient(90deg,#3b82f6,#60a5fa)}
+.sp-fill.sp-night{background:linear-gradient(90deg,#8b5cf6,#a78bfa)}
+.sp-fill.sp-general{background:linear-gradient(90deg,#10b981,#34d399)}
+.completion-ring{display:inline-flex;align-items:center;gap:.5rem}
+.completion-pct{font-size:1.3rem;font-weight:800;color:var(--primary)}
+.completion-label{font-size:.72rem;color:var(--text-muted);line-height:1.2}
+
+/* ── Section Error State ── */
+.dash-error{text-align:center;padding:1.5rem 1rem;color:var(--danger-text);font-size:.82rem}
+.dash-error-icon{font-size:1.2rem;margin-bottom:.3rem;display:block;opacity:.6}
+
+/* ── Severity badge ── */
+.severity{font-size:.62rem;padding:.15rem .45rem;border-radius:4px;font-weight:700;text-transform:uppercase;letter-spacing:.3px;display:inline-block}
+.severity-critical{background:#fef2f2;color:#dc2626;border:1px solid #fecaca}
+.severity-high{background:#fff7ed;color:#ea580c;border:1px solid #fed7aa}
+.severity-medium{background:#fffbeb;color:#d97706;border:1px solid #fde68a}
+.severity-low{background:#f0fdf4;color:#16a34a;border:1px solid #bbf7d0}
+
+/* ── Toggle Switch ── */
+.toggle-switch{position:relative;display:inline-block;width:40px;height:22px;cursor:pointer}
+.toggle-switch input{opacity:0;width:0;height:0}
+.toggle-slider{position:absolute;inset:0;background:#ccc;border-radius:22px;transition:.2s}
+.toggle-slider::before{content:'';position:absolute;width:16px;height:16px;left:3px;bottom:3px;background:#fff;border-radius:50%;transition:.2s}
+.toggle-switch input:focus-visible+.toggle-slider{outline:2px solid var(--primary,#0ea5a4);outline-offset:2px}
+.toggle-switch input:checked+.toggle-slider{background:var(--primary,#0ea5a4)}
+.toggle-switch input:checked+.toggle-slider::before{transform:translateX(18px)}
+
+/* ── AI Chat Widget ── */
+.ai-fab{position:fixed;bottom:1.25rem;right:1.25rem;width:54px;height:54px;border-radius:50%;background:linear-gradient(135deg,#0ea5a4,#0d9488);color:#fff;border:none;cursor:pointer;box-shadow:0 4px 20px rgba(14,165,164,.4);display:flex;align-items:center;justify-content:center;transition:transform .2s,box-shadow .2s;z-index:90}
+.ai-fab:hover{transform:scale(1.1);box-shadow:0 6px 28px rgba(14,165,164,.5)}
+.ai-fab:active{transform:scale(.95)}
+.ai-fab svg{width:26px;height:26px}
+.ai-fab .ai-fab-close{display:none}
+.ai-fab.open .ai-fab-icon{display:none}
+.ai-fab.open .ai-fab-close{display:block}
+.ai-fab.open{background:linear-gradient(135deg,#64748b,#475569);box-shadow:0 4px 16px rgba(71,85,105,.3)}
+
+.ai-panel{position:fixed;bottom:5rem;right:1.25rem;width:400px;max-width:calc(100vw - 2rem);height:540px;max-height:calc(100vh - 7rem);background:var(--surface);border:1px solid var(--border);border-radius:16px;box-shadow:0 20px 60px rgba(0,0,0,.12),0 0 0 1px rgba(0,0,0,.04);z-index:89;flex-direction:column;overflow:hidden;display:flex;opacity:0;visibility:hidden;transform:translateY(12px) scale(.97);transition:opacity .25s ease,transform .25s ease,visibility .25s}
+.ai-panel.open{opacity:1;visibility:visible;transform:translateY(0) scale(1)}
+
+.ai-header{padding:.85rem 1rem;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:.5rem;background:linear-gradient(135deg,#f0fdfa,#ecfdf5)}
+.ai-header-icon{font-size:1.15rem}
+.ai-header-title{font-size:.9rem;font-weight:700;color:var(--text);flex:1}
+.ai-header-badge{font-size:.58rem;background:linear-gradient(135deg,#0ea5a4,#0d9488);color:#fff;padding:.15rem .5rem;border-radius:10px;font-weight:700;letter-spacing:.3px;text-transform:uppercase}
+
+.ai-messages{flex:1;overflow-y:auto;padding:1rem;display:flex;flex-direction:column;gap:.75rem;overscroll-behavior:contain;scroll-behavior:smooth}
+.ai-msg{max-width:85%;padding:.7rem .9rem;border-radius:16px;font-size:.82rem;line-height:1.65;word-wrap:break-word;animation:aiMsgIn .25s ease}
+.ai-msg b{font-weight:700}
+.ai-msg h3,.ai-msg h4,.ai-msg h5{margin-top:.5rem}
+.ai-msg-bot{background:var(--bg);color:var(--text);align-self:flex-start;border-bottom-left-radius:4px;box-shadow:0 1px 3px rgba(0,0,0,.04)}
+.ai-msg-user{background:linear-gradient(135deg,#0ea5a4,#0d9488);color:#fff;align-self:flex-end;border-bottom-right-radius:4px;font-weight:500;box-shadow:0 2px 8px rgba(14,165,164,.2)}
+.ai-msg-error{background:#fef2f2;color:#dc2626;align-self:flex-start;font-size:.78rem;border:1px solid #fecaca;border-radius:12px}
+@keyframes aiMsgIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+
+.ai-suggestions{padding:.5rem .85rem .25rem;display:flex;flex-wrap:wrap;gap:.35rem}
+.ai-chip{font-size:.72rem;padding:.35rem .7rem;border-radius:20px;border:1px solid var(--border);background:var(--surface);color:var(--text);cursor:pointer;transition:all .15s;white-space:nowrap;box-shadow:0 1px 2px rgba(0,0,0,.04)}
+.ai-chip:hover{background:var(--primary);color:#fff;border-color:var(--primary);box-shadow:0 2px 8px rgba(14,165,164,.2);transform:translateY(-1px)}
+.ai-chip:active{transform:translateY(0)}
+
+.ai-input-wrap{padding:.65rem .85rem;border-top:1px solid var(--border);display:flex;gap:.5rem;align-items:flex-end;background:var(--surface)}
+.ai-input{flex:1;border:1.5px solid var(--border);border-radius:12px;padding:.5rem .75rem;font-size:.82rem;outline:none;transition:border-color .15s,box-shadow .15s;font-family:inherit;resize:none;max-height:80px;line-height:1.4}
+.ai-input:focus{border-color:var(--primary);box-shadow:0 0 0 3px rgba(14,165,164,.08)}
+.ai-send{width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,#0ea5a4,#0d9488);color:#fff;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .15s;flex-shrink:0;box-shadow:0 2px 6px rgba(14,165,164,.2)}
+.ai-send:hover:not(:disabled){transform:scale(1.08);box-shadow:0 3px 10px rgba(14,165,164,.3)}
+.ai-send:disabled{opacity:.35;cursor:not-allowed;box-shadow:none}
+.ai-typing{display:flex;gap:4px;padding:.3rem 0;align-items:center}
+.ai-typing span{width:7px;height:7px;border-radius:50%;background:var(--primary);opacity:.4;animation:aiTyping .8s infinite ease-in-out}
+.ai-typing span:nth-child(2){animation-delay:.15s}
+.ai-typing span:nth-child(3){animation-delay:.3s}
+@keyframes aiTyping{0%,100%{opacity:.3;transform:translateY(0)}50%{opacity:1;transform:translateY(-4px)}}
+
+@media(max-width:480px){.ai-panel{bottom:0;right:0;width:100%;height:100vh;max-height:100vh;border-radius:0}.ai-fab{bottom:1rem;right:1rem;width:48px;height:48px}}
+
+/* ── Work Verification Log ── */
+.work-log{display:flex;flex-direction:column;gap:.75rem}
+.wl-card{border-radius:var(--radius-lg);border:1px solid var(--border);background:var(--surface);overflow:hidden;transition:box-shadow .15s}
+.wl-card:hover{box-shadow:var(--shadow)}
+.wl-card.wl-flagged{border-color:#fecaca;background:#fffbfb}
+.wl-header{display:flex;align-items:flex-start;justify-content:space-between;padding:.75rem .85rem .5rem;gap:.5rem;flex-wrap:wrap}
+.wl-room{font-weight:700;font-size:.88rem;color:var(--text)}
+.wl-meta{display:flex;flex-wrap:wrap;gap:.3rem .75rem;padding:0 .85rem .5rem;font-size:.72rem;color:var(--text-muted)}
+.wl-meta-item{display:inline-flex;align-items:center;gap:.25rem}
+.wl-meta-item b{color:var(--text);font-weight:600}
+.wl-photos{display:flex;gap:.4rem;padding:.35rem .85rem .7rem;overflow-x:auto;-webkit-overflow-scrolling:touch;scroll-snap-type:x mandatory}
+.wl-photos::-webkit-scrollbar{height:4px}
+.wl-photos::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
+.wl-thumb{width:110px;height:85px;flex-shrink:0;border-radius:var(--radius);overflow:hidden;cursor:pointer;border:1px solid var(--border-light);position:relative;transition:transform .1s;scroll-snap-align:start}
+.wl-thumb:hover{transform:scale(1.03);box-shadow:var(--shadow-md)}
+.wl-thumb img{width:100%;height:100%;object-fit:cover;display:block}
+.wl-notes{padding:0 .85rem .65rem;font-size:.74rem;color:var(--text-muted);font-style:italic}
+.wl-status{font-size:.58rem;padding:.1rem .35rem;border-radius:3px;font-weight:700;text-transform:uppercase;flex-shrink:0}
+.wl-status-submitted{background:#f0fdf4;color:#16a34a}
+.wl-status-flagged{background:#fef2f2;color:#dc2626}
+
+/* ── Responsive ── */
+@media(max-width:1024px){
+  .kpi-grid{grid-template-columns:repeat(3,1fr)}
+  .dash-grid-2{grid-template-columns:1fr 1fr}
+}
+@media(max-width:768px){
+  .dash-grid-2{grid-template-columns:1fr}
+  .kpi-grid{grid-template-columns:repeat(2,1fr)}
+  .room-status-grid{grid-template-columns:repeat(auto-fill,minmax(110px,1fr))}
+  .trend-wrap{height:120px}
+  .perf-name{min-width:70px;max-width:100px}
+  .sp-grid{grid-template-columns:repeat(2,1fr)}
+}
+@media(max-width:480px){
+  .kpi-grid{grid-template-columns:repeat(2,1fr);gap:.5rem}
+  .kpi-card{padding:.75rem .85rem}
+  .kpi-value{font-size:1.4rem}
+  .dash-section{padding:.85rem}
+  .room-status-grid{grid-template-columns:repeat(auto-fill,minmax(100px,1fr))}
+  .status-summary{gap:.5rem;font-size:.72rem}
+  .wl-thumb{width:90px;height:70px}
+  .perf-name{min-width:60px;max-width:80px;font-size:.75rem}
+  .dash-table{font-size:.72rem}
+  .dash-table th,.dash-table td{padding:.35rem .35rem}
+  .sp-grid{grid-template-columns:1fr}
+}
+@media(prefers-reduced-motion:reduce){
+  .skeleton{animation:none !important}
+  .trend-fill,.sp-fill,.perf-bar-fill{transition:none !important}
+}
+/* Refresh bar */
+.dash-refresh{display:flex;align-items:center;justify-content:flex-end;gap:.6rem;padding:.35rem 0;font-size:.72rem;color:var(--text-muted)}
+
+/* ── Room Status Filters ── */
+.rs-filters{display:flex;align-items:center;gap:.4rem;flex-wrap:wrap}
+.rs-date-input{padding:.25rem .4rem;border:1px solid var(--border);border-radius:var(--radius);font-size:.72rem;background:var(--surface);color:var(--text);width:auto}
+.rs-shift-select{padding:.25rem .4rem;border:1px solid var(--border);border-radius:var(--radius);font-size:.72rem;background:var(--surface);color:var(--text);width:auto}
+.rs-today-btn{font-size:.68rem !important;padding:.2rem .5rem !important}
+
+/* ── Room Drill-Down ── */
+.rd-daily{display:flex;gap:.3rem;flex-wrap:wrap;margin-bottom:.75rem}
+.rd-day{width:34px;height:34px;border-radius:var(--radius);display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:.55rem;font-weight:600;border:1px solid var(--border-light);cursor:default;position:relative}
+.rd-day-label{font-size:.48rem;color:var(--text-muted);line-height:1}
+.rd-day-dot{width:8px;height:8px;border-radius:50%;margin-top:1px}
+.rd-day.rd-cleaned{background:#f0fdf4;border-color:#bbf7d0}.rd-day.rd-cleaned .rd-day-dot{background:#16a34a}
+.rd-day.rd-partial{background:#fffbeb;border-color:#fde68a}.rd-day.rd-partial .rd-day-dot{background:#f59e0b}
+.rd-day.rd-dirty{background:#fef2f2;border-color:#fecaca}.rd-day.rd-dirty .rd-day-dot{background:#ef4444}
+.rd-day.rd-nosched{background:var(--bg)}.rd-day.rd-nosched .rd-day-dot{background:#cbd5e1}
+.rd-section{margin-bottom:.65rem}
+.rd-section-title{font-size:.78rem;font-weight:600;color:var(--text);margin-bottom:.4rem}
+.rd-record{padding:.5rem .65rem;border:1px solid var(--border);border-radius:var(--radius);margin-bottom:.35rem;font-size:.75rem}
+.rd-record-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:.15rem}
+.rd-record-meta{font-size:.68rem;color:var(--text-muted)}
+.rd-ticket{padding:.35rem .5rem;border-left:3px solid var(--warning);background:var(--bg);border-radius:0 var(--radius) var(--radius) 0;margin-bottom:.3rem;font-size:.75rem}
+.rd-stats{display:flex;gap:1rem;flex-wrap:wrap;font-size:.78rem;color:var(--text-muted);margin-bottom:.65rem}
+.rd-stats b{color:var(--text);font-weight:600}
+.dash-refresh button{background:none;border:1px solid var(--border);border-radius:var(--radius);padding:.25rem .6rem;font-size:.72rem;cursor:pointer;color:var(--text-muted);display:inline-flex;align-items:center;gap:.3rem;transition:border-color .15s,color .15s}
+.dash-refresh button:hover{border-color:var(--primary);color:var(--primary)}
+.dash-refresh button.refreshing{opacity:.5;pointer-events:none}
+
+/* QR Modal */
+.qr-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:.75rem}
+.qr-card{background:var(--bg);border:1px solid var(--border);border-radius:var(--radius-lg);padding:.75rem;text-align:center}
+.qr-card-title{font-size:.78rem;font-weight:600;color:var(--text);margin-bottom:.15rem}
+.qr-card-sub{font-size:.68rem;color:var(--text-muted);margin-bottom:.5rem}
+.qr-card svg{width:100%;max-width:160px;height:auto;display:block;margin:0 auto .5rem}
+.qr-card-url{font-size:.62rem;color:var(--text-light);word-break:break-all;font-family:monospace;background:var(--surface);padding:.25rem .4rem;border-radius:var(--radius-sm)}
+.qr-mod-section{margin-bottom:1.25rem}
+.qr-mod-label{font-size:.85rem;font-weight:600;color:var(--primary);margin-bottom:.6rem;display:flex;align-items:center;gap:.4rem}
+.qr-print-bar{display:flex;justify-content:flex-end;gap:.5rem;margin-bottom:.75rem}
+@media(max-width:480px){.qr-card{padding:.5rem}.qr-card-title{font-size:.72rem}.qr-card-sub{font-size:.62rem;margin-bottom:.35rem}}
+@media print{body>*:not(#adminQrModal){display:none!important}#adminQrModal{position:static;background:#fff}#adminQrModal .modal{max-width:100%;max-height:none;box-shadow:none;border:none;overflow:visible}.qr-print-bar,.modal-actions{display:none!important}.qr-card{break-inside:avoid;border:1px solid #ddd}}
+/* KPI trend arrow */
+.kpi-trend{font-size:.68rem;font-weight:600}
+.kpi-trend-up{color:#16a34a}
+.kpi-trend-down{color:#ef4444}
+.kpi-trend-flat{color:var(--text-muted)}
+</style>
+</head>
+<body>
+<nav class="topbar">
+  <div class="topbar-left">
+    <button class="nav-toggle" id="nav-toggle"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"/></svg></button>
+    <span class="topbar-brand">Kodspot</span>
+    <div class="topbar-nav" id="topbar-nav"></div>
+  </div>
+  <div class="topbar-right">
+    <span class="topbar-user" id="userName"></span>
+    <button class="btn btn-sm btn-ghost" onclick="App.logout()">Logout</button>
+  </div>
+</nav>
+<div class="sa-banner" id="sa-banner"></div>
+
+<main class="container">
+  <!-- Refresh indicator -->
+  <div class="dash-refresh" id="refreshBar">
+    <span id="lastRefresh"></span>
+    <button onclick="showAdminQR()" title="Share login QR codes">📱 Share QR</button>
+    <button onclick="manualRefresh()" id="refreshBtn">↻ Refresh</button>
+  </div>
+
+  <!-- KPI Cards -->
+  <div class="kpi-grid" id="kpiGrid"></div>
+
+  <!-- Shift Progress -->
+  <div class="dash-section" style="margin-bottom:1rem" id="shiftProgressSection">
+    <div class="dash-section-title" style="justify-content:space-between">
+      <span>Today's Inspections by Shift</span>
+    </div>
+    <div id="shiftProgress"></div>
+  </div>
+
+  <!-- Inspection Status Board (full width) -->
+  <div class="dash-section" style="margin-bottom:1rem">
+    <div class="dash-section-title" style="justify-content:space-between;flex-wrap:wrap">
+      <span>Location Inspection Status <span class="badge badge-info" id="roomBadge"></span></span>
+      <div class="rs-filters">
+        <input type="date" class="form-input rs-date-input" id="rsDate" title="Select date">
+        <button class="btn btn-sm btn-outline rs-today-btn" id="rsTodayBtn" onclick="resetRoomFilters()" style="display:none" title="Back to today">Today</button>
+      </div>
+    </div>
+    <div id="statusSummary" class="status-summary"></div>
+    <div id="roomGrid" class="room-status-grid"></div>
+  </div>
+
+  <!-- Inspection Activity Trend -->
+  <div class="dash-section" style="margin-bottom:1rem">
+    <div class="dash-section-title">Inspection Activity (7 Days)</div>
+    <div id="trendChart"></div>
+  </div>
+
+  <!-- Row 2: Open Tickets + Problem Locations -->
+  <div class="dash-grid dash-grid-2" style="margin-bottom:1rem">
+    <div class="dash-section">
+      <div class="dash-section-title">Active Tickets <span class="badge badge-warning" id="ticketBadge">0</span></div>
+      <div id="ticketList" class="dash-scroll"></div>
+      <div id="ticketViewAll" style="display:none;text-align:right;padding-top:.4rem"><a href="#" class="btn btn-sm btn-outline dash-link" data-page="admin-tickets" style="font-size:.72rem">View All Tickets →</a></div>
+    </div>
+    <div class="dash-section">
+      <div class="dash-section-title">Problem Locations <span class="badge badge-warning" id="problemBadge">0</span></div>
+      <div id="problemList" class="dash-scroll"></div>
+      <div id="problemViewAll" style="display:none;text-align:right;padding-top:.4rem"><a href="#" class="btn btn-sm btn-outline dash-link" data-page="admin-analytics" style="font-size:.72rem">View Analytics →</a></div>
+    </div>
+  </div>
+
+  <!-- Row 3: Worker Performance -->
+  <div class="dash-section" style="margin-bottom:1rem">
+    <div class="dash-section-title">Worker Performance</div>
+    <div id="workerPerf"></div>
+  </div>
+
+  <!-- Row 4: Today's Inspection Log -->
+  <div class="dash-section" style="margin-bottom:1rem">
+    <div class="dash-section-title">Today's Inspection Log <span class="badge badge-info" id="photoBadge">0</span></div>
+    <div id="photoGallery" class="work-log"></div>
+  </div>
+</main>
+
+<!-- Location Inspection History Modal -->
+<div class="modal-overlay" id="roomDetailModal">
+  <div class="modal" style="max-width:560px">
+    <h2 class="modal-title" id="rdTitle">Location History</h2>
+    <div id="rdBody"><div class="empty-state">Loading…</div></div>
+    <div class="modal-actions">
+      <button type="button" class="btn btn-outline" onclick="App.closeModal('roomDetailModal')">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- QR Modal -->
+<div class="modal-overlay" id="adminQrModal">
+  <div class="modal" style="max-width:620px">
+    <h2 class="modal-title">Login QR Codes</h2>
+    <p style="font-size:.78rem;color:var(--text-muted);margin-bottom:.75rem">Staff can scan these QR codes to open the login page and install the app on their phone.</p>
+    <div class="qr-print-bar">
+      <button class="btn btn-sm btn-outline" onclick="window.print()">🖨 Print</button>
+    </div>
+    <div id="adminQrBody"><div class="empty-state">Loading QR codes…</div></div>
+    <div class="modal-actions">
+      <button type="button" class="btn btn-outline" onclick="App.closeModal('adminQrModal')">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- Lightbox -->
+<div class="lightbox-overlay" id="lightbox">
+  <button class="lightbox-close" onclick="closeLightbox()">×</button>
+  <button class="lightbox-nav lb-prev" onclick="navLightbox(-1)">‹</button>
+  <button class="lightbox-nav lb-next" onclick="navLightbox(1)">›</button>
+  <img class="lightbox-img" id="lbImg" src="">
+  <div class="lightbox-info" id="lbInfo"></div>
+</div>
+
+<script src="/js/offline-sync.js?v=1"></script>
+<script src="/js/app.js?v=11"></script>
+<script>
+if (!App.initAdmin('dashboard')) throw '';
+App.initNotifications(App.apiFetch);
+// Fix inline "View All" links for org-scoped URLs
+document.querySelectorAll('.dash-link[data-page]').forEach(function(a) { a.href = App.orgPath(a.dataset.page); });
+var esc = App.esc, $ = App.$;
+
+// Skeleton loading
+App.showSkeletonCards('kpiGrid', 6);
+App.showSkeleton('shiftProgress');
+App.showSkeletonCards('roomGrid', 8);
+App.showSkeleton('trendChart');
+App.showSkeletonRows('ticketList');
+App.showSkeleton('workerPerf');
+App.showSkeletonRows('problemList');
+App.showSkeletonCards('photoGallery', 4);
+
+// ── Refresh timestamp ──
+var _lastRefreshTime = null;
+function updateRefreshTime() {
+  _lastRefreshTime = new Date();
+  var el = $('lastRefresh');
+  if (el) el.textContent = 'Updated ' + _lastRefreshTime.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
+}
+function _tickRefresh() {
+  if (!_lastRefreshTime) return;
+  var sec = Math.round((Date.now() - _lastRefreshTime.getTime()) / 1000);
+  var el = $('lastRefresh');
+  if (!el) return;
+  if (sec < 60) el.textContent = 'Updated just now';
+  else if (sec < 300) el.textContent = 'Updated ' + Math.floor(sec / 60) + 'm ago';
+}
+setInterval(_tickRefresh, 30000);
+
+// ── Section error handler ──
+function sectionError(elId, msg) {
+  $(elId).innerHTML = '<div class="dash-error"><span class="dash-error-icon">⚠</span>' + (msg || 'Failed to load') + '</div>';
+}
+
+// ── KPI Cards ──
+async function loadKPIs() {
+  var d = await App.apiFetchJson('/analytics/dashboard');
+  if (!d) { sectionError('kpiGrid', 'Failed to load dashboard data'); return; }
+  function kpi(cls, label, val, sub) {
+    return '<div class="kpi-card ' + cls + '">' +
+      '<div class="kpi-label">' + label + '</div>' +
+      '<div class="kpi-value">' + val + '</div>' +
+      (sub ? '<div class="kpi-sub">' + sub + '</div>' : '') +
+    '</div>';
+  }
+  var inspSub = d.todayInspections === 0 && d.yesterdayInspections > 0 ? 'Yesterday: <b>' + d.yesterdayInspections + '</b>' :
+                d.todayInspections > 0 && d.yesterdayInspections > 0 ? 'Yesterday: <b>' + d.yesterdayInspections + '</b>' :
+                d.weeklyAvg > 0 ? 'Avg/day: <b>' + d.weeklyAvg + '</b>' : 'No inspections yet';
+
+  // Trend arrows
+  var inspTrend = '';
+  if (d.yesterdayInspections > 0) {
+    var diff = d.todayInspections - d.yesterdayInspections;
+    if (diff > 0) inspTrend = ' <span class="kpi-trend kpi-trend-up">↑' + diff + '</span>';
+    else if (diff < 0) inspTrend = ' <span class="kpi-trend kpi-trend-down">↓' + Math.abs(diff) + '</span>';
+    else inspTrend = ' <span class="kpi-trend kpi-trend-flat">→</span>';
+  }
+
+  $('kpiGrid').innerHTML =
+    kpi('kpi-rooms', 'Locations', d.totalLocations, 'Active inspectable') +
+    kpi('kpi-cleaned', '⚡ Inspections Today', d.todayInspections + inspTrend, inspSub) +
+    kpi('kpi-tickets', '⚠ Faults Today', d.todayFaults, d.openFaults > 0 ? d.openFaults + ' open faults' : 'No open faults') +
+    kpi('kpi-tickets', 'Active Tickets', d.openTickets, d.openTickets > 0 ? 'Open + In Progress' : 'All clear') +
+    kpi('kpi-workers', 'Workers', d.activeWorkers, 'Active staff') +
+    kpi('kpi-supervisors', 'Supervisors', d.activeSupervisors, 'Active') +
+    kpi('kpi-records', 'Total Inspections', d.totalInspections, d.weeklyAvg > 0 ? 'Avg <b>' + d.weeklyAvg + '</b>/day this week' : 'Lifetime');
+
+  // Render shift progress
+  renderShiftProgress(d.shiftProgress, d.shiftConfig);
+}
+
+function fmtTime(h, m) { var ap = h >= 12 ? 'PM' : 'AM'; var hh = h % 12 || 12; return hh + (m > 0 ? ':' + pad2(m) : '') + ap; }
+
+function renderShiftProgress(sp, sc) {
+  if (!sp) { $('shiftProgressSection').style.display = 'none'; return; }
+  var shifts = ['MORNING', 'AFTERNOON', 'NIGHT', 'GENERAL'];
+  var colors = {MORNING:'sp-morning', AFTERNOON:'sp-afternoon', NIGHT:'sp-night', GENERAL:'sp-general'};
+  var icons = {MORNING:'🌅', AFTERNOON:'☀️', NIGHT:'🌙', GENERAL:'🏠'};
+  var hasAny = shifts.some(function(s) { return sp[s] && sp[s].done > 0; });
+  if (!hasAny) { $('shiftProgressSection').style.display = 'none'; return; }
+  var html = '<div class="sp-grid">';
+  for (var i = 0; i < shifts.length; i++) {
+    var s = shifts[i];
+    var data = sp[s];
+    if (!data || data.done === 0) continue;
+    var timeLabel = '';
+    if (sc && sc[s] && s !== 'GENERAL') {
+      timeLabel = ' <span style="font-size:.62rem;color:var(--text-muted);font-weight:400">' + fmtTime(sc[s].startHour, sc[s].startMin) + '–' + fmtTime(sc[s].endHour, sc[s].endMin) + '</span>';
+    }
+    html += '<div class="sp-item">' +
+      '<div class="sp-label"><b>' + icons[s] + ' ' + s.charAt(0) + s.slice(1).toLowerCase() + timeLabel + '</b><span>' + data.done + ' inspections</span></div>' +
+      '<div class="sp-bar"><div class="sp-fill ' + colors[s] + '" style="width:100%"><span class="sp-fill-label">' + data.done + '</span></div></div></div>';
+  }
+  html += '</div>';
+  $('shiftProgress').innerHTML = html;
+}
+
+// ── Inspection Status Board (with date filter) ──
+var _rsDate = '';
+var _rsGen = 0;
+
+function getTodayISO() { var d = new Date(); return d.getFullYear() + '-' + ('0'+(d.getMonth()+1)).slice(-2) + '-' + ('0'+d.getDate()).slice(-2); }
+
+// Initialize date input to today
+(function() {
+  var dateInput = $('rsDate');
+  dateInput.value = getTodayISO();
+  dateInput.max = getTodayISO();
+  dateInput.addEventListener('change', function() {
+    _rsDate = this.value;
+    updateTodayBtnVisibility();
+    loadInspectionStatus();
+  });
+})();
+
+function updateTodayBtnVisibility() {
+  var isToday = !_rsDate || _rsDate === getTodayISO();
+  $('rsTodayBtn').style.display = isToday ? 'none' : '';
+}
+
+function resetRoomFilters() {
+  _rsDate = '';
+  $('rsDate').value = getTodayISO();
+  $('rsTodayBtn').style.display = 'none';
+  loadInspectionStatus();
+}
+
+async function loadInspectionStatus() {
+  var gen = ++_rsGen;
+  var params = '';
+  if (_rsDate && _rsDate !== getTodayISO()) params += '?date=' + _rsDate;
+
+  var data = await App.apiFetchJson('/analytics/inspection-status' + params);
+  if (gen !== _rsGen) return;
+  if (!data) { sectionError('roomGrid', 'Failed to load inspection status'); return; }
+  if (!Array.isArray(data) || !data.length) {
+    $('roomGrid').innerHTML = '<div class="dash-empty"><span class="dash-empty-icon">📍</span><div class="dash-empty-text">No locations found</div><div class="dash-empty-sub">Add locations to see inspection status</div></div>';
+    $('roomBadge').textContent = '';
+    $('statusSummary').innerHTML = '';
+    return;
+  }
+  var c = {INSPECTED:0, HAS_FAULTS:0, NOT_INSPECTED:0};
+  for (var i = 0; i < data.length; i++) c[data[i].status] = (c[data[i].status] || 0) + 1;
+  $('roomBadge').textContent = (c.INSPECTED + c.HAS_FAULTS) + '/' + data.length + ' inspected';
+  $('statusSummary').innerHTML =
+    '<span><b style="color:#16a34a">' + c.INSPECTED + '</b> Pass</span>' +
+    '<span><b style="color:#f59e0b">' + c.HAS_FAULTS + '</b> Faults</span>' +
+    '<span><b style="color:#ef4444">' + c.NOT_INSPECTED + '</b> Pending</span>';
+  var cls = {INSPECTED:'rs-cleaned', HAS_FAULTS:'rs-partial', NOT_INSPECTED:'rs-dirty'};
+  $('roomGrid').innerHTML = data.map(function(r) {
+    var info = r.lastInspectedAt ? new Date(r.lastInspectedAt).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}) : '';
+    var parent = r.parentName ? r.parentName + ' — ' : '';
+    var faultInfo = r.totalFaults > 0 ? ' · ' + r.totalFaults + ' fault' + (r.totalFaults > 1 ? 's' : '') : '';
+    return '<div class="rs-card ' + cls[r.status] + '" onclick="openLocationDetail(\'' + r.id + '\')" title="' + esc(parent + r.name) + (info ? '\nLast: ' + info : '') + faultInfo + '\nClick for history">' +
+      '<div class="rs-dot"></div><div class="rs-name">' + esc(r.name) + '</div>' +
+      '<div class="rs-meta">' + esc(r.type.replace('_',' ')) + (info ? ' · ' + info : '') + faultInfo + '</div></div>';
+  }).join('');
+}
+
+// ── Location Inspection History Modal ──
+async function openLocationDetail(locationId) {
+  $('rdTitle').textContent = 'Location History';
+  $('rdBody').innerHTML = '<div class="empty-state">Loading history…</div>';
+  App.openModal('roomDetailModal');
+
+  var data = await App.apiFetchJson('/analytics/location/' + locationId + '/history?days=14');
+  if (!data) { $('rdBody').innerHTML = '<div class="dash-error"><span class="dash-error-icon">⚠</span>Failed to load location history</div>'; return; }
+  if (!data.location) { $('rdBody').innerHTML = '<div class="dash-error"><span class="dash-error-icon">⚠</span>Location not found or was deleted</div>'; return; }
+
+  var loc = data.location;
+  $('rdTitle').textContent = (loc.parentName ? loc.parentName + ' → ' : '') + loc.name;
+
+  var html = '';
+
+  // Stats summary
+  var inspectedDays = data.dailyStatus.filter(function(d) { return d.status === 'INSPECTED' || d.status === 'HAS_FAULTS'; }).length;
+  var totalDays = data.dailyStatus.length;
+  var rate = totalDays > 0 ? Math.round(inspectedDays / totalDays * 100) : 0;
+  html += '<div class="rd-stats">';
+  html += '<span>Type: <b>' + esc(loc.type.replace('_', ' ')) + '</b></span>';
+  html += '<span>14-day coverage: <b style="color:' + (rate >= 80 ? '#16a34a' : rate >= 50 ? '#f59e0b' : '#ef4444') + '">' + rate + '%</b></span>';
+  html += '</div>';
+
+  // Daily status dots
+  html += '<div class="rd-section"><div class="rd-section-title">Daily Status (last ' + (data.days || 14) + ' days)</div>';
+  html += '<div class="rd-daily">';
+  var dayCls = {INSPECTED:'rd-cleaned', HAS_FAULTS:'rd-partial', NOT_INSPECTED:'rd-dirty', UPCOMING:'rd-nosched'};
+  var reversed = data.dailyStatus.slice().reverse();
+  for (var i = 0; i < reversed.length; i++) {
+    var day = reversed[i];
+    var dt = new Date(day.date + 'T12:00:00');
+    var dayLabel = dt.toLocaleDateString(undefined, {weekday:'narrow'});
+    var dayNum = dt.getDate();
+    var tip = day.date + ': ' + day.status.replace('_', ' ') + (day.inspections > 0 ? ' (' + day.inspections + ' inspections' + (day.faults > 0 ? ', ' + day.faults + ' faults' : '') + ')' : '');
+    html += '<div class="rd-day ' + (dayCls[day.status] || 'rd-nosched') + '" title="' + tip + '">' +
+      '<div class="rd-day-label">' + dayLabel + '</div>' +
+      '<div class="rd-day-dot"></div>' +
+      '<div class="rd-day-label">' + dayNum + '</div>' +
+    '</div>';
+  }
+  html += '</div></div>';
+
+  // Recent inspections
+  if (data.recentInspections && data.recentInspections.length > 0) {
+    html += '<div class="rd-section"><div class="rd-section-title">Recent Inspections</div>';
+    var shiftCls = {MORNING:'shift-morning',AFTERNOON:'shift-afternoon',NIGHT:'shift-night',GENERAL:'shift-general'};
+    for (var j = 0; j < Math.min(data.recentInspections.length, 5); j++) {
+      var rec = data.recentInspections[j];
+      var time = new Date(rec.inspectedAt || rec.createdAt).toLocaleString(undefined, {month:'short', day:'numeric', hour:'2-digit', minute:'2-digit'});
+      html += '<div class="rd-record">';
+      html += '<div class="rd-record-header"><span class="shift-badge ' + (shiftCls[rec.shift] || '') + '">' + (rec.shift || 'GENERAL') + '</span>';
+      if (rec.faultyCount > 0) html += ' <span style="color:#ef4444;font-size:.68rem;font-weight:600">⚠ ' + rec.faultyCount + ' FAULT' + (rec.faultyCount > 1 ? 'S' : '') + '</span>';
+      html += '<span style="font-size:.68rem;color:var(--text-muted)">' + time + '</span></div>';
+      html += '<div class="rd-record-meta">👤 ' + esc(rec.supervisor || '—') + ' · ⚡ ' + (rec.items || 0) + ' items checked';
+      if (rec.imageCount > 0) html += ' · 📷 ' + rec.imageCount;
+      html += '</div>';
+      if (rec.notes) html += '<div class="rd-record-meta" style="font-style:italic;margin-top:.1rem">"' + esc(rec.notes) + '"</div>';
+      html += '</div>';
+    }
+    html += '</div>';
+  } else {
+    html += '<div class="rd-section"><div class="rd-section-title">Recent Inspections</div><div style="font-size:.78rem;color:var(--text-muted)">No inspections in the last 14 days</div></div>';
+  }
+
+  // Active tickets
+  if (data.activeTickets && data.activeTickets.length > 0) {
+    html += '<div class="rd-section"><div class="rd-section-title">Active Tickets (' + data.activeTickets.length + ')</div>';
+    for (var k = 0; k < data.activeTickets.length; k++) {
+      var t = data.activeTickets[k];
+      html += '<div class="rd-ticket"><b>' + esc(t.title) + '</b> <span class="badge badge-' + esc(t.priority.toLowerCase()) + '" style="font-size:.58rem">' + esc(t.priority) + '</span>';
+      html += '<div style="font-size:.68rem;color:var(--text-muted);margin-top:.1rem">' + esc(t.status.replace('_', ' ')) + ' · ' + new Date(t.createdAt).toLocaleDateString() + '</div></div>';
+    }
+    html += '</div>';
+  }
+
+  $('rdBody').innerHTML = html;
+}
+
+// ── Inspection Trend (7 days) ──
+async function loadTrend() {
+  var data = await App.apiFetchJson('/analytics/inspection-trend?days=7');
+  if (!data || !data.trend) { sectionError('trendChart', 'Failed to load trend data'); return; }
+  var trend = data.trend;
+  var hasData = trend.some(function(d) { return d.count > 0; });
+  if (!hasData) {
+    $('trendChart').innerHTML = '<div class="trend-empty"><span class="dash-empty-icon">📊</span><div>No inspections in the last 7 days</div><div style="font-size:.72rem;margin-top:.3rem;color:var(--text-light)">Records will appear here once supervisors submit inspection reports</div></div>';
+    return;
+  }
+  var max = Math.max.apply(null, trend.map(function(d) { return d.count; }).concat([1]));
+  $('trendChart').innerHTML = '<div class="trend-wrap">' + trend.map(function(d) {
+    var pct = Math.max(Math.round(d.count / max * 100), d.count > 0 ? 8 : 2);
+    var dayName = new Date(d.date + 'T12:00:00').toLocaleDateString(undefined, {weekday:'short'});
+    var dayNum = new Date(d.date + 'T12:00:00').getDate();
+    return '<div class="trend-col">' +
+      '<div class="trend-val">' + (d.count > 0 ? d.count : '') + '</div>' +
+      '<div class="trend-fill" style="height:' + pct + '%"></div>' +
+      '<div class="trend-day">' + dayName + '<br>' + dayNum + '</div></div>';
+  }).join('') + '</div>';
+}
+
+// ── Active Tickets (OPEN + IN_PROGRESS) ──
+async function loadTickets() {
+  var data = await App.apiFetchJson('/tickets?status=OPEN,IN_PROGRESS&limit=10');
+  if (!data) { sectionError('ticketList', 'Failed to load tickets'); return; }
+  $('ticketBadge').textContent = data.total;
+  if (data.tickets.length === 0) {
+    $('ticketList').innerHTML = '<div class="dash-empty"><span class="dash-empty-icon">✓</span><div class="dash-empty-text">No active tickets</div><div class="dash-empty-sub">All issues are resolved</div></div>';
+    return;
+  }
+  var prCls = {URGENT:'badge-urgent',HIGH:'badge-high',NORMAL:'badge-normal',LOW:'badge-low'};
+  var stCls = {OPEN:'badge-open',IN_PROGRESS:'badge-in_progress'};
+  var html = '<table class="dash-table"><thead><tr><th>Title</th><th>Priority</th><th class="hide-mobile">Status</th></tr></thead><tbody>';
+  for (var i = 0; i < data.tickets.length; i++) {
+    var t = data.tickets[i];
+    html += '<tr style="cursor:pointer" onclick="location.href=App.orgPath(\'admin-tickets\')">' +
+      '<td>' + esc(t.title) + '<br><span style="font-size:.68rem;color:var(--text-muted)">' + esc(t.location.name) + '</span></td>' +
+      '<td><span class="badge ' + (prCls[t.priority] || '') + '">' + t.priority + '</span></td>' +
+      '<td class="hide-mobile"><span class="badge ' + (stCls[t.status] || '') + '">' + t.status.replace('_',' ') + '</span></td></tr>';
+  }
+  html += '</tbody></table>';
+  if (data.total > 10) html += '<div style="text-align:center;padding:.4rem;font-size:.72rem;color:var(--text-muted)">Showing 10 of ' + data.total + ' tickets</div>';
+  $('ticketList').innerHTML = html;
+  if (data.total > 0) $('ticketViewAll').style.display = 'block';
+}
+
+// ── Worker Performance (electrical inspections) ──
+async function loadWorkerPerf() {
+  var data = await App.apiFetchJson('/analytics/workers');
+  if (!data || !data.length) {
+    $('workerPerf').innerHTML = '<div class="dash-empty"><span class="dash-empty-icon">👷</span><div class="dash-empty-text">No workers yet</div><div class="dash-empty-sub"><a href="' + App.orgPath('admin-workers') + '" style="color:var(--primary)">Add workers →</a></div></div>';
+    return;
+  }
+  var workers = data.slice(0, 10);
+  var maxRec = Math.max.apply(null, workers.map(function(w) { return w.inspectionCount; }).concat([1]));
+  var html = '<div style="font-size:.68rem;color:var(--text-muted);margin-bottom:.5rem">Ranked by inspection activity</div><div class="perf-bars">';
+  for (var i = 0; i < workers.length; i++) {
+    var w = workers[i];
+    var pct = w.inspectionCount > 0 ? Math.max(Math.round(w.inspectionCount / maxRec * 100), 5) : 0;
+    var meta = w.inspectionCount + ' inspections';
+    if (w.totalFaults > 0) meta += ' · <span style="color:#ef4444">' + w.totalFaults + ' faults</span>';
+    if (w.locationTicketCount > 0) meta += ' · ' + w.locationTicketCount + ' ticket' + (w.locationTicketCount > 1 ? 's' : '');
+    html += '<div class="perf-row" style="cursor:pointer" onclick="location.href=App.orgPath(\'admin-workers\')">' +
+      '<div class="perf-name" title="' + esc(w.name) + '">' + esc(w.name) + '</div>' +
+      '<div class="perf-bar-wrap">';
+    if (pct > 0) {
+      html += '<div class="perf-bar-fill" style="width:' + pct + '%"><span class="perf-bar-label">' + meta + '</span></div>';
+    } else {
+      html += '<div style="font-size:.68rem;color:var(--text-light);padding:.2rem .5rem">No inspections yet</div>';
+    }
+    html += '</div></div>';
+  }
+  html += '</div>';
+  if (data.length > 10) html += '<div style="text-align:center;padding:.3rem;font-size:.72rem"><a href="' + App.orgPath('admin-workers') + '" style="color:var(--primary)">View all ' + data.length + ' workers →</a></div>';
+  $('workerPerf').innerHTML = html;
+}
+
+// ── Problem Locations (fault-based severity) ──
+async function loadProblems() {
+  var data = await App.apiFetchJson('/analytics/problem-locations?days=7');
+  if (!data) { sectionError('problemList', 'Failed to load problem locations'); return; }
+  $('problemBadge').textContent = data.locations.length;
+  if (data.locations.length === 0) {
+    $('problemList').innerHTML = '<div class="dash-empty"><span class="dash-empty-icon">✓</span><div class="dash-empty-text">No problem areas</div><div class="dash-empty-sub">All locations performing well</div></div>';
+    return;
+  }
+  function getSeverity(score) {
+    if (score >= 25) return {label:'Critical',cls:'severity-critical'};
+    if (score >= 15) return {label:'High',cls:'severity-high'};
+    if (score >= 5) return {label:'Medium',cls:'severity-medium'};
+    return {label:'Low',cls:'severity-low'};
+  }
+  var html = '<table class="dash-table"><thead><tr><th>Location</th><th>Severity</th><th>Issues</th></tr></thead><tbody>';
+  var shown = Math.min(data.locations.length, 10);
+  for (var i = 0; i < shown; i++) {
+    var p = data.locations[i];
+    var sev = getSeverity(p.score);
+    var parent = p.location.parent ? p.location.parent.name + ' → ' : '';
+    var issues = [];
+    if (p.faultCount > 0) issues.push(p.faultCount + ' fault' + (p.faultCount > 1 ? 's' : ''));
+    if (p.flaggedCount > 0) issues.push(p.flaggedCount + ' flagged');
+    if (p.ticketCount > 0) issues.push(p.ticketCount + ' ticket' + (p.ticketCount > 1 ? 's' : ''));
+    html += '<tr style="cursor:pointer" onclick="openLocationDetail(\'' + p.location.id + '\')">' +
+      '<td>' + esc(parent + p.location.name) + '</td>' +
+      '<td><span class="severity ' + sev.cls + '">' + sev.label + '</span></td>' +
+      '<td style="font-size:.72rem">' + issues.join(', ') + '</td></tr>';
+  }
+  html += '</tbody></table>';
+  if (data.locations.length > shown) html += '<div style="text-align:center;padding:.4rem;font-size:.72rem;color:var(--text-muted)">+ ' + (data.locations.length - shown) + ' more</div>';
+  $('problemList').innerHTML = html;
+  if (data.locations.length > 0) $('problemViewAll').style.display = 'block';
+}
+
+// ── Today's Inspection Log ──
+var allLbImages = [];
+var lbIndex = 0;
+
+function openLightbox(idx) {
+  lbIndex = idx;
+  var img = allLbImages[idx];
+  if (!img) return;
+  $('lbImg').src = img.url;
+  $('lbInfo').textContent = img.location + ' · ' + img.shift + ' · ' + img.supervisor + ' · ' + img.time;
+  $('lightbox').classList.add('active');
+  document.body.style.overflow = 'hidden';
+}
+function closeLightbox() {
+  $('lightbox').classList.remove('active');
+  document.body.style.overflow = '';
+}
+function navLightbox(dir) {
+  lbIndex = (lbIndex + dir + allLbImages.length) % allLbImages.length;
+  var img = allLbImages[lbIndex];
+  $('lbImg').src = img.url;
+  $('lbInfo').textContent = img.location + ' · ' + img.shift + ' · ' + img.supervisor + ' · ' + img.time;
+}
+// Close on overlay click or Escape key
+$('lightbox').addEventListener('click', function(e) { if (e.target === this) closeLightbox(); });
+document.addEventListener('keydown', function(e) {
+  if (!$('lightbox').classList.contains('active')) return;
+  if (e.key === 'Escape') closeLightbox();
+  if (e.key === 'ArrowLeft') navLightbox(-1);
+  if (e.key === 'ArrowRight') navLightbox(1);
+});
+
+async function loadInspectionLog() {
+  var todayISO = new Date().toISOString().split('T')[0];
+  var data = await App.apiFetchJson('/electrical-inspections?from=' + todayISO + '&limit=100');
+  if (!data) return;
+  var records = data.inspections || [];
+  $('photoBadge').textContent = records.length + ' inspection' + (records.length !== 1 ? 's' : '');
+  if (records.length === 0) {
+    $('photoGallery').innerHTML = '<div class="dash-empty"><span class="dash-empty-icon">⚡</span><div class="dash-empty-text">No inspections logged today</div><div class="dash-empty-sub">Inspections appear here when supervisors submit reports</div></div>';
+    return;
+  }
+  allLbImages = [];
+  var shiftCls = {MORNING:'shift-morning',AFTERNOON:'shift-afternoon',NIGHT:'shift-night',GENERAL:'shift-general'};
+  var statusCls = {SUBMITTED:'wl-status-submitted',FLAGGED:'wl-status-flagged'};
+  var html = '';
+  for (var i = 0; i < records.length; i++) {
+    var rec = records[i];
+    var locName = rec.location ? rec.location.name : '—';
+    var sup = rec.supervisor ? rec.supervisor.name : '—';
+    var shift = rec.shift || 'GENERAL';
+    var time = new Date(rec.inspectedAt || rec.createdAt).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
+    var workers = rec.workers ? rec.workers.map(function(w) { return w.name; }).join(', ') : '—';
+    var hasFaults = rec.faultyCount > 0 || rec.status === 'FLAGGED';
+    var itemCount = rec.items ? rec.items.length : (rec.itemCount || 0);
+
+    html += '<div class="wl-card' + (hasFaults ? ' wl-flagged' : '') + '">';
+    html += '<div class="wl-header"><div>' +
+      '<span class="wl-room">' + esc(locName) + '</span> ' +
+      '<span class="shift-badge ' + (shiftCls[shift] || '') + '">' + shift + '</span>' +
+      '</div><span class="wl-status ' + (hasFaults ? statusCls.FLAGGED : statusCls.SUBMITTED) + '">' + (hasFaults ? '⚠ FAULTS' : '✓ PASS') + '</span></div>';
+    html += '<div class="wl-meta">' +
+      '<span class="wl-meta-item">🕐 <b>' + time + '</b></span>' +
+      '<span class="wl-meta-item">👤 ' + esc(sup) + '</span>' +
+      '<span class="wl-meta-item">⚡ ' + itemCount + ' items</span>' +
+      (rec.faultyCount > 0 ? '<span class="wl-meta-item" style="color:#ef4444">⚠ ' + rec.faultyCount + ' fault' + (rec.faultyCount > 1 ? 's' : '') + '</span>' : '') +
+    '</div>';
+    // Photos if any
+    var images = rec.images || [];
+    if (images.length > 0) {
+      html += '<div class="wl-photos">';
+      for (var j = 0; j < images.length; j++) {
+        var imgIdx = allLbImages.length;
+        var imgSrc = App.imgUrl(images[j].imageUrl);
+        allLbImages.push({url: imgSrc, location: locName, shift: shift, supervisor: sup, time: time});
+        html += '<div class="wl-thumb" onclick="openLightbox(' + imgIdx + ')"><img src="' + esc(imgSrc) + '" alt="Inspection" loading="lazy"></div>';
+      }
+      html += '</div>';
+    }
+    if (rec.notes) {
+      html += '<div class="wl-notes">"' + esc(rec.notes) + '"</div>';
+    }
+    html += '</div>';
+  }
+  $('photoGallery').innerHTML = html;
+}
+
+// ── Load everything in parallel ──
+var _abortController = null;
+function loadAll() {
+  if (_abortController) _abortController.abort();
+  _abortController = new AbortController();
+  return Promise.all([loadKPIs(), loadInspectionStatus(), loadTrend(), loadTickets(), loadWorkerPerf(), loadProblems(), loadInspectionLog()]).then(function() {
+    updateRefreshTime();
+    _abortController = null;
+  }).catch(function() { _abortController = null; });
+}
+function manualRefresh() {
+  var btn = $('refreshBtn');
+  if (btn) btn.classList.add('refreshing');
+  loadAll().finally(function() { if (btn) btn.classList.remove('refreshing'); });
+}
+loadAll();
+
+// ── Auto-refresh every 5 minutes ──
+var _refreshInterval = setInterval(function() {
+  loadAll();
+}, 5 * 60 * 1000);
+
+// ── Login QR Codes ──
+var MOD_QR_NAMES = { ele: '⚡ Electrical', civil: '🏗️ Civil', asset: '📦 Assets', complaints: '📝 Complaints' };
+
+async function showAdminQR() {
+  $('adminQrBody').innerHTML = '<div class="empty-state">Loading QR codes…</div>';
+  App.openModal('adminQrModal');
+
+  // Fetch org info to get enabled modules
+  var me = await App.apiFetchJson('/auth/me');
+  if (!me || !me.org) { $('adminQrBody').innerHTML = '<div class="empty-state">Could not load organization info</div>'; return; }
+  var org = me.org;
+  var mods = org.enabledModules || ['ele'];
+  var slug = App.getOrgSlug() || org.slug;
+  if (!slug) { $('adminQrBody').innerHTML = '<div class="empty-state">Organization URL not configured</div>'; return; }
+
+  var html = '';
+  for (var i = 0; i < mods.length; i++) {
+    var mod = mods[i];
+    html += '<div class="qr-mod-section">';
+    html += '<div class="qr-mod-label">' + (MOD_QR_NAMES[mod] || mod) + '</div>';
+    html += '<div class="qr-grid">';
+    html += adminQrCard(mod, 'admin', slug);
+    html += adminQrCard(mod, 'supervisor', slug);
+    html += '</div></div>';
+  }
+  $('adminQrBody').innerHTML = html;
+
+  for (var j = 0; j < mods.length; j++) {
+    fetchAdminQR(mods[j], 'admin');
+    fetchAdminQR(mods[j], 'supervisor');
+  }
+}
+
+function adminQrCard(mod, role, slug) {
+  var label = role === 'admin' ? 'Admin Login' : 'Supervisor Login';
+  var page = role === 'admin' ? 'admin-login' : 'supervisor-login';
+  var url = '/' + slug + '/' + mod + '/' + page;
+  return '<div class="qr-card">' +
+    '<div class="qr-card-title">' + label + '</div>' +
+    '<div class="qr-card-sub">' + mod.toUpperCase() + ' module</div>' +
+    '<div id="aqr-' + mod + '-' + role + '" style="width:100%;max-width:160px;aspect-ratio:1;margin:0 auto .5rem;display:flex;align-items:center;justify-content:center;color:var(--text-muted);font-size:.75rem">Loading…</div>' +
+    '<div class="qr-card-url">' + esc(url) + '</div>' +
+  '</div>';
+}
+
+async function fetchAdminQR(mod, role) {
+  var el = $('aqr-' + mod + '-' + role);
+  if (!el) return;
+  try {
+    var res = await App.apiFetch('/auth/login-qr?mod=' + mod + '&role=' + role);
+    if (res && res.ok) {
+      var svg = await res.text();
+      el.innerHTML = svg;
+      el.style = '';
+      var svgEl = el.querySelector('svg');
+      if (svgEl) { svgEl.style.width = '100%'; svgEl.style.maxWidth = '160px'; svgEl.style.height = 'auto'; }
+    } else {
+      el.textContent = 'Failed';
+    }
+  } catch(e) {
+    el.textContent = 'Error';
+  }
+}
+
+// ── AI Chat Widget ──
+var _aiOpen = false;
+var _aiReady = false;
+
+async function initAiWidget() {
+  var res = await App.apiFetch('/ai/status');
+  if (!res || !res.ok) return;
+  var status = await res.json();
+  if (!status.enabled) return;
+
+  // Show FAB
+  _aiReady = true;
+  $('aiFab').style.display = 'flex';
+
+  // Load suggestions
+  loadAiSuggestions();
+}
+
+function toggleAiChat() {
+  _aiOpen = !_aiOpen;
+  $('aiFab').classList.toggle('open', _aiOpen);
+  $('aiPanel').classList.toggle('open', _aiOpen);
+  if (_aiOpen) {
+    $('aiInput').focus();
+    if ($('aiMessages').children.length === 0) {
+      addAiMessage('bot', "Hi! I'm your electrical operations assistant. Ask me about today's inspections, faults, team performance, open tickets, or any operational question. 👋");
+    }
+  }
+}
+
+async function loadAiSuggestions() {
+  try {
+    var res = await App.apiFetch('/ai/suggestions');
+    if (!res || !res.ok) return;
+    var data = await res.json();
+    if (!data.suggestions || !data.suggestions.length) return;
+    var html = data.suggestions.map(function(s) {
+      return '<button class="ai-chip" data-q="' + esc(s.text) + '">' + esc(s.icon) + ' ' + esc(s.text) + '</button>';
+  }).join('');
+  $('aiSuggestions').innerHTML = html;
+  $('aiSuggestions').querySelectorAll('.ai-chip').forEach(function(btn) {
+    btn.addEventListener('click', function() { askAi(this.dataset.q); });
+  });
+  } catch(e) { /* non-critical */ }
+}
+
+function addAiMessage(type, text) {
+  var el = document.createElement('div');
+  el.className = 'ai-msg ai-msg-' + type;
+  if (type === 'user' || type === 'error') {
+    el.textContent = text;
+  } else {
+    // Markdown: code blocks, inline code, headers, bold, italic, nested bullets
+    var html = esc(text);
+    html = html.replace(/```[\w]*\n([\s\S]*?)```/g, '<pre style="background:var(--bg-secondary);padding:.6rem;border-radius:6px;overflow-x:auto;font-size:.8rem;margin:.5rem 0"><code>$1</code></pre>');
+    html = html.replace(/`([^`]+)`/g, '<code style="background:var(--bg-secondary);padding:1px 4px;border-radius:3px;font-size:.85em">$1</code>');
+    html = html.replace(/\n---+\n/g, '\n<hr style="border:none;border-top:1px solid var(--border);margin:.75rem 0">\n');
+    html = html.replace(/^#### (.+)$/gm, '<h5 style="margin:.8rem 0 .3rem;font-size:.85rem;color:var(--primary)">$1</h5>');
+    html = html.replace(/^### (.+)$/gm, '<h4 style="margin:1rem 0 .4rem;font-size:.9rem;color:var(--primary)">$1</h4>');
+    html = html.replace(/^## (.+)$/gm, '<h3 style="margin:1rem 0 .5rem;font-size:.95rem">$1</h3>');
+    html = html.replace(/^# (.+)$/gm, '<h3 style="margin:1rem 0 .5rem;font-size:1rem;font-weight:700">$1</h3>');
+    html = html.replace(/\*\*(.+?)\*\*/g, '<b>$1</b>');
+    html = html.replace(/(?<!\*)\*(\S[^*]*?\S|\S)\*(?!\*)/g, '<i>$1</i>');
+    html = html.replace(/\n {2,}[-*] /g, '\n&nbsp;&nbsp;&nbsp;&nbsp;◦ ');
+    html = html.replace(/\n[-*] /g, '\n• ');
+    html = html.replace(/\n(\d+)\. /g, '\n<span style="font-weight:600;color:var(--primary)">$1.</span> ');
+    html = html.replace(/^[-*] /, '• ');
+    html = html.replace(/\n/g, '<br>');
+    el.innerHTML = html;
+  }
+  $('aiMessages').appendChild(el);
+  $('aiMessages').scrollTop = $('aiMessages').scrollHeight;
+  return el;
+}
+
+function showAiTyping() {
+  var el = document.createElement('div');
+  el.className = 'ai-msg ai-msg-bot';
+  el.id = 'aiTyping';
+  el.innerHTML = '<div class="ai-typing"><span></span><span></span><span></span></div>';
+  $('aiMessages').appendChild(el);
+  $('aiMessages').scrollTop = $('aiMessages').scrollHeight;
+}
+
+function removeAiTyping() {
+  var el = $('aiTyping');
+  if (el) el.remove();
+}
+
+var _aiChatBusy = false;
+async function askAi(text) {
+  if (_aiChatBusy || !text || !text.trim()) return;
+  _aiChatBusy = true;
+  var msg = text.trim();
+  $('aiInput').value = '';
+  $('aiSuggestions').innerHTML = '';
+
+  addAiMessage('user', msg);
+  showAiTyping();
+  $('aiSend').disabled = true;
+
+  try {
+    var res = await App.apiFetch('/ai/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message: msg })
+    });
+
+    removeAiTyping();
+    $('aiSend').disabled = false;
+
+    if (!res) return;
+    if (!res.ok) {
+      var d = await res.json().catch(function() { return {}; });
+      if (d.code === 'AI_RATE_LIMIT') {
+        addAiMessage('error', '⏳ ' + (d.error || 'Too many requests. Please wait a moment.'));
+      } else {
+        addAiMessage('error', d.error || 'Something went wrong. Please try again.');
+      }
+      return;
+    }
+    var data = await res.json();
+    addAiMessage('bot', data.response);
+
+    // Reload suggestions after response
+    loadAiSuggestions();
+  } catch (err) {
+    removeAiTyping();
+    $('aiSend').disabled = false;
+    addAiMessage('error', 'Network error. Please check your connection.');
+  } finally {
+    _aiChatBusy = false;
+  }
+}
+
+function onAiKeydown(e) {
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
+    askAi($('aiInput').value);
+  }
+}
+
+// Init AI widget after page loads
+setTimeout(initAiWidget, 1000);
+</script>
+
+<!-- AI Chat Widget -->
+<button class="ai-fab" id="aiFab" onclick="toggleAiChat()" style="display:none" title="AI Assistant">
+  <span class="ai-fab-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a7 7 0 0 1 7 7v1a7 7 0 0 1-14 0V9a7 7 0 0 1 7-7Z"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><circle cx="9" cy="10" r="1" fill="currentColor"/><circle cx="15" cy="10" r="1" fill="currentColor"/><path d="M12 18v4"/><path d="M8 22h8"/></svg></span>
+  <span class="ai-fab-close"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="22" height="22"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></span>
+</button>
+
+<div class="ai-panel" id="aiPanel">
+  <div class="ai-header">
+    <span class="ai-header-icon">🤖</span>
+    <span class="ai-header-title">AI Assistant</span>
+    <span class="ai-header-badge">BETA</span>
+  </div>
+  <div class="ai-messages" id="aiMessages"></div>
+  <div class="ai-suggestions" id="aiSuggestions"></div>
+  <div class="ai-input-wrap">
+    <textarea class="ai-input" id="aiInput" placeholder="Ask about inspections, faults, tickets…" rows="1" onkeydown="onAiKeydown(event)" maxlength="500"></textarea>
+    <button class="ai-send" id="aiSend" onclick="askAi($('aiInput').value)" title="Send">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18"><path d="m22 2-7 20-4-9-9-4Z"/><path d="m22 2-11 11"/></svg>
+    </button>
+  </div>
+</div>
+
+</body>
+</html>

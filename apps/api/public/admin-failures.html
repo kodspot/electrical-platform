@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
+<link rel="manifest" href="/site.webmanifest">
+<meta name="theme-color" content="#0891b2">
+<title>Asset Failures — Kodspot</title>
+<link rel="stylesheet" href="/css/design-system.css?v=9">
+<style>
+.page-title{display:flex;align-items:center;gap:.5rem;margin-bottom:1.25rem;flex-wrap:wrap;justify-content:space-between}
+.page-title h1{font-size:1.25rem;font-weight:700;margin:0}
+
+/* Stats */
+.f-stats{display:flex;gap:.75rem;margin-bottom:1rem;flex-wrap:wrap}
+.f-stat{flex:1;min-width:100px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:.85rem .75rem;text-align:center}
+.f-stat-val{font-size:1.4rem;font-weight:700;line-height:1.1}
+.f-stat-label{font-size:.68rem;color:var(--text-muted);margin-top:.15rem}
+.f-stat.stat-open .f-stat-val{color:var(--danger)}
+.f-stat.stat-progress .f-stat-val{color:var(--warning-text)}
+.f-stat.stat-resolved .f-stat-val{color:var(--success)}
+
+/* Filters */
+.f-filters{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:.75rem;margin-bottom:.75rem}
+.f-filter-row{display:flex;gap:.6rem;flex-wrap:wrap;align-items:center}
+
+/* Table */
+.f-tbl{width:100%;border-collapse:collapse;font-size:.82rem}
+.f-tbl th{text-align:left;padding:.5rem .4rem;font-size:.7rem;font-weight:600;color:var(--text-muted);border-bottom:1px solid var(--border);white-space:nowrap}
+.f-tbl td{padding:.55rem .4rem;border-bottom:1px solid var(--border-light,var(--border));vertical-align:middle}
+.f-tbl tr:hover{background:var(--hover-bg,rgba(8,145,178,.03))}
+.empty{text-align:center;padding:2rem;color:var(--text-muted)}
+
+.f-pager{display:flex;justify-content:center;gap:.3rem;margin-top:.75rem;flex-wrap:wrap}
+.f-pager button{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);padding:.3rem .6rem;font-size:.75rem;cursor:pointer;color:var(--text)}
+.f-pager button:hover{border-color:var(--primary)}
+.f-pager button.active{background:var(--primary);color:#fff;border-color:var(--primary)}
+.f-pager button:disabled{opacity:.4;cursor:default}
+
+/* Severity */
+.sev-low{background:rgba(120,120,120,.08);color:var(--text-muted)}
+.sev-medium{background:rgba(245,158,11,.1);color:var(--warning-text)}
+.sev-high{background:rgba(239,68,68,.1);color:var(--danger)}
+.sev-critical{background:rgba(239,68,68,.2);color:var(--danger);font-weight:700}
+
+/* Failure status */
+.fs-open{background:rgba(239,68,68,.1);color:var(--danger)}
+.fs-acknowledged{background:rgba(245,158,11,.1);color:var(--warning-text)}
+.fs-in_progress{background:rgba(8,145,178,.1);color:#0891b2}
+.fs-resolved{background:rgba(16,185,129,.1);color:var(--success)}
+.fs-closed{background:rgba(120,120,120,.1);color:var(--text-muted)}
+
+/* Detail */
+.fd-grid{display:grid;grid-template-columns:1fr 1fr;gap:.4rem .75rem;font-size:.82rem;margin-bottom:.75rem}
+.fd-label{font-weight:600;color:var(--text-muted);font-size:.72rem}
+.fd-val{margin-bottom:.3rem}
+
+.img-grid{display:flex;gap:.4rem;flex-wrap:wrap;margin:.5rem 0}
+.img-grid img{width:64px;height:64px;object-fit:cover;border-radius:var(--radius-sm);cursor:pointer;border:1px solid var(--border)}
+
+@media(max-width:768px){
+  .f-tbl td,.f-tbl th{padding:.45rem .3rem;font-size:.75rem}
+  .hide-mobile{display:none}
+  .fd-grid{grid-template-columns:1fr}
+}
+</style>
+</head>
+<body>
+<nav class="topbar">
+  <div class="topbar-left">
+    <a class="topbar-brand" href="/">Kodspot</a>
+    <div id="topbar-nav"></div>
+  </div>
+  <div class="topbar-right">
+    <span class="topbar-user" id="userName"></span>
+    <button class="btn btn-sm btn-ghost" id="logoutBtn">Logout</button>
+  </div>
+</nav>
+
+<main class="main-content">
+  <div class="page-title">
+    <h1>🔴 Asset Failures</h1>
+    <div style="display:flex;gap:.5rem">
+      <button class="btn btn-sm btn-outline" onclick="exportCSV()">CSV</button>
+      <button class="btn btn-sm btn-danger" onclick="openReportModal()">+ Report Failure</button>
+    </div>
+  </div>
+
+  <!-- Stats -->
+  <div class="f-stats">
+    <div class="f-stat stat-open"><div class="f-stat-val" id="statOpen">0</div><div class="f-stat-label">Open</div></div>
+    <div class="f-stat stat-progress"><div class="f-stat-val" id="statProgress">0</div><div class="f-stat-label">In Progress</div></div>
+    <div class="f-stat stat-resolved"><div class="f-stat-val" id="statResolved">0</div><div class="f-stat-label">Resolved</div></div>
+    <div class="f-stat"><div class="f-stat-val" id="statClosed">0</div><div class="f-stat-label">Closed</div></div>
+  </div>
+
+  <!-- Filters -->
+  <div class="f-filters">
+    <div class="f-filter-row">
+      <input class="form-input" style="flex:2;min-width:140px" id="fSearch" placeholder="Search asset, title…" oninput="debounceSearch()">
+      <select class="form-select" style="flex:1;min-width:100px" id="fSeverity" onchange="loadFailures(1)">
+        <option value="">All Severity</option>
+        <option value="LOW">Low</option><option value="MEDIUM">Medium</option>
+        <option value="HIGH">High</option><option value="CRITICAL">Critical</option>
+      </select>
+      <select class="form-select" style="flex:1;min-width:100px" id="fFStatus" onchange="loadFailures(1)">
+        <option value="">All Status</option>
+        <option value="OPEN">Open</option><option value="ACKNOWLEDGED">Acknowledged</option>
+        <option value="IN_PROGRESS">In Progress</option><option value="RESOLVED">Resolved</option><option value="CLOSED">Closed</option>
+      </select>
+      <input class="form-input" style="flex:0 0 130px" id="fFrom" type="date" title="From" onchange="loadFailures(1)">
+      <input class="form-input" style="flex:0 0 130px" id="fTo" type="date" title="To" onchange="loadFailures(1)">
+      <select class="form-select" style="flex:1;min-width:90px" id="fSort" onchange="loadFailures(1)">
+        <option value="">Newest</option><option value="severity">By Severity</option>
+        <option value="oldest">Oldest</option><option value="status">By Status</option>
+      </select>
+      <button class="btn btn-sm btn-ghost" onclick="clearFilters()">Clear</button>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="table-wrap">
+      <table class="f-tbl">
+        <thead>
+          <tr>
+            <th>Asset</th><th>Title</th><th>Severity</th><th>Status</th>
+            <th class="hide-mobile">Failed At</th><th class="hide-mobile">Logged By</th><th>Actions</th>
+          </tr>
+        </thead>
+        <tbody id="tableBody"><tr><td colspan="7" class="empty">Loading…</td></tr></tbody>
+      </table>
+    </div>
+    <div class="f-pager" id="pager"></div>
+  </div>
+</main>
+
+<!-- Report Failure Modal -->
+<div class="modal-overlay" id="reportModal">
+  <div class="modal" style="max-width:520px">
+    <h2 class="modal-title">Report Failure</h2>
+    <div id="reportError" class="error-msg"></div>
+    <form id="reportForm">
+      <div><label class="form-label">Asset *</label><select class="form-select" id="rAsset" required><option value="">Select asset…</option></select></div>
+      <div style="margin-top:.5rem"><label class="form-label">Title *</label><input class="form-input" id="rTitle" required maxlength="300" placeholder="Phase R failure"></div>
+      <div style="margin-top:.5rem"><label class="form-label">Severity</label>
+        <select class="form-select" id="rSeverity">
+          <option value="LOW">Low</option><option value="MEDIUM" selected>Medium</option>
+          <option value="HIGH">High</option><option value="CRITICAL">Critical</option>
+        </select>
+      </div>
+      <div style="margin-top:.5rem"><label class="form-label">Failed At</label><input class="form-input" id="rFailedAt" type="datetime-local"></div>
+      <div style="margin-top:.5rem"><label class="form-label">Description</label><textarea class="form-textarea" id="rDescription" rows="3" maxlength="5000" placeholder="Describe the failure…"></textarea></div>
+      <div class="modal-actions">
+        <button type="button" class="btn btn-outline" onclick="App.closeModal('reportModal')">Cancel</button>
+        <button type="submit" class="btn btn-danger" id="reportBtn">Report Failure</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Detail Modal -->
+<div class="modal-overlay" id="detailModal">
+  <div class="modal" style="max-width:600px;max-height:90vh;overflow-y:auto">
+    <h2 class="modal-title" id="detailTitle">Failure Details</h2>
+    <div id="detailContent"></div>
+    <div id="resolveSection" style="display:none;margin-top:.75rem;padding:.75rem;background:var(--bg);border-radius:var(--radius-lg);border:1px solid var(--border)">
+      <div style="font-weight:700;font-size:.85rem;margin-bottom:.5rem">Resolve / Update Status</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:.5rem">
+        <div><label class="form-label">Status</label>
+          <select class="form-select" id="dStatus"></select>
+        </div>
+        <div><label class="form-label">Cause</label><input class="form-input" id="dCause" maxlength="2000" placeholder="Root cause"></div>
+        <div style="grid-column:1/-1"><label class="form-label">Resolution Notes</label><textarea class="form-textarea" id="dResolution" rows="2" maxlength="5000" placeholder="How was it resolved?"></textarea></div>
+        <div><label class="form-label">Resolution Cost (₹)</label><input class="form-input" id="dCost" type="number" min="0" step="0.01"></div>
+        <div><label class="form-label">Downtime (minutes)</label><input class="form-input" id="dDowntime" type="number" min="0"></div>
+      </div>
+      <div style="margin-top:.5rem;text-align:right">
+        <button type="button" class="btn btn-sm btn-primary" id="updateStatusBtn" onclick="updateFailure()">Update</button>
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button type="button" class="btn btn-outline" onclick="App.closeModal('detailModal')">Close</button>
+    </div>
+  </div>
+</div>
+
+<script src="/js/offline-sync.js?v=1"></script>
+<script src="/js/app.js?v=11"></script>
+<script>
+if (!App.initAdmin('failures')) throw '';
+App.initNotifications(App.apiFetch);
+var esc = App.esc, $ = App.$;
+var currentPage = 1, totalPages = 1, PAGE_SIZE = 25;
+var searchTimer = null, currentFailureId = null, currentFailure = null;
+
+function debounceSearch(){ clearTimeout(searchTimer); searchTimer = setTimeout(function(){ loadFailures(1); }, 300); }
+
+var SEV_CLS = { LOW:'sev-low', MEDIUM:'sev-medium', HIGH:'sev-high', CRITICAL:'sev-critical' };
+var FS_CLS = { OPEN:'fs-open', ACKNOWLEDGED:'fs-acknowledged', IN_PROGRESS:'fs-in_progress', RESOLVED:'fs-resolved', CLOSED:'fs-closed' };
+var FS_LABEL = { OPEN:'Open', ACKNOWLEDGED:'Acknowledged', IN_PROGRESS:'In Progress', RESOLVED:'Resolved', CLOSED:'Closed' };
+
+var VALID_TRANSITIONS = {
+  OPEN: ['ACKNOWLEDGED','IN_PROGRESS','RESOLVED','CLOSED'],
+  ACKNOWLEDGED: ['IN_PROGRESS','RESOLVED','CLOSED'],
+  IN_PROGRESS: ['RESOLVED','CLOSED'],
+  RESOLVED: ['CLOSED','OPEN'],
+  CLOSED: ['OPEN']
+};
+
+async function loadFailures(page){
+  currentPage = page||1;
+  var params = ['page='+currentPage, 'limit='+PAGE_SIZE];
+  var s=$('fSearch').value.trim(); if(s) params.push('search='+encodeURIComponent(s));
+  var sev=$('fSeverity').value; if(sev) params.push('severity='+sev);
+  var st=$('fFStatus').value; if(st) params.push('status='+st);
+  var from=$('fFrom').value; if(from) params.push('from='+from);
+  var to=$('fTo').value; if(to) params.push('to='+to);
+  var sort=$('fSort').value; if(sort) params.push('sort='+sort);
+
+  var res = await App.apiFetch('/asset-failures?'+params.join('&'));
+  if(!res) return;
+  var data = await res.json();
+  var failures = data.failures||[];
+  totalPages = data.pages||1;
+
+  // Stats
+  var bs = data.stats?.byStatus||{};
+  $('statOpen').textContent = (bs.OPEN||0)+(bs.ACKNOWLEDGED||0);
+  $('statProgress').textContent = bs.IN_PROGRESS||0;
+  $('statResolved').textContent = bs.RESOLVED||0;
+  $('statClosed').textContent = bs.CLOSED||0;
+
+  if(!failures.length){
+    $('tableBody').innerHTML = '<tr><td colspan="7" class="empty">No failures found</td></tr>';
+    $('pager').innerHTML=''; return;
+  }
+
+  $('tableBody').innerHTML = failures.map(function(f){
+    return '<tr>'+
+      '<td><span style="font-weight:600;font-size:.78rem">'+esc(f.asset?f.asset.assetCode:'')+'</span><br><span style="font-size:.72rem;color:var(--text-muted)">'+esc(f.asset?f.asset.name:'')+'</span></td>'+
+      '<td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(f.title)+'</td>'+
+      '<td><span class="badge '+(SEV_CLS[f.severity]||'')+'">'+f.severity+'</span></td>'+
+      '<td><span class="badge '+(FS_CLS[f.status]||'')+'">'+(FS_LABEL[f.status]||f.status)+'</span></td>'+
+      '<td class="hide-mobile" style="font-size:.72rem">'+App.fmtDateShort(f.failedAt)+'</td>'+
+      '<td class="hide-mobile" style="font-size:.72rem">'+esc(f.loggedBy?f.loggedBy.name:'')+'</td>'+
+      '<td><button class="btn btn-sm btn-outline" onclick="viewDetail(\''+f.id+'\')">View</button></td>'+
+    '</tr>';
+  }).join('');
+  renderPager();
+}
+
+function renderPager(){
+  if(totalPages<=1){$('pager').innerHTML='';return;}
+  var h='<button'+(currentPage<=1?' disabled':'')+' onclick="loadFailures('+(currentPage-1)+')">← Prev</button>';
+  for(var i=1;i<=totalPages&&i<=10;i++){h+='<button class="'+(i===currentPage?'active':'')+'" onclick="loadFailures('+i+')">'+i+'</button>';}
+  h+='<button'+(currentPage>=totalPages?' disabled':'')+' onclick="loadFailures('+(currentPage+1)+')">Next →</button>';
+  $('pager').innerHTML=h;
+}
+
+function clearFilters(){
+  $('fSearch').value='';$('fSeverity').value='';$('fFStatus').value='';$('fFrom').value='';$('fTo').value='';$('fSort').value='';
+  loadFailures(1);
+}
+
+// ── Detail ──
+async function viewDetail(id){
+  var res = await App.apiFetch('/asset-failures/'+id);
+  if(!res) return;
+  var f = await res.json();
+  currentFailureId = f.id;
+  currentFailure = f;
+
+  $('detailTitle').textContent = f.title;
+  var h = '<div class="fd-grid">';
+  h += '<div><div class="fd-label">Asset</div><div class="fd-val" style="font-weight:600">'+esc(f.asset?f.asset.assetCode+' — '+f.asset.name:'—')+'</div></div>';
+  h += '<div><div class="fd-label">Category</div><div class="fd-val">'+esc(f.asset?f.asset.category:'—')+'</div></div>';
+  h += '<div><div class="fd-label">Location</div><div class="fd-val">'+esc(f.asset&&f.asset.location?f.asset.location.name:'—')+'</div></div>';
+  h += '<div><div class="fd-label">Severity</div><div class="fd-val"><span class="badge '+(SEV_CLS[f.severity]||'')+'">'+f.severity+'</span></div></div>';
+  h += '<div><div class="fd-label">Status</div><div class="fd-val"><span class="badge '+(FS_CLS[f.status]||'')+'">'+(FS_LABEL[f.status]||f.status)+'</span></div></div>';
+  h += '<div><div class="fd-label">Failed At</div><div class="fd-val">'+App.fmtDateShort(f.failedAt)+'</div></div>';
+  h += '<div><div class="fd-label">Logged By</div><div class="fd-val">'+esc(f.loggedBy?f.loggedBy.name:'—')+'</div></div>';
+  if(f.acknowledgedAt) h += '<div><div class="fd-label">Acknowledged</div><div class="fd-val">'+App.fmtDateShort(f.acknowledgedAt)+'</div></div>';
+  if(f.resolvedAt){
+    h += '<div><div class="fd-label">Resolved At</div><div class="fd-val">'+App.fmtDateShort(f.resolvedAt)+'</div></div>';
+    h += '<div><div class="fd-label">Resolved By</div><div class="fd-val">'+esc(f.resolvedBy?f.resolvedBy.name:'—')+'</div></div>';
+  }
+  h += '</div>';
+  if(f.description) h += '<div style="font-size:.78rem;color:var(--text-muted);margin-bottom:.35rem"><b>Description:</b> '+esc(f.description)+'</div>';
+  if(f.cause) h += '<div style="font-size:.78rem;margin-bottom:.35rem"><b>Root Cause:</b> '+esc(f.cause)+'</div>';
+  if(f.resolution) h += '<div style="font-size:.78rem;margin-bottom:.35rem"><b>Resolution:</b> '+esc(f.resolution)+'</div>';
+  if(f.resolutionCost) h += '<div style="font-size:.78rem;margin-bottom:.35rem"><b>Cost:</b> ₹'+Number(f.resolutionCost).toLocaleString('en-IN')+'</div>';
+  if(f.downtime!=null) h += '<div style="font-size:.78rem;margin-bottom:.35rem"><b>Downtime:</b> '+(f.downtime>=60?Math.floor(f.downtime/60)+'h '+f.downtime%60+'m':f.downtime+' min')+'</div>';
+
+  // Images
+  if(f.images && f.images.length){
+    h += '<div style="font-weight:600;font-size:.82rem;margin-top:.5rem">Photos ('+f.images.length+')</div>';
+    h += '<div class="img-grid">';
+    f.images.forEach(function(img){ h+='<img src="'+esc(img.imageUrl)+'" title="'+esc((img.type||'')+' '+(img.caption||''))+'">'; });
+    h += '</div>';
+  }
+
+  $('detailContent').innerHTML = h;
+
+  // Status update section
+  var transitions = VALID_TRANSITIONS[f.status]||[];
+  if(transitions.length>0){
+    $('resolveSection').style.display='';
+    var opts = '<option value="">— Keep current —</option>';
+    transitions.forEach(function(t){ opts+='<option value="'+t+'">'+(FS_LABEL[t]||t)+'</option>'; });
+    $('dStatus').innerHTML = opts;
+    $('dCause').value = f.cause||'';
+    $('dResolution').value = f.resolution||'';
+    $('dCost').value = f.resolutionCost||'';
+    $('dDowntime').value = f.downtime||'';
+  } else {
+    $('resolveSection').style.display='none';
+  }
+
+  App.openModal('detailModal');
+}
+
+async function updateFailure(){
+  if(!currentFailureId) return;
+  var body = {};
+  var st = $('dStatus').value; if(st) body.status = st;
+  var cause = $('dCause').value.trim(); if(cause) body.cause = cause;
+  var resolution = $('dResolution').value.trim(); if(resolution) body.resolution = resolution;
+  var cost = $('dCost').value; if(cost) body.resolutionCost = parseFloat(cost);
+  var downtime = $('dDowntime').value; if(downtime) body.downtime = parseInt(downtime);
+
+  if(Object.keys(body).length===0){ App.toast('Nothing to update','error'); return; }
+
+  var btn = $('updateStatusBtn');
+  btn.disabled = true;
+  try{
+    var res = await App.apiFetch('/asset-failures/'+currentFailureId, {
+      method:'PATCH', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)
+    });
+    if(!res){btn.disabled=false;return;}
+    if(!res.ok){var d=await res.json();App.toast(d.error||'Failed','error');btn.disabled=false;return;}
+    App.toast('Failure updated','success');
+    App.closeModal('detailModal');
+    loadFailures(currentPage);
+  }catch(e){App.toast('Network error','error');}
+  btn.disabled=false;
+}
+
+// ── Report failure ──
+function openReportModal(){
+  $('reportForm').reset();
+  $('rSeverity').value='MEDIUM';
+  App.hideError('reportError');
+  loadAssetSelect();
+  App.openModal('reportModal');
+}
+
+var assetsLoaded = false;
+async function loadAssetSelect(){
+  if(assetsLoaded) return;
+  var res = await App.apiFetch('/assets?limit=100&active=true');
+  if(!res) return;
+  var data = await res.json();
+  var opts = '<option value="">Select asset…</option>';
+  (data.assets||[]).forEach(function(a){
+    opts += '<option value="'+a.id+'">'+esc(a.assetCode+' — '+a.name)+'</option>';
+  });
+  $('rAsset').innerHTML = opts;
+  assetsLoaded = true;
+}
+
+$('reportForm').addEventListener('submit', async function(e){
+  e.preventDefault();
+  App.hideError('reportError');
+  var body = {
+    assetId: $('rAsset').value,
+    title: $('rTitle').value.trim(),
+    severity: $('rSeverity').value,
+    description: $('rDescription').value.trim()||undefined,
+    failedAt: $('rFailedAt').value||undefined
+  };
+  if(!body.assetId){ App.showError('reportError','Select an asset'); return; }
+
+  var btn=$('reportBtn'); btn.disabled=true;
+  try{
+    var res = await App.apiFetch('/asset-failures', {
+      method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)
+    });
+    if(!res){btn.disabled=false;return;}
+    if(!res.ok){var d=await res.json();App.showError('reportError',d.error||'Failed');btn.disabled=false;return;}
+    App.closeModal('reportModal');
+    App.toast('Failure reported','success');
+    loadFailures(currentPage);
+  }catch(err){App.showError('reportError','Network error');}
+  btn.disabled=false;
+});
+
+async function exportCSV(){
+  var params=[];
+  var st=$('fFStatus').value; if(st) params.push('status='+st);
+  var sev=$('fSeverity').value; if(sev) params.push('severity='+sev);
+  var from=$('fFrom').value; if(from) params.push('from='+from);
+  var to=$('fTo').value; if(to) params.push('to='+to);
+  var res = await App.apiFetch('/asset-failures/export?'+params.join('&'));
+  if(!res) return;
+  var blob = await res.blob();
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a'); a.href=url; a.download='asset-failures-'+new Date().toISOString().split('T')[0]+'.csv'; a.click();
+  URL.revokeObjectURL(url);
+}
+
+loadFailures(1);
+</script>
+</body>
+</html>

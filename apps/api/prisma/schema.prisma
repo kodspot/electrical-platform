@@ -1,0 +1,838 @@
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "linux-musl-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Organization {
+  id   String  @id @default(uuid())
+  name String
+  slug String  @unique
+  type String? // "hospital", "hotel", "office", etc.
+
+  address        String?
+  phone          String?
+  email          String?
+  logoUrl        String?
+  enabledModules String[] @default(["ele"])
+
+  // AI Assistant settings (managed by superadmin only)
+  aiEnabled           Boolean   @default(false)
+  aiProvider          String? // "azure-openai" | "gemini"
+  aiModel             String? // e.g. "gpt-4o", "gemini-2.0-flash"
+  aiApiKey            String? // Encrypted with DATA_ENCRYPTION_KEY
+  aiApiKeyLastUsedAt  DateTime?
+  aiMonthlyTokenLimit Int?      @default(100000) // soft cap per month
+  aiTotalTokensUsed   Int       @default(0) // reset monthly by scheduler
+
+  status OrgStatus @default(ACTIVE)
+
+  users                 User[]
+  workers               Worker[]
+  locations             Location[]
+  tickets               Ticket[]
+  auditLogs             AuditLog[]
+  notifications         Notification[]
+  shiftConfigs          ShiftConfig[]
+  workerAssignments     WorkerAssignment[]
+  attendance            Attendance[]
+  dutyRosters           DutyRoster[]
+  aiUsageLogs           AiUsageLog[]
+  inspectionTemplates   InspectionTemplate[]
+  electricalInspections ElectricalInspection[]
+  assets                Asset[]
+  assetEvents           AssetEvent[]
+  assetFailures         AssetFailure[]
+  alertRules            AlertRule[]
+  alerts                Alert[]
+  aiInsights            AiInsight[]
+
+  deletedAt  DateTime?
+  purgeAfter DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status])
+}
+
+model User {
+  id    String        @id @default(uuid())
+  orgId String?
+  org   Organization? @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  name         String
+  email        String
+  phone        String?
+  designation  String?
+  employeeId   String?
+  department   String?
+  gender       String?
+  bloodGroup   String?
+  dateOfBirth  DateTime?
+  dateOfJoin   DateTime?
+  address      String?
+  aadharNo     String?
+  notes        String?
+  passwordHash String
+  role         UserRole
+
+  isActive           Boolean   @default(true)
+  tokenInvalidBefore DateTime?
+
+  ticketsCreated        Ticket[]               @relation("TicketCreatedBy")
+  ticketsAssigned       Ticket[]               @relation("TicketAssignedTo")
+  notifications         Notification[]
+  attendanceMarked      Attendance[]           @relation("AttendanceMarkedBy")
+  dutyRosters           DutyRoster[]           @relation("DutyRosterSupervisor")
+  electricalInspections ElectricalInspection[] @relation("ElectricalInspector")
+  assetEventsLogged     AssetEvent[]            @relation("AssetEventLogger")
+  assetFailuresLogged   AssetFailure[]          @relation("AssetFailureLogger")
+  assetFailuresResolved AssetFailure[]          @relation("AssetFailureResolver")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([orgId, email])
+  @@index([orgId, role])
+  @@index([orgId, isActive])
+  @@index([email])
+}
+
+model Worker {
+  id    String       @id @default(uuid())
+  orgId String
+  org   Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  employeeId  String? // Unique worker ID within org (e.g., EMP-001)
+  name        String
+  phone       String?
+  email       String?
+  address     String?
+  department  String? // e.g., "Electrical", "Maintenance"
+  designation String? // e.g., "Electrician", "Floor Supervisor"
+  dateOfBirth DateTime?
+  dateOfJoin  DateTime?
+  gender      String? // "Male", "Female", "Other"
+  bloodGroup  String?
+  aadharNo    String? // ID proof
+  notes       String?
+  pinHash     String? // Hashed 4-6 digit PIN for worker login
+  tokenInvalidBefore DateTime? // Reject tokens issued before this timestamp
+  isActive    Boolean   @default(true)
+
+  ticketsResolved       Ticket[]               @relation("TicketResolvedWorkers")
+  assignments           WorkerAssignment[]
+  attendance            Attendance[]
+  dutyRosterAssignments DutyRosterWorker[]
+  electricalInspections ElectricalInspection[]
+  notifications         Notification[]         @relation("WorkerNotifications")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([orgId, employeeId])
+  @@index([orgId, isActive])
+}
+
+model Location {
+  id       String       @id @default(uuid())
+  orgId    String
+  org      Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  parentId String?
+  parent   Location?    @relation("LocationHierarchy", fields: [parentId], references: [id])
+  children Location[]   @relation("LocationHierarchy")
+
+  name      String
+  type      LocationType
+  qrCode    String       @unique
+  sortOrder Int          @default(0)
+  isActive  Boolean      @default(true)
+  notes     String?
+
+  tickets               Ticket[]
+  workerAssignments     WorkerAssignment[]
+  dutyRosters           DutyRoster[]
+  electricalInspections ElectricalInspection[]
+  assets                Asset[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([orgId, parentId])
+  @@index([orgId, type])
+  @@index([orgId, isActive])
+}
+
+model Ticket {
+  id    String       @id @default(uuid())
+  orgId String
+  org   Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  locationId   String
+  location     Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  createdById  String?
+  createdBy    User?    @relation("TicketCreatedBy", fields: [createdById], references: [id])
+  assignedToId String?
+  assignedTo   User?    @relation("TicketAssignedTo", fields: [assignedToId], references: [id])
+
+  title       String
+  description String?
+  imageUrl    String?
+  priority    TicketPriority @default(NORMAL)
+  status      TicketStatus   @default(OPEN)
+  source      String         @default("INTERNAL") // INTERNAL or PUBLIC
+  module      String         @default("ele") // ele, civil, asset, complaints
+  guestName   String?
+  guestPhone  String?
+  issueType   String? // Module-specific issue type
+
+  resolvedImageUrl String?
+  resolvedNote     String?
+  resolvedWorkers  Worker[]  @relation("TicketResolvedWorkers")
+  resolvedAt       DateTime?
+
+  // Public review fields
+  reviewToken     String?   @unique
+  reviewExpiresAt DateTime?
+  reviewStatus    String? // PENDING, CONFIRMED, REJECTED
+  reviewNote      String? // Guest comment when confirming/rejecting
+  reviewedAt      DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([orgId, status])
+  @@index([orgId, locationId])
+  @@index([assignedToId, status])
+  @@index([orgId, createdAt])
+  @@index([orgId, source])
+  @@index([orgId, module, status])
+}
+
+model AuditLog {
+  id    String        @id @default(uuid())
+  orgId String?
+  org   Organization? @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  actorType String
+  actorId   String?
+
+  action String
+
+  entityType String?
+  entityId   String?
+  oldValue   Json?
+  newValue   Json?
+
+  createdAt DateTime @default(now())
+
+  @@index([orgId, createdAt])
+  @@index([action, createdAt])
+}
+
+model Notification {
+  id     String        @id @default(uuid())
+  orgId  String
+  org    Organization? @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  userId String?
+  user   User?         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workerId String?
+  worker   Worker?     @relation("WorkerNotifications", fields: [workerId], references: [id], onDelete: Cascade)
+
+  type     String // ticket_assigned, ticket_created, ticket_resolved, public_complaint, alert_*, escalation
+  title    String
+  body     String?
+  entityId String? // ticket id or other entity
+  isRead   Boolean @default(false)
+
+  createdAt DateTime @default(now())
+
+  @@index([userId, isRead])
+  @@index([workerId, isRead])
+  @@index([orgId, createdAt])
+}
+
+model ShiftConfig {
+  id    String       @id @default(uuid())
+  orgId String
+  org   Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  shift     Shift
+  startHour Int // 0-23
+  startMin  Int     @default(0) // 0-59
+  endHour   Int // 0-23
+  endMin    Int     @default(0) // 0-59
+  isActive  Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([orgId, shift])
+  @@index([orgId])
+}
+
+enum UserRole {
+  SUPER_ADMIN
+  ADMIN
+  SUPERVISOR
+}
+
+enum OrgStatus {
+  ACTIVE
+  SUSPENDED
+  DELETED
+}
+
+enum LocationType {
+  BUILDING
+  FLOOR
+  ROOM
+  CORRIDOR
+  WASHROOM
+  ICU
+  LOBBY
+  KITCHEN
+  WARD
+  MEETING_ROOM
+  OTHER
+}
+
+enum Shift {
+  MORNING
+  AFTERNOON
+  NIGHT
+  GENERAL
+}
+
+enum InspectionStatus {
+  SUBMITTED
+  FLAGGED
+}
+
+enum TicketPriority {
+  LOW
+  NORMAL
+  HIGH
+  URGENT
+}
+
+enum TicketStatus {
+  OPEN
+  IN_PROGRESS
+  RESOLVED
+  CLOSED
+}
+
+enum AttendanceStatus {
+  PRESENT
+  ABSENT
+  LEAVE
+  HALF_DAY
+}
+
+enum AssetStatus {
+  OPERATIONAL
+  UNDER_MAINTENANCE
+  FAULTY
+  DECOMMISSIONED
+}
+
+enum AssetCondition {
+  NEW
+  GOOD
+  FAIR
+  POOR
+  CRITICAL
+}
+
+enum AssetEventType {
+  INSTALLED
+  INSPECTED
+  MAINTAINED
+  REPAIRED
+  RELOCATED
+  DECOMMISSIONED
+  RECOMMISSIONED
+  NOTE
+}
+
+enum FailureSeverity {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum FailureStatus {
+  OPEN
+  ACKNOWLEDGED
+  IN_PROGRESS
+  RESOLVED
+  CLOSED
+}
+
+enum AlertTrigger {
+  INSPECTION_FAULT
+  INSPECTION_LATE
+  INSPECTION_MISSED
+  ASSET_FAILURE_REPORTED
+  ASSET_FAILURE_UNRESOLVED
+  ASSET_MAINTENANCE_OVERDUE
+  TICKET_HIGH_PRIORITY
+  ATTENDANCE_LOW
+}
+
+enum AlertSeverity {
+  INFO
+  WARNING
+  HIGH
+  CRITICAL
+}
+
+model WorkerAssignment {
+  id    String       @id @default(uuid())
+  orgId String
+  org   Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  workerId   String
+  worker     Worker   @relation(fields: [workerId], references: [id], onDelete: Cascade)
+  locationId String
+  location   Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
+
+  isPrimary Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([workerId, locationId])
+  @@index([orgId])
+  @@index([locationId])
+  @@index([workerId])
+}
+
+model Attendance {
+  id    String       @id @default(uuid())
+  orgId String
+  org   Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  workerId   String
+  worker     Worker @relation(fields: [workerId], references: [id], onDelete: Cascade)
+  markedById String
+  markedBy   User   @relation("AttendanceMarkedBy", fields: [markedById], references: [id])
+
+  date   DateTime         @db.Date
+  shift  Shift
+  status AttendanceStatus
+
+  note String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([workerId, date, shift])
+  @@index([orgId, date])
+  @@index([workerId, date])
+  @@index([markedById])
+}
+
+model DutyRoster {
+  id    String       @id @default(uuid())
+  orgId String
+  org   Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  date         DateTime @db.Date
+  shift        Shift
+  locationId   String
+  location     Location @relation(fields: [locationId], references: [id])
+  supervisorId String
+  supervisor   User     @relation("DutyRosterSupervisor", fields: [supervisorId], references: [id])
+
+  workers DutyRosterWorker[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([orgId, date, shift, supervisorId])
+  @@index([orgId, date])
+  @@index([orgId, date, shift, locationId])
+}
+
+model DutyRosterWorker {
+  id       String     @id @default(uuid())
+  rosterId String
+  roster   DutyRoster @relation(fields: [rosterId], references: [id], onDelete: Cascade)
+  workerId String
+  worker   Worker     @relation(fields: [workerId], references: [id])
+
+  @@unique([rosterId, workerId])
+  @@index([workerId])
+}
+
+model AiUsageLog {
+  id    String       @id @default(uuid())
+  orgId String
+  org   Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  userId       String
+  action       String // "chat" | "analyze"
+  prompt       String? // first 200 chars of user message
+  provider     String // "gemini" | "azure-openai"
+  model        String
+  inputTokens  Int?
+  outputTokens Int?
+  totalTokens  Int?
+  latencyMs    Int? // response time in milliseconds
+  success      Boolean @default(true)
+  errorCode    String? // AI_AUTH_ERROR, AI_RATE_LIMIT, etc.
+  keySource    String  @default("org") // "org" | "global"
+
+  createdAt DateTime @default(now())
+
+  @@index([orgId, createdAt])
+  @@index([orgId, action])
+  @@index([userId, createdAt])
+}
+
+// ── Asset Management Module ──
+
+model Asset {
+  id    String       @id @default(uuid())
+  orgId String
+  org   Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  locationId String
+  location   Location @relation(fields: [locationId], references: [id])
+
+  assetCode  String  // Unique within org, e.g. "ELE-TFR-001"
+  name       String  // "Main Transformer", "Panel Board A"
+  category   String  // "Transformer", "Panel", "Generator", "UPS", "Motor", "Cable", etc.
+  make       String? // Manufacturer
+  model      String? // Model number
+  serialNo   String? // Manufacturer serial
+  ratedCapacity String? // "100 KVA", "32A", "415V"
+  description  String?
+  imageUrl     String?
+
+  status    AssetStatus    @default(OPERATIONAL)
+  condition AssetCondition @default(GOOD)
+
+  installDate       DateTime? @db.Date
+  warrantyExpiry    DateTime? @db.Date
+  lastMaintenanceAt DateTime?
+  nextMaintenanceDue DateTime? @db.Date
+  maintenanceCycleDays Int?    // e.g. 90 = quarterly
+
+  purchaseCost Float?
+  metadata     Json?   // Flexible key-value for custom fields
+
+  isActive Boolean @default(true)
+
+  events   AssetEvent[]
+  failures AssetFailure[]
+  images   AssetImage[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([orgId, assetCode])
+  @@index([orgId, status])
+  @@index([orgId, category])
+  @@index([orgId, locationId])
+  @@index([orgId, isActive])
+  @@index([orgId, nextMaintenanceDue])
+}
+
+model AssetEvent {
+  id    String       @id @default(uuid())
+  orgId String
+  org   Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  assetId  String
+  asset    Asset @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  loggedById String
+  loggedBy   User @relation("AssetEventLogger", fields: [loggedById], references: [id])
+
+  type     AssetEventType
+  summary  String   // Short description: "Quarterly maintenance completed"
+  details  String?  // Longer notes
+  cost     Float?   // Cost of maintenance/repair if applicable
+  imageUrl String?  // Evidence photo
+
+  // Snapshot at time of event
+  statusBefore    AssetStatus?
+  statusAfter     AssetStatus?
+  conditionBefore AssetCondition?
+  conditionAfter  AssetCondition?
+
+  eventDate DateTime @default(now())
+  createdAt DateTime @default(now())
+
+  @@index([assetId, eventDate])
+  @@index([orgId, eventDate])
+  @@index([orgId, type])
+}
+
+model AssetFailure {
+  id    String       @id @default(uuid())
+  orgId String
+  org   Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  assetId    String
+  asset      Asset @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  loggedById String
+  loggedBy   User @relation("AssetFailureLogger", fields: [loggedById], references: [id])
+
+  title       String   // "Phase R failure", "Oil leak detected"
+  description String?
+  cause       String?  // Root cause (filled on resolution)
+  severity    FailureSeverity @default(MEDIUM)
+  status      FailureStatus   @default(OPEN)
+
+  failedAt   DateTime @default(now()) // When the failure occurred
+  acknowledgedAt DateTime?
+  resolvedAt     DateTime?
+  resolvedById   String?
+  resolvedBy     User? @relation("AssetFailureResolver", fields: [resolvedById], references: [id])
+  resolution     String? // Resolution notes
+  resolutionCost Float?
+
+  downtime Int? // Total downtime in minutes once resolved
+
+  images AssetFailureImage[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([assetId, status])
+  @@index([orgId, status])
+  @@index([orgId, severity])
+  @@index([orgId, failedAt])
+}
+
+model AssetImage {
+  id      String @id @default(uuid())
+  assetId String
+  asset   Asset  @relation(fields: [assetId], references: [id], onDelete: Cascade)
+
+  imageUrl String
+  caption  String?
+  isPrimary Boolean @default(false)
+
+  createdAt DateTime @default(now())
+
+  @@index([assetId])
+}
+
+model AssetFailureImage {
+  id        String       @id @default(uuid())
+  failureId String
+  failure   AssetFailure @relation(fields: [failureId], references: [id], onDelete: Cascade)
+
+  imageUrl String
+  caption  String?
+  type     String @default("REPORT") // REPORT (when logging) or RESOLUTION (when resolving)
+
+  createdAt DateTime @default(now())
+
+  @@index([failureId])
+}
+
+// ── Alert + Automation ──
+
+model AlertRule {
+  id    String       @id @default(uuid())
+  orgId String
+  org   Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  name        String
+  description String?
+  trigger     AlertTrigger
+  conditions  Json   // Trigger-specific: { minFaults:3, minSeverity:'HIGH', hoursOpen:24, ... }
+  actions     Json   // Action list: [{ type:'NOTIFY_ADMINS' }, { type:'CREATE_TICKET', priority:'HIGH' }]
+
+  // Escalation policy
+  escalateAfterMinutes Int?  // If alert not acknowledged within N minutes, escalate
+  escalationActions    Json? // Actions on escalation: [{ type:'NOTIFY_ADMINS' }, { type:'CREATE_TICKET' }]
+  maxEscalations       Int?  @default(1) // Max escalation rounds
+
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  alerts Alert[]
+
+  @@index([orgId, isActive])
+  @@index([orgId, trigger])
+}
+
+model Alert {
+  id    String       @id @default(uuid())
+  orgId String
+  org   Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  ruleId String?
+  rule   AlertRule? @relation(fields: [ruleId], references: [id], onDelete: SetNull)
+
+  trigger    AlertTrigger
+  severity   AlertSeverity @default(WARNING)
+  title      String
+  body       String?
+
+  entityType String? // 'inspection', 'asset', 'failure', 'ticket'
+  entityId   String?
+  metadata   Json?
+  actionsRun Json?   // Snapshot of executed actions
+
+  acknowledged   Boolean   @default(false)
+  acknowledgedBy String?
+  acknowledgedAt DateTime?
+
+  // Escalation tracking
+  escalationLevel  Int       @default(0)  // 0 = not escalated, 1+ = escalation rounds
+  lastEscalatedAt  DateTime?
+
+  dedupKey  String? // Prevents duplicate alerts
+  createdAt DateTime @default(now())
+
+  @@index([orgId, createdAt])
+  @@index([orgId, acknowledged, createdAt])
+  @@index([orgId, trigger])
+  @@unique([orgId, dedupKey])
+}
+
+model AiInsight {
+  id    String       @id @default(uuid())
+  orgId String
+  org   Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  type    String  // 'daily_summary', 'weekly_report', 'anomaly', 'trend_alert'
+  title   String
+  content String  // AI-generated markdown
+  metadata Json?  // tokens used, model, latency
+  period  String? // '2026-04-06', '2026-W14'
+
+  isRead  Boolean @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([orgId, type, createdAt])
+  @@unique([orgId, type, period])
+}
+
+// ── Inspection Templates ──
+
+model InspectionTemplate {
+  id    String       @id @default(uuid())
+  orgId String
+  org   Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  name          String // e.g. "Standard Room Inspection", "MCB Panel Deep Check"
+  description   String?
+  locationTypes String[] // Empty = all types; otherwise filter e.g. ["ROOM","WARD"]
+  isDefault     Boolean  @default(false) // One default per org — auto-selected when no specific match
+  isActive      Boolean  @default(true)
+  version       Int      @default(1) // Incremented on edit so historical inspections keep old snapshot
+  sortOrder     Int      @default(0)
+
+  items       InspectionTemplateItem[]
+  inspections ElectricalInspection[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([orgId, isActive])
+  @@index([orgId, isDefault])
+}
+
+model InspectionTemplateItem {
+  id         String             @id @default(uuid())
+  templateId String
+  template   InspectionTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+
+  label       String // e.g. "Lighting", "MCB Panel", "Earth Resistance"
+  checkKey    String // Machine key: LIGHTING, FAN, CUSTOM_1, etc.
+  responseType String @default("STATUS") // STATUS (OK/FAULTY/NA), READING (numeric), YES_NO
+  unit        String? // For READING type: "V", "Ω", "A", etc.
+  minValue    Float?  // For READING type: acceptable min
+  maxValue    Float?  // For READING type: acceptable max
+  isRequired  Boolean @default(true)
+  sortOrder   Int     @default(0)
+
+  inspectionItems ElectricalInspectionItem[]
+
+  @@index([templateId])
+}
+
+// ── Electrical Module ──
+
+model ElectricalInspection {
+  id    String       @id @default(uuid())
+  orgId String
+  org   Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  locationId   String
+  location     Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  supervisorId String
+  supervisor   User     @relation("ElectricalInspector", fields: [supervisorId], references: [id])
+  templateId   String?
+  template     InspectionTemplate? @relation(fields: [templateId], references: [id])
+
+  workers Worker[]
+  images  ElectricalImage[]
+  items   ElectricalInspectionItem[]
+
+  shift  Shift            @default(GENERAL)
+  notes  String?
+  status InspectionStatus @default(SUBMITTED)
+
+  expectedShift Shift?
+  isLate        Boolean @default(false)
+  lateReason    String?
+  flagReason    String?
+
+  faultyCount Int @default(0) // Cached count of FAULTY items
+
+  inspectedAt DateTime @default(now())
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([orgId, inspectedAt])
+  @@index([orgId, locationId])
+  @@index([supervisorId, inspectedAt])
+  @@index([orgId, status])
+  @@index([templateId])
+}
+
+model ElectricalInspectionItem {
+  id           String               @id @default(uuid())
+  inspectionId String
+  inspection   ElectricalInspection @relation(fields: [inspectionId], references: [id], onDelete: Cascade)
+
+  templateItemId String?
+  templateItem   InspectionTemplateItem? @relation(fields: [templateItemId], references: [id])
+
+  checkType String // LIGHTING, FAN, AC, etc. (from template checkKey or legacy)
+  status    String // OK, FAULTY, NA
+  remarks   String?
+  reading   Float? // For READING response type
+
+  @@index([inspectionId])
+  @@index([templateItemId])
+}
+
+model ElectricalImage {
+  id           String               @id @default(uuid())
+  inspectionId String
+  inspection   ElectricalInspection @relation(fields: [inspectionId], references: [id], onDelete: Cascade)
+
+  imageUrl String
+  caption  String?
+
+  createdAt DateTime @default(now())
+
+  @@index([inspectionId])
+}

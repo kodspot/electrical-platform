@@ -1,0 +1,514 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
+<link rel="manifest" href="/site.webmanifest">
+<meta name="theme-color" content="#1a7f64">
+<title>AI Assistant — Kodspot</title>
+<link rel="stylesheet" href="/css/design-system.css?v=9">
+<style>
+/* ── AI Page Layout ── */
+.ai-page-header{display:flex;align-items:center;justify-content:space-between;gap:1rem;margin-bottom:1.5rem;flex-wrap:wrap}
+.ai-page-title{display:flex;align-items:center;gap:.6rem}
+.ai-page-title h1{font-size:1.35rem;font-weight:700;color:var(--text);margin:0}
+.ai-page-title .ai-badge{font-size:.58rem;background:linear-gradient(135deg,#0ea5a4,#0d9488);color:#fff;padding:.2rem .6rem;border-radius:10px;font-weight:700;letter-spacing:.5px;text-transform:uppercase}
+.ai-provider-pill{display:flex;align-items:center;gap:.4rem;padding:.3rem .7rem;background:var(--bg);border:1px solid var(--border);border-radius:20px;font-size:.72rem;color:var(--text-muted);font-weight:500}
+.ai-provider-pill .dot{width:6px;height:6px;border-radius:50%;background:#10b981}
+
+/* ── Insight Cards Grid ── */
+.ai-insights-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:1rem;margin-bottom:1.5rem}
+.ai-insight-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:1.15rem;cursor:pointer;transition:all .2s;position:relative;overflow:hidden}
+.ai-insight-card:hover{border-color:var(--primary);box-shadow:0 4px 16px rgba(14,165,164,.1);transform:translateY(-2px)}
+.ai-insight-card.loading{pointer-events:none;opacity:.7}
+.ai-insight-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;border-radius:var(--radius-lg) var(--radius-lg) 0 0}
+.ai-insight-card.card-green::before{background:linear-gradient(90deg,#10b981,#34d399)}
+.ai-insight-card.card-blue::before{background:linear-gradient(90deg,#3b82f6,#60a5fa)}
+.ai-insight-card.card-purple::before{background:linear-gradient(90deg,#8b5cf6,#a78bfa)}
+.ai-insight-card.card-amber::before{background:linear-gradient(90deg,#f59e0b,#fbbf24)}
+.ai-insight-card.card-rose::before{background:linear-gradient(90deg,#f43f5e,#fb7185)}
+.ai-insight-card.card-indigo::before{background:linear-gradient(90deg,#6366f1,#818cf8)}
+.ai-insight-card.card-teal::before{background:linear-gradient(90deg,#0ea5a4,#14b8a6)}
+.ai-insight-card.card-orange::before{background:linear-gradient(90deg,#ea580c,#fb923c)}
+.ai-insight-icon{width:40px;height:40px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:1.25rem;margin-bottom:.65rem}
+.ai-insight-card.card-green .ai-insight-icon{background:#ecfdf5;color:#059669}
+.ai-insight-card.card-blue .ai-insight-icon{background:#eff6ff;color:#2563eb}
+.ai-insight-card.card-purple .ai-insight-icon{background:#f5f3ff;color:#7c3aed}
+.ai-insight-card.card-amber .ai-insight-icon{background:#fffbeb;color:#d97706}
+.ai-insight-card.card-rose .ai-insight-icon{background:#fff1f2;color:#e11d48}
+.ai-insight-card.card-indigo .ai-insight-icon{background:#eef2ff;color:#4f46e5}
+.ai-insight-card.card-teal .ai-insight-icon{background:#f0fdfa;color:#0d9488}
+.ai-insight-card.card-orange .ai-insight-icon{background:#fff7ed;color:#ea580c}
+.ai-insight-title{font-size:.88rem;font-weight:600;color:var(--text);margin-bottom:.2rem}
+.ai-insight-desc{font-size:.72rem;color:var(--text-muted);line-height:1.4}
+.ai-insight-loader{display:none;position:absolute;top:50%;left:50%;transform:translate(-50%,-50%)}
+.ai-insight-card.loading .ai-insight-loader{display:block}
+.ai-insight-card.loading .ai-insight-icon,
+.ai-insight-card.loading .ai-insight-title,
+.ai-insight-card.loading .ai-insight-desc{opacity:.3}
+
+/* ── Result Panel ── */
+.ai-result-panel{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);box-shadow:var(--shadow-sm);display:none;margin-bottom:1.5rem}
+.ai-result-panel.show{display:block;animation:fadeSlideIn .3s ease}
+@keyframes fadeSlideIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+.ai-result-header{display:flex;align-items:center;justify-content:space-between;padding:1rem 1.25rem;border-bottom:1px solid var(--border);background:linear-gradient(135deg,#f0fdfa,#ecfdf5);border-radius:var(--radius-lg) var(--radius-lg) 0 0}
+.ai-result-title{font-size:.92rem;font-weight:700;color:var(--text);display:flex;align-items:center;gap:.5rem}
+.ai-result-actions{display:flex;gap:.4rem}
+.ai-result-actions button{padding:.3rem .6rem;border:1px solid var(--border);border-radius:var(--radius);background:var(--surface);font-size:.72rem;cursor:pointer;color:var(--text-muted);transition:all .15s}
+.ai-result-actions button:hover{border-color:var(--primary);color:var(--primary)}
+.ai-result-body{padding:1.5rem;font-size:.84rem;line-height:1.75;color:var(--text);max-height:600px;overflow-y:auto}
+.ai-result-body b,.ai-result-body strong{font-weight:700;color:var(--text)}
+.ai-result-body h3,.ai-result-body h4,.ai-result-body h5{border-bottom:1px solid var(--border-light,#eee);padding-bottom:.3rem}
+.ai-result-body ul,.ai-result-body ol{padding-left:1.25rem;margin:.4rem 0}
+.ai-result-body li{margin-bottom:.25rem}
+.ai-result-body hr{border:none;border-top:1px solid var(--border);margin:1rem 0}
+.ai-result-body pre{margin:.75rem 0}
+.ai-result-loading{text-align:center;padding:2.5rem;color:var(--text-muted)}
+.ai-result-loading .ai-typing{display:inline-flex;gap:4px;align-items:center}
+.ai-result-loading .ai-typing span{width:8px;height:8px;border-radius:50%;background:var(--primary);opacity:.4;animation:aiTyping .8s infinite ease-in-out}
+.ai-result-loading .ai-typing span:nth-child(2){animation-delay:.15s}
+.ai-result-loading .ai-typing span:nth-child(3){animation-delay:.3s}
+@keyframes aiTyping{0%,100%{opacity:.3;transform:translateY(0)}50%{opacity:1;transform:translateY(-4px)}}
+
+/* ── Chat Section ── */
+.ai-chat-section{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);box-shadow:var(--shadow-sm);overflow:hidden}
+.ai-chat-header{padding:.85rem 1.15rem;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:.5rem;background:linear-gradient(135deg,#f0fdfa,#ecfdf5)}
+.ai-chat-header-icon{font-size:1.15rem}
+.ai-chat-header-title{font-size:.88rem;font-weight:700;color:var(--text);flex:1}
+.ai-chat-clear{margin-left:auto;background:none;border:1px solid var(--border);color:var(--text-muted);cursor:pointer;font-size:.72rem;padding:.25rem .6rem;border-radius:6px;transition:all .15s;display:none}
+.ai-chat-clear:hover{border-color:var(--danger,#dc2626);color:var(--danger,#dc2626);background:#fef2f2}
+.ai-chat-messages{height:400px;overflow-y:auto;padding:1rem;display:flex;flex-direction:column;gap:.75rem;overscroll-behavior:contain;scroll-behavior:smooth}
+.ai-chat-msg{max-width:82%;padding:.7rem .9rem;border-radius:16px;font-size:.82rem;line-height:1.65;word-wrap:break-word;animation:fadeSlideIn .25s ease}
+.ai-chat-msg b{font-weight:700}
+.ai-chat-msg h3,.ai-chat-msg h4,.ai-chat-msg h5{margin-top:.5rem}
+.ai-chat-msg-bot{background:var(--bg);color:var(--text);align-self:flex-start;border-bottom-left-radius:4px;box-shadow:0 1px 3px rgba(0,0,0,.04)}
+.ai-chat-msg-user{background:linear-gradient(135deg,#0ea5a4,#0d9488);color:#fff;align-self:flex-end;border-bottom-right-radius:4px;font-weight:500;box-shadow:0 2px 8px rgba(14,165,164,.18)}
+.ai-chat-msg-error{background:#fef2f2;color:#dc2626;align-self:flex-start;font-size:.78rem;border:1px solid #fecaca;border-radius:12px}
+.ai-chat-suggestions{padding:.5rem .85rem .25rem;display:flex;flex-wrap:wrap;gap:.35rem}
+.ai-chat-chip{font-size:.72rem;padding:.35rem .7rem;border-radius:20px;border:1px solid var(--border);background:var(--surface);color:var(--text);cursor:pointer;transition:all .15s;white-space:nowrap}
+.ai-chat-chip:hover{background:var(--primary);color:#fff;border-color:var(--primary);transform:translateY(-1px);box-shadow:0 2px 8px rgba(14,165,164,.18)}
+.ai-chat-input-wrap{padding:.75rem 1rem;border-top:1px solid var(--border);display:flex;gap:.5rem;align-items:flex-end;background:var(--surface)}
+.ai-chat-input{flex:1;border:1.5px solid var(--border);border-radius:12px;padding:.55rem .8rem;font-size:.82rem;outline:none;transition:border-color .15s,box-shadow .15s;font-family:inherit;resize:none;max-height:80px;line-height:1.4}
+.ai-chat-input:focus{border-color:var(--primary);box-shadow:0 0 0 3px rgba(14,165,164,.08)}
+.ai-chat-send{width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,#0ea5a4,#0d9488);color:#fff;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .15s;flex-shrink:0;box-shadow:0 2px 8px rgba(14,165,164,.2)}
+.ai-chat-send:hover:not(:disabled){transform:scale(1.08);box-shadow:0 3px 12px rgba(14,165,164,.3)}
+.ai-chat-send:disabled{opacity:.35;cursor:not-allowed;box-shadow:none}
+
+/* ── Responsive ── */
+@media(max-width:768px){
+  .ai-insights-grid{grid-template-columns:1fr 1fr}
+  .ai-chat-messages{height:320px}
+  .ai-chat-msg{max-width:90%}
+}
+@media(max-width:480px){
+  .ai-insights-grid{grid-template-columns:1fr}
+  .ai-page-header{flex-direction:column;align-items:flex-start}
+  .ai-result-body{max-height:400px;padding:1rem;font-size:.8rem}
+  .ai-result-header{padding:.75rem .85rem}
+  .ai-result-title{font-size:.84rem}
+  .ai-chat-messages{height:280px}
+  .ai-chat-input-wrap{padding:.6rem .75rem}
+  .ai-chat-msg{max-width:92%}
+}
+</style>
+</head>
+<body>
+<nav class="topbar">
+  <div class="topbar-left">
+    <button class="nav-toggle" id="nav-toggle"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"/></svg></button>
+    <span class="topbar-brand">Kodspot</span>
+    <div class="topbar-nav" id="topbar-nav"></div>
+  </div>
+  <div class="topbar-right">
+    <span class="topbar-user" id="userName"></span>
+    <button class="btn btn-sm btn-ghost" onclick="App.logout()">Logout</button>
+  </div>
+</nav>
+<div class="sa-banner" id="sa-banner"></div>
+
+<main class="container" style="opacity:0;transition:opacity .2s">
+  <div class="ai-page-header">
+    <div class="ai-page-title">
+      <h1>AI Assistant</h1>
+      <span class="ai-badge">BETA</span>
+    </div>
+    <div class="ai-provider-pill" id="providerPill" style="display:none">
+      <span class="dot"></span>
+      <span id="providerName">Connected</span>
+    </div>
+  </div>
+
+  <!-- Quick Insight Cards -->
+  <h2 style="font-size:.92rem;font-weight:700;color:var(--text);margin-bottom:.75rem;display:flex;align-items:center;gap:.4rem">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>
+    Quick Insights
+  </h2>
+  <div class="ai-insights-grid" id="insightsGrid">
+    <div class="ai-insight-card card-green" data-type="daily-summary">
+      <div class="ai-insight-icon">📊</div>
+      <div class="ai-insight-title">Daily Summary</div>
+      <div class="ai-insight-desc">Get a complete overview of today's operations, completion rates, and key highlights.</div>
+      <div class="ai-insight-loader"><div class="ai-typing"><span></span><span></span><span></span></div></div>
+    </div>
+    <div class="ai-insight-card card-blue" data-type="best-performers">
+      <div class="ai-insight-icon">🏆</div>
+      <div class="ai-insight-title">Best Performers</div>
+      <div class="ai-insight-desc">Identify top supervisors and workers based on inspection records and punctuality.</div>
+      <div class="ai-insight-loader"><div class="ai-typing"><span></span><span></span><span></span></div></div>
+    </div>
+    <div class="ai-insight-card card-rose" data-type="underperformers">
+      <div class="ai-insight-icon">📉</div>
+      <div class="ai-insight-title">Areas to Improve</div>
+      <div class="ai-insight-desc">Find supervisors with late submissions, low completion shifts, and attendance issues.</div>
+      <div class="ai-insight-loader"><div class="ai-typing"><span></span><span></span><span></span></div></div>
+    </div>
+    <div class="ai-insight-card card-purple" data-type="shift-analysis">
+      <div class="ai-insight-icon">🔄</div>
+      <div class="ai-insight-title">Shift Analysis</div>
+      <div class="ai-insight-desc">Compare shift performance — completion, late counts, and coverage gaps.</div>
+      <div class="ai-insight-loader"><div class="ai-typing"><span></span><span></span><span></span></div></div>
+    </div>
+    <div class="ai-insight-card card-amber" data-type="attendance-insights">
+      <div class="ai-insight-icon">📋</div>
+      <div class="ai-insight-title">Attendance Insights</div>
+      <div class="ai-insight-desc">Analyze workforce attendance patterns and their impact on operations.</div>
+      <div class="ai-insight-loader"><div class="ai-typing"><span></span><span></span><span></span></div></div>
+    </div>
+    <div class="ai-insight-card card-indigo" data-type="ticket-analysis">
+      <div class="ai-insight-icon">🎫</div>
+      <div class="ai-insight-title">Ticket Analysis</div>
+      <div class="ai-insight-desc">Review open tickets, common issues, and locations needing attention.</div>
+      <div class="ai-insight-loader"><div class="ai-typing"><span></span><span></span><span></span></div></div>
+    </div>
+    <div class="ai-insight-card card-teal" data-type="recommendations">
+      <div class="ai-insight-icon">💡</div>
+      <div class="ai-insight-title">Recommendations</div>
+      <div class="ai-insight-desc">Get AI-powered suggestions to improve efficiency, prioritized by impact.</div>
+      <div class="ai-insight-loader"><div class="ai-typing"><span></span><span></span><span></span></div></div>
+    </div>
+    <div class="ai-insight-card card-orange" data-type="weekly-report">
+      <div class="ai-insight-icon">📝</div>
+      <div class="ai-insight-title">Weekly Report</div>
+      <div class="ai-insight-desc">Generate a professional management report with trends and priorities.</div>
+      <div class="ai-insight-loader"><div class="ai-typing"><span></span><span></span><span></span></div></div>
+    </div>
+  </div>
+
+  <!-- Result Panel -->
+  <div class="ai-result-panel" id="resultPanel">
+    <div class="ai-result-header">
+      <div class="ai-result-title">
+        <span id="resultIcon">📊</span>
+        <span id="resultTitle">Analysis</span>
+      </div>
+      <div class="ai-result-actions">
+        <button onclick="copyResult()" title="Copy to clipboard">📋 Copy</button>
+        <button onclick="closeResult()">✕ Close</button>
+      </div>
+    </div>
+    <div class="ai-result-body" id="resultBody"></div>
+  </div>
+
+  <!-- Free Chat -->
+  <h2 style="font-size:.92rem;font-weight:700;color:var(--text);margin-bottom:.75rem;margin-top:.5rem;display:flex;align-items:center;gap:.4rem">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+    Ask Anything
+  </h2>
+  <div class="ai-chat-section">
+    <div class="ai-chat-header">
+      <span class="ai-chat-header-icon">🤖</span>
+      <span class="ai-chat-header-title">Chat with AI</span>
+      <button id="clearChatBtn" class="ai-chat-clear" title="Clear chat history">Clear</button>
+    </div>
+    <div class="ai-chat-messages" id="chatMessages"></div>
+    <div class="ai-chat-suggestions" id="chatSuggestions"></div>
+    <div class="ai-chat-input-wrap">
+      <textarea class="ai-chat-input" id="chatInput" placeholder="Ask about inspections, attendance, performance…" rows="1" maxlength="500"></textarea>
+      <button class="ai-chat-send" id="chatSend" title="Send">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18"><path d="m22 2-7 20-4-9-9-4Z"/><path d="m22 2-11 11"/></svg>
+      </button>
+    </div>
+  </div>
+</main>
+
+<script src="/js/offline-sync.js?v=1"></script>
+<script src="/js/app.js?v=11"></script>
+<script>
+var esc = App.esc, $ = App.$;
+if (!App.initAdmin('admin-ai')) throw '';
+
+var _insightBusy = false;
+var _chatBusy = false;
+
+// ── Chat History (localStorage) ──
+var _chatStorageKey = 'kodspot_ai_chat_' + (App.getOrgSlug() || 'default');
+var _chatHistory = [];
+var _maxChatHistory = 50; // keep last 50 messages
+
+function _saveChatHistory() {
+  try { localStorage.setItem(_chatStorageKey, JSON.stringify(_chatHistory.slice(-_maxChatHistory))); } catch(e) { /* quota */ }
+}
+
+function _loadChatHistory() {
+  try { return JSON.parse(localStorage.getItem(_chatStorageKey) || '[]'); } catch(e) { return []; }
+}
+
+// ── Provider Info ──
+(async function() {
+  var container = document.querySelector('.container');
+  try {
+    var res = await App.apiFetch('/ai/status');
+    if (!res || !res.ok) { container.style.opacity = '1'; return; }
+    var s = await res.json();
+    if (!s.enabled) {
+      container.innerHTML =
+        '<div style="text-align:center;padding:4rem 1rem">' +
+        '<div style="font-size:3rem;margin-bottom:1rem">🤖</div>' +
+        '<h2 style="font-size:1.1rem;color:var(--text);margin-bottom:.5rem">AI Assistant Not Enabled</h2>' +
+        '<p style="font-size:.85rem;color:var(--text-muted)">Contact your administrator to enable AI features for your organization.</p>' +
+        '</div>';
+      container.style.opacity = '1';
+      return;
+    }
+    var pill = $('providerPill');
+    pill.style.display = 'flex';
+    var pName = s.provider === 'azure-openai' ? 'Azure OpenAI' : s.provider === 'gemini' ? 'Google Gemini' : s.provider;
+    $('providerName').textContent = pName + (s.model ? ' · ' + s.model : '');
+    container.style.opacity = '1';
+    // Restore chat history or show welcome message
+    _chatHistory = _loadChatHistory();
+    if (_chatHistory.length > 0) {
+      _chatHistory.forEach(function(m) { addChatMessage(m.type, m.text, true); });
+    } else {
+      addChatMessage('bot', "Hi! I'm your operations assistant. Use the insight cards above for quick analysis, or ask me anything about your electrical inspection data. 👋");
+    }
+    loadChatSuggestions();
+  } catch(e) {
+    container.style.opacity = '1';
+  }
+})();
+
+// ── Insight Cards ──
+var INSIGHT_META = {
+  'daily-summary': { icon: '📊', title: 'Daily Summary' },
+  'best-performers': { icon: '🏆', title: 'Best Performers' },
+  'underperformers': { icon: '📉', title: 'Areas to Improve' },
+  'shift-analysis': { icon: '🔄', title: 'Shift Analysis' },
+  'attendance-insights': { icon: '📋', title: 'Attendance Insights' },
+  'ticket-analysis': { icon: '🎫', title: 'Ticket Analysis' },
+  'recommendations': { icon: '💡', title: 'Recommendations' },
+  'weekly-report': { icon: '📝', title: 'Weekly Report' }
+};
+
+$('insightsGrid').addEventListener('click', function(e) {
+  var card = e.target.closest('.ai-insight-card');
+  if (!card || card.classList.contains('loading')) return;
+  runInsight(card.dataset.type, card);
+});
+
+async function runInsight(type, card) {
+  if (_insightBusy) return;
+  _insightBusy = true;
+  var meta = INSIGHT_META[type] || { icon: '📊', title: 'Analysis' };
+
+  // Show loading on card
+  card.classList.add('loading');
+
+  // Show result panel with loading
+  var panel = $('resultPanel');
+  panel.classList.add('show');
+  $('resultIcon').textContent = meta.icon;
+  $('resultTitle').textContent = meta.title;
+  $('resultBody').innerHTML =
+    '<div class="ai-result-loading">' +
+    '<div class="ai-typing"><span></span><span></span><span></span></div>' +
+    '<p style="margin-top:.6rem;font-size:.82rem">Analyzing your data…</p></div>';
+  panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+
+  try {
+    var res = await App.apiFetch('/ai/analyze', {
+      method: 'POST',
+      body: JSON.stringify({ type: type })
+    });
+
+    card.classList.remove('loading');
+
+    if (!res || !res.ok) {
+      var d = await (res ? res.json().catch(function() { return {}; }) : {});
+      $('resultBody').innerHTML = '<div style="color:var(--danger);padding:1rem">' + esc(d.error || 'Failed to get analysis. Please try again.') + '</div>';
+      return;
+    }
+
+    var data = await res.json();
+    $('resultBody').innerHTML = formatAiResponse(data.response);
+  } catch (err) {
+    card.classList.remove('loading');
+    $('resultBody').innerHTML = '<div style="color:var(--danger);padding:1rem">Network error. Please check your connection.</div>';
+  } finally {
+    _insightBusy = false;
+  }
+}
+
+function formatAiResponse(text) {
+  if (!text) return '<p>No response.</p>';
+  var html = esc(text);
+  // Code blocks (``` ... ```)
+  html = html.replace(/```[\w]*\n([\s\S]*?)```/g, '<pre style="background:var(--bg-secondary);padding:.6rem;border-radius:6px;overflow-x:auto;font-size:.8rem;margin:.5rem 0"><code>$1</code></pre>');
+  // Inline code (`...`)
+  html = html.replace(/`([^`]+)`/g, '<code style="background:var(--bg-secondary);padding:1px 4px;border-radius:3px;font-size:.85em">$1</code>');
+  // Horizontal rules (--- or ***)
+  html = html.replace(/\n---+\n/g, '\n<hr style="border:none;border-top:1px solid var(--border);margin:.75rem 0">\n');
+  // Headers (#### → h5, ### → h4, ## → h3, # → h3 bold)
+  html = html.replace(/^#### (.+)$/gm, '<h5 style="margin:.8rem 0 .3rem;font-size:.85rem;color:var(--primary)">$1</h5>');
+  html = html.replace(/^### (.+)$/gm, '<h4 style="margin:1rem 0 .4rem;font-size:.9rem;color:var(--primary)">$1</h4>');
+  html = html.replace(/^## (.+)$/gm, '<h3 style="margin:1rem 0 .5rem;font-size:.95rem">$1</h3>');
+  html = html.replace(/^# (.+)$/gm, '<h3 style="margin:1rem 0 .5rem;font-size:1rem;font-weight:700">$1</h3>');
+  // Bold & italic (must be before bullet conversion since * is used for both)
+  html = html.replace(/\*\*(.+?)\*\*/g, '<b>$1</b>');
+  html = html.replace(/(?<!\*)\*(\S[^*]*?\S|\S)\*(?!\*)/g, '<i>$1</i>');
+  // Nested bullets (  - or    - or  * or    *)
+  html = html.replace(/\n {2,}[-*] /g, '\n&nbsp;&nbsp;&nbsp;&nbsp;◦ ');
+  // Top-level bullets (- or *)
+  html = html.replace(/\n[-*] /g, '\n• ');
+  // Numbered lists
+  html = html.replace(/\n(\d+)\. /g, '\n<span style="font-weight:600;color:var(--primary)">$1.</span> ');
+  // Leading bullet at start of text
+  html = html.replace(/^[-*] /, '• ');
+  html = html.replace(/\n/g, '<br>');
+  return html;
+}
+
+function closeResult() {
+  $('resultPanel').classList.remove('show');
+}
+
+function copyResult() {
+  var body = $('resultBody');
+  var text = body.innerText || body.textContent;
+  navigator.clipboard.writeText(text).then(function() {
+    App.toast('Copied to clipboard', 'success');
+  }).catch(function() {
+    App.toast('Failed to copy', 'error');
+  });
+}
+
+// ── Chat ──
+async function loadChatSuggestions() {
+  try {
+    var res = await App.apiFetch('/ai/suggestions');
+    if (!res || !res.ok) return;
+    var data = await res.json();
+    if (!data.suggestions || !data.suggestions.length) return;
+    var html = data.suggestions.map(function(s) {
+      return '<button class="ai-chat-chip" data-q="' + esc(s.text) + '">' + esc(s.icon) + ' ' + esc(s.text) + '</button>';
+    }).join('');
+    $('chatSuggestions').innerHTML = html;
+    $('chatSuggestions').querySelectorAll('.ai-chat-chip').forEach(function(btn) {
+      btn.addEventListener('click', function() { sendChat(this.dataset.q); });
+    });
+  } catch(e) { /* non-critical */ }
+}
+
+function addChatMessage(type, text, skipSave) {
+  var el = document.createElement('div');
+  el.className = 'ai-chat-msg ai-chat-msg-' + type;
+  if (type === 'user') {
+    el.textContent = text;
+  } else if (type === 'error') {
+    el.textContent = text;
+  } else {
+    el.innerHTML = formatAiResponse(text);
+  }
+  $('chatMessages').appendChild(el);
+  $('chatMessages').scrollTop = $('chatMessages').scrollHeight;
+  // Persist (skip for welcome message restore and errors)
+  if (!skipSave && type !== 'error') {
+    _chatHistory.push({ type: type, text: text, ts: Date.now() });
+    _saveChatHistory();
+  }
+  return el;
+}
+
+function showChatTyping() {
+  var el = document.createElement('div');
+  el.className = 'ai-chat-msg ai-chat-msg-bot';
+  el.id = 'chatTyping';
+  el.innerHTML = '<div class="ai-typing"><span></span><span></span><span></span></div>';
+  $('chatMessages').appendChild(el);
+  $('chatMessages').scrollTop = $('chatMessages').scrollHeight;
+}
+
+function removeChatTyping() {
+  var el = $('chatTyping');
+  if (el) el.remove();
+}
+
+async function sendChat(text) {
+  if (_chatBusy || !text || !text.trim()) return;
+  _chatBusy = true;
+  var msg = text.trim();
+  $('chatInput').value = '';
+  $('chatInput').style.height = 'auto';
+  $('chatSuggestions').innerHTML = '';
+
+  addChatMessage('user', msg);
+  showChatTyping();
+  $('chatSend').disabled = true;
+
+  try {
+    var res = await App.apiFetch('/ai/chat', {
+      method: 'POST',
+      body: JSON.stringify({ message: msg })
+    });
+
+    removeChatTyping();
+    $('chatSend').disabled = false;
+
+    if (!res) return;
+    if (!res.ok) {
+      var d = await res.json().catch(function() { return {}; });
+      addChatMessage('error', d.error || 'Something went wrong. Please try again.');
+      return;
+    }
+    var data = await res.json();
+    addChatMessage('bot', data.response);
+    loadChatSuggestions();
+    $('clearChatBtn').style.display = 'block';
+  } catch (err) {
+    removeChatTyping();
+    $('chatSend').disabled = false;
+    addChatMessage('error', 'Network error. Please check your connection.');
+  } finally {
+    _chatBusy = false;
+  }
+}
+
+// Input handlers
+$('chatSend').addEventListener('click', function() { sendChat($('chatInput').value); });
+$('chatInput').addEventListener('keydown', function(e) {
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
+    sendChat($('chatInput').value);
+  }
+});
+$('chatInput').addEventListener('input', function() {
+  this.style.height = 'auto';
+  this.style.height = Math.min(this.scrollHeight, 80) + 'px';
+});
+
+// Clear chat history
+$('clearChatBtn').addEventListener('click', function() {
+  _chatHistory = [];
+  _saveChatHistory();
+  $('chatMessages').innerHTML = '';
+  addChatMessage('bot', "Hi! I'm your operations assistant. Use the insight cards above for quick analysis, or ask me anything about your electrical inspection data. 👋");
+  this.style.display = 'none';
+});
+// Show clear button if there's history
+if (_chatHistory.length > 1) $('clearChatBtn').style.display = 'block';
+</script>
+</body>
+</html>

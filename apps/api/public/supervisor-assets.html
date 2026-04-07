@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
+<link rel="manifest" href="/site.webmanifest">
+<meta name="theme-color" content="#0891b2">
+<title>Asset Events — Kodspot</title>
+<link rel="stylesheet" href="/css/design-system.css?v=9">
+<style>
+.sv-shell{max-width:540px;margin:0 auto;padding:1.25rem .75rem;min-height:calc(100dvh - 56px)}
+.asset-header{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:1rem;margin-bottom:1rem}
+.asset-header h2{font-size:1rem;font-weight:700;margin:0 0 .15rem}
+.asset-header p{font-size:.72rem;color:var(--text-muted);margin:0}
+.asset-meta{display:flex;gap:.75rem;flex-wrap:wrap;margin-top:.5rem;font-size:.75rem}
+.asset-meta-item{display:flex;align-items:center;gap:.25rem}
+.asset-meta-label{color:var(--text-muted)}
+
+/* Quick actions */
+.quick-actions{display:grid;grid-template-columns:repeat(2,1fr);gap:.5rem;margin-bottom:1rem}
+.qa-btn{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:.75rem .6rem;text-align:center;cursor:pointer;transition:border-color .15s;min-height:var(--touch-min,44px);font-size:.82rem;font-weight:600;color:var(--text)}
+.qa-btn:hover{border-color:var(--primary)}
+.qa-btn .qa-icon{font-size:1.3rem;display:block;margin-bottom:.2rem}
+.qa-btn.qa-danger{border-color:var(--danger);color:var(--danger)}
+
+/* Event form */
+.form-section{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:1rem;margin-bottom:.85rem}
+.form-section-title{display:flex;align-items:center;gap:.35rem;font-size:.82rem;font-weight:700;margin-bottom:.65rem;color:var(--text)}
+
+/* Timeline */
+.tl-item{display:flex;gap:.6rem;padding:.6rem 0;border-bottom:1px solid var(--border-light,var(--border));font-size:.78rem}
+.tl-item:last-child{border:none}
+.tl-dot{width:10px;height:10px;border-radius:50%;margin-top:4px;flex-shrink:0}
+.tl-content{flex:1}
+.tl-date{font-size:.68rem;color:var(--text-muted)}
+.tl-tag{font-size:.6rem;padding:.1rem .3rem;border-radius:3px;font-weight:600}
+
+.success-screen{text-align:center;padding:3rem 1rem;display:none}
+.success-check{width:76px;height:76px;border-radius:50%;background:var(--success);display:flex;align-items:center;justify-content:center;margin:0 auto 1.25rem;font-size:2.2rem;color:#fff;box-shadow:0 4px 16px rgba(16,185,129,.25)}
+
+@media(max-width:480px){
+  .sv-shell{padding:.85rem .5rem}
+  .quick-actions{gap:.35rem}
+  .qa-btn{padding:.6rem .4rem;font-size:.75rem}
+}
+</style>
+</head>
+<body>
+<nav class="topbar">
+  <div class="topbar-left">
+    <span class="topbar-brand">🔧 Kodspot Assets</span>
+    <div class="sv-nav" id="sv-nav">
+      <a href="/supervisor-scan" class="sv-nav-link">Scan</a>
+      <a href="/supervisor-assets" class="sv-nav-link active" data-mod="asset">Assets</a>
+      <a href="/supervisor-tickets" class="sv-nav-link">Tickets</a>
+      <a href="/supervisor-attendance" class="sv-nav-link">Attendance</a>
+    </div>
+  </div>
+  <div class="topbar-right">
+    <span class="topbar-user" id="userName"></span>
+    <button class="btn btn-sm btn-ghost" onclick="App.logoutSup()">Logout</button>
+  </div>
+</nav>
+
+<!-- Main: Asset selection or event logging -->
+<div class="sv-shell" id="mainView">
+  <div class="asset-header" id="assetHeader">
+    <h2 id="assetTitle">Select an Asset</h2>
+    <p id="assetSub">Search or scan QR to find an asset</p>
+  </div>
+
+  <!-- Asset search (shown when no asset selected) -->
+  <div id="searchSection">
+    <div class="form-section">
+      <div class="form-section-title">🔍 Find Asset</div>
+      <input class="form-input" id="assetSearch" placeholder="Search by code, name, serial…" oninput="debounceAssetSearch()" style="margin-bottom:.5rem">
+      <div id="assetResults" style="max-height:300px;overflow-y:auto"></div>
+    </div>
+  </div>
+
+  <!-- Asset detail + actions (shown when asset is selected) -->
+  <div id="assetView" style="display:none">
+    <div class="asset-meta" id="assetMeta"></div>
+
+    <!-- Quick actions -->
+    <div class="quick-actions" style="margin-top:1rem">
+      <button class="qa-btn" onclick="openEventForm('INSPECTED')"><span class="qa-icon">🔍</span>Log Inspection</button>
+      <button class="qa-btn" onclick="openEventForm('MAINTAINED')"><span class="qa-icon">🔧</span>Log Maintenance</button>
+      <button class="qa-btn" onclick="openEventForm('REPAIRED')"><span class="qa-icon">🛠️</span>Log Repair</button>
+      <button class="qa-btn qa-danger" onclick="openFailureForm()"><span class="qa-icon">🔴</span>Report Failure</button>
+    </div>
+
+    <!-- Recent timeline -->
+    <div class="form-section">
+      <div class="form-section-title">📋 Recent Activity</div>
+      <div id="timeline" style="max-height:300px;overflow-y:auto"><div style="text-align:center;padding:.75rem;color:var(--text-muted);font-size:.78rem">Loading…</div></div>
+    </div>
+
+    <button class="btn btn-outline btn-block" style="margin-top:.5rem" onclick="clearAsset()">← Select Different Asset</button>
+  </div>
+</div>
+
+<!-- Event Form Modal -->
+<div class="modal-overlay" id="eventModal">
+  <div class="modal" style="max-width:480px">
+    <h2 class="modal-title" id="eventModalTitle">Log Event</h2>
+    <div id="eventError" class="error-msg"></div>
+    <form id="eventForm">
+      <div><label class="form-label">Summary *</label><input class="form-input" id="eSummary" required maxlength="500" placeholder="Brief description of what was done"></div>
+      <div style="margin-top:.5rem"><label class="form-label">Details</label><textarea class="form-textarea" id="eDetails" rows="3" maxlength="5000" placeholder="Additional notes…"></textarea></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:.5rem;margin-top:.5rem">
+        <div><label class="form-label">Status After</label>
+          <select class="form-select" id="eStatusAfter">
+            <option value="">— No change —</option>
+            <option value="OPERATIONAL">Operational</option><option value="UNDER_MAINTENANCE">Under Maintenance</option>
+            <option value="FAULTY">Faulty</option>
+          </select>
+        </div>
+        <div><label class="form-label">Condition After</label>
+          <select class="form-select" id="eConditionAfter">
+            <option value="">— No change —</option>
+            <option value="NEW">New</option><option value="GOOD">Good</option><option value="FAIR">Fair</option>
+            <option value="POOR">Poor</option><option value="CRITICAL">Critical</option>
+          </select>
+        </div>
+      </div>
+      <div style="margin-top:.5rem"><label class="form-label">Cost (₹)</label><input class="form-input" id="eCost" type="number" min="0" step="0.01" placeholder="0"></div>
+      <div class="modal-actions">
+        <button type="button" class="btn btn-outline" onclick="App.closeModal('eventModal')">Cancel</button>
+        <button type="submit" class="btn btn-primary" id="eventSubmitBtn">Log Event</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Failure Form Modal -->
+<div class="modal-overlay" id="failureModal">
+  <div class="modal" style="max-width:480px">
+    <h2 class="modal-title">🔴 Report Failure</h2>
+    <div id="failureError" class="error-msg"></div>
+    <form id="failureForm">
+      <div><label class="form-label">Title *</label><input class="form-input" id="ffTitle" required maxlength="300" placeholder="Phase R failure"></div>
+      <div style="margin-top:.5rem"><label class="form-label">Severity</label>
+        <select class="form-select" id="ffSeverity">
+          <option value="LOW">Low</option><option value="MEDIUM" selected>Medium</option>
+          <option value="HIGH">High</option><option value="CRITICAL">Critical</option>
+        </select>
+      </div>
+      <div style="margin-top:.5rem"><label class="form-label">Description</label><textarea class="form-textarea" id="ffDescription" rows="3" maxlength="5000" placeholder="Describe the failure…"></textarea></div>
+      <div class="modal-actions">
+        <button type="button" class="btn btn-outline" onclick="App.closeModal('failureModal')">Cancel</button>
+        <button type="submit" class="btn btn-danger" id="failureSubmitBtn">Report Failure</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Success screen -->
+<div class="sv-shell success-screen" id="successView">
+  <div class="success-check">✓</div>
+  <div style="font-size:1.2rem;font-weight:700;margin-bottom:.35rem" id="successTitle">Event Logged!</div>
+  <p style="font-size:.82rem;color:var(--text-muted);margin-bottom:1.5rem" id="successSub">Activity recorded successfully.</p>
+  <button class="btn btn-primary btn-block" onclick="backToAsset()">Back to Asset</button>
+</div>
+
+<script src="/js/offline-sync.js?v=1"></script>
+<script src="/js/app.js?v=11"></script>
+<script>
+if (!App.initSupervisor()) throw '';
+App.initNotifications(App.supFetch, 'supervisor');
+var esc = App.esc, $ = App.$;
+document.querySelectorAll('#sv-nav a').forEach(function(a){ var pg = a.getAttribute('href').replace(/^\//, ''); a.href = App.orgPath(pg); });
+
+var selectedAsset = null;
+var currentEventType = null;
+var searchTimer = null;
+
+function debounceAssetSearch(){ clearTimeout(searchTimer); searchTimer = setTimeout(searchAssets, 300); }
+
+// ── Asset search ──
+async function searchAssets(){
+  var q = $('assetSearch').value.trim();
+  if(!q || q.length < 2){
+    $('assetResults').innerHTML = '<div style="text-align:center;padding:.75rem;color:var(--text-muted);font-size:.78rem">Type at least 2 characters…</div>';
+    return;
+  }
+  var res = await App.supFetch('/assets?search='+encodeURIComponent(q)+'&limit=20&active=true');
+  if(!res) return;
+  var data = await res.json();
+  var assets = data.assets||[];
+  if(!assets.length){
+    $('assetResults').innerHTML = '<div style="text-align:center;padding:.75rem;color:var(--text-muted);font-size:.78rem">No assets found</div>';
+    return;
+  }
+  $('assetResults').innerHTML = assets.map(function(a){
+    var statusColor = a.status==='FAULTY'?'var(--danger)':a.status==='UNDER_MAINTENANCE'?'var(--warning-text)':'var(--success)';
+    return '<div style="display:flex;align-items:center;gap:.5rem;padding:.55rem .6rem;background:var(--bg);border-radius:var(--radius);margin-bottom:.35rem;cursor:pointer;border:1px solid var(--border);transition:border-color .1s" onclick=\'selectAsset('+JSON.stringify(a).replace(/'/g,"&#39;")+')\'>' +
+      '<div style="flex:1"><div style="font-weight:600;font-size:.82rem">'+esc(a.assetCode)+'</div><div style="font-size:.72rem;color:var(--text-muted)">'+esc(a.name)+' · '+esc(a.category)+'</div></div>' +
+      '<div style="font-size:.68rem;color:'+statusColor+';font-weight:600">'+a.status+'</div></div>';
+  }).join('');
+}
+
+function selectAsset(a){
+  selectedAsset = a;
+  $('searchSection').style.display = 'none';
+  $('assetView').style.display = '';
+  $('assetTitle').textContent = a.assetCode + ' — ' + a.name;
+  $('assetSub').textContent = a.category + (a.location ? ' · ' + a.location.name : '');
+
+  var meta = '';
+  if(a.make) meta += '<div class="asset-meta-item"><span class="asset-meta-label">Make:</span> '+esc(a.make)+'</div>';
+  if(a.model) meta += '<div class="asset-meta-item"><span class="asset-meta-label">Model:</span> '+esc(a.model)+'</div>';
+  meta += '<div class="asset-meta-item"><span class="asset-meta-label">Status:</span> <span style="font-weight:600">'+a.status+'</span></div>';
+  meta += '<div class="asset-meta-item"><span class="asset-meta-label">Condition:</span> '+a.condition+'</div>';
+  $('assetMeta').innerHTML = meta;
+
+  loadTimeline(a.id);
+}
+
+function clearAsset(){
+  selectedAsset = null;
+  $('searchSection').style.display = '';
+  $('assetView').style.display = 'none';
+  $('assetSearch').value = '';
+  $('assetResults').innerHTML = '';
+  $('assetTitle').textContent = 'Select an Asset';
+  $('assetSub').textContent = 'Search or scan QR to find an asset';
+}
+
+// ── Timeline ──
+async function loadTimeline(assetId){
+  $('timeline').innerHTML = '<div style="text-align:center;padding:.75rem;color:var(--text-muted);font-size:.78rem">Loading…</div>';
+  var res = await App.supFetch('/assets/'+assetId+'/timeline?limit=20');
+  if(!res) return;
+  var items = await res.json();
+  if(!items.length){ $('timeline').innerHTML='<div style="padding:.5rem;color:var(--text-muted);font-size:.78rem">No activity yet</div>'; return; }
+
+  var DOT = {
+    INSTALLED:'#0891b2', INSPECTED:'#8b5cf6', MAINTAINED:'#10b981', REPAIRED:'#f59e0b',
+    RELOCATED:'#6366f1', DECOMMISSIONED:'#6b7280', RECOMMISSIONED:'#0891b2', NOTE:'#94a3b8'
+  };
+
+  $('timeline').innerHTML = items.map(function(item){
+    var dot = item.kind==='failure'?'#ef4444':(DOT[item.type]||'#94a3b8');
+    var title = item.kind==='failure'?'🔴 '+esc(item.title):esc(item.summary);
+    var tag = '';
+    if(item.kind==='failure') tag='<span class="tl-tag" style="background:rgba(239,68,68,.1);color:var(--danger)">'+item.severity+' · '+item.status+'</span>';
+    else if(item.type) tag='<span class="tl-tag" style="background:rgba(8,145,178,.1);color:#0891b2">'+item.type+'</span>';
+    var by = item.loggedBy?item.loggedBy.name:'';
+    return '<div class="tl-item"><div class="tl-dot" style="background:'+dot+'"></div><div class="tl-content"><div>'+title+'</div>'+
+      (tag?'<div style="margin-top:2px">'+tag+'</div>':'')+
+      '<div class="tl-date">'+App.fmtDateShort(item.date)+(by?' · '+esc(by):'')+'</div></div></div>';
+  }).join('');
+}
+
+// ── Event form ──
+function openEventForm(type){
+  currentEventType = type;
+  var labels = { INSPECTED:'Log Inspection', MAINTAINED:'Log Maintenance', REPAIRED:'Log Repair', NOTE:'Log Note' };
+  $('eventModalTitle').textContent = labels[type]||'Log Event';
+  $('eventForm').reset();
+  App.hideError('eventError');
+
+  // Pre-fill suggested status
+  if(type==='MAINTAINED'||type==='REPAIRED') $('eStatusAfter').value='OPERATIONAL';
+  else $('eStatusAfter').value='';
+  $('eConditionAfter').value='';
+
+  App.openModal('eventModal');
+}
+
+$('eventForm').addEventListener('submit', async function(e){
+  e.preventDefault();
+  App.hideError('eventError');
+  if(!selectedAsset){ App.showError('eventError','No asset selected'); return; }
+
+  var body = {
+    assetId: selectedAsset.id,
+    type: currentEventType,
+    summary: $('eSummary').value.trim()
+  };
+  var details = $('eDetails').value.trim(); if(details) body.details = details;
+  var sa = $('eStatusAfter').value; if(sa) body.statusAfter = sa;
+  var ca = $('eConditionAfter').value; if(ca) body.conditionAfter = ca;
+  var cost = $('eCost').value; if(cost) body.cost = parseFloat(cost);
+
+  var btn=$('eventSubmitBtn'); btn.disabled=true;
+  try{
+    var res = await App.supFetch('/asset-events', {
+      method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)
+    });
+    if(!res){btn.disabled=false;return;}
+    if(!res.ok){var d=await res.json();App.showError('eventError',d.error||'Failed');btn.disabled=false;return;}
+    App.closeModal('eventModal');
+    showSuccess('Event Logged!', currentEventType+' recorded for '+selectedAsset.assetCode);
+  }catch(err){App.showError('eventError','Network error');}
+  btn.disabled=false;
+});
+
+// ── Failure form ──
+function openFailureForm(){
+  $('failureForm').reset();
+  $('ffSeverity').value='MEDIUM';
+  App.hideError('failureError');
+  App.openModal('failureModal');
+}
+
+$('failureForm').addEventListener('submit', async function(e){
+  e.preventDefault();
+  App.hideError('failureError');
+  if(!selectedAsset){ App.showError('failureError','No asset selected'); return; }
+
+  var body = {
+    assetId: selectedAsset.id,
+    title: $('ffTitle').value.trim(),
+    severity: $('ffSeverity').value,
+    description: $('ffDescription').value.trim()||undefined
+  };
+
+  var btn=$('failureSubmitBtn'); btn.disabled=true;
+  try{
+    var res = await App.supFetch('/asset-failures', {
+      method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)
+    });
+    if(!res){btn.disabled=false;return;}
+    if(!res.ok){var d=await res.json();App.showError('failureError',d.error||'Failed');btn.disabled=false;return;}
+    App.closeModal('failureModal');
+    showSuccess('Failure Reported!', body.title+' — '+body.severity+' severity');
+  }catch(err){App.showError('failureError','Network error');}
+  btn.disabled=false;
+});
+
+// ── Success ──
+function showSuccess(title, sub){
+  $('mainView').style.display='none';
+  $('successView').style.display='';
+  $('successTitle').textContent=title;
+  $('successSub').textContent=sub;
+}
+
+function backToAsset(){
+  $('successView').style.display='none';
+  $('mainView').style.display='';
+  if(selectedAsset) loadTimeline(selectedAsset.id);
+}
+
+// ── URL param: pre-select asset by ID ──
+var params = new URLSearchParams(location.search);
+var preAssetId = params.get('assetId');
+if(preAssetId){
+  (async function(){
+    var res = await App.supFetch('/assets/'+preAssetId);
+    if(res && res.ok){ var a = await res.json(); selectAsset(a); }
+  })();
+}
+</script>
+</body>
+</html>

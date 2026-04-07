@@ -1,0 +1,497 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
+<link rel="manifest" href="/site.webmanifest">
+<meta name="theme-color" content="#0891b2">
+<title>Asset Management — Kodspot</title>
+<link rel="stylesheet" href="/css/design-system.css?v=9">
+<style>
+.page-title{display:flex;align-items:center;gap:.5rem;margin-bottom:1.25rem;flex-wrap:wrap;justify-content:space-between}
+.page-title h1{font-size:1.25rem;font-weight:700;margin:0}
+.page-actions{display:flex;gap:.5rem;flex-wrap:wrap}
+
+/* Stats */
+.a-stats{display:flex;gap:.75rem;margin-bottom:1rem;flex-wrap:wrap}
+.a-stat{flex:1;min-width:100px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:.85rem .75rem;text-align:center}
+.a-stat-val{font-size:1.4rem;font-weight:700;line-height:1.1}
+.a-stat-label{font-size:.68rem;color:var(--text-muted);margin-top:.15rem}
+.a-stat.stat-faulty .a-stat-val{color:var(--danger)}
+.a-stat.stat-maint .a-stat-val{color:var(--warning-text)}
+.a-stat.stat-overdue .a-stat-val{color:var(--danger)}
+
+/* Filters */
+.a-filters{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:.75rem;margin-bottom:.75rem}
+.a-filter-row{display:flex;gap:.6rem;flex-wrap:wrap;align-items:center;width:100%}
+.a-filter-row+.a-filter-row{margin-top:.5rem}
+
+/* Table */
+.a-tbl{width:100%;border-collapse:collapse;font-size:.82rem}
+.a-tbl th{text-align:left;padding:.5rem .4rem;font-size:.7rem;font-weight:600;color:var(--text-muted);border-bottom:1px solid var(--border);white-space:nowrap}
+.a-tbl td{padding:.55rem .4rem;border-bottom:1px solid var(--border-light,var(--border));vertical-align:middle}
+.a-tbl tr:hover{background:var(--hover-bg,rgba(8,145,178,.03))}
+.a-code{font-family:var(--font-mono,monospace);font-size:.72rem;color:var(--primary);font-weight:600}
+.a-name{font-weight:600;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.empty{text-align:center;padding:2rem;color:var(--text-muted)}
+
+/* Pager */
+.a-pager{display:flex;justify-content:center;gap:.3rem;margin-top:.75rem;flex-wrap:wrap}
+.a-pager button{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);padding:.3rem .6rem;font-size:.75rem;cursor:pointer;color:var(--text)}
+.a-pager button:hover{border-color:var(--primary)}
+.a-pager button.active{background:var(--primary);color:#fff;border-color:var(--primary)}
+.a-pager button:disabled{opacity:.4;cursor:default}
+
+/* Status badges */
+.st-operational{background:rgba(16,185,129,.1);color:var(--success)}
+.st-faulty{background:rgba(239,68,68,.1);color:var(--danger)}
+.st-maintenance{background:rgba(245,158,11,.1);color:var(--warning-text)}
+.st-decommissioned{background:rgba(120,120,120,.1);color:var(--text-muted)}
+.cond-new{color:var(--primary)}
+.cond-good{color:var(--success)}
+.cond-fair{color:var(--warning-text)}
+.cond-poor{color:var(--danger)}
+.cond-critical{color:var(--danger);font-weight:700}
+
+/* Detail modal */
+.detail-grid{display:grid;grid-template-columns:1fr 1fr;gap:.4rem .75rem;font-size:.82rem;margin-bottom:.75rem}
+.detail-label{font-weight:600;color:var(--text-muted);font-size:.72rem}
+.detail-val{margin-bottom:.3rem}
+
+.timeline-item{display:flex;gap:.6rem;padding:.5rem 0;border-bottom:1px solid var(--border-light,var(--border));font-size:.78rem}
+.timeline-dot{width:10px;height:10px;border-radius:50%;margin-top:4px;flex-shrink:0}
+.timeline-content{flex:1}
+.timeline-date{font-size:.68rem;color:var(--text-muted)}
+
+.img-grid{display:flex;gap:.4rem;flex-wrap:wrap;margin:.5rem 0}
+.img-grid img{width:64px;height:64px;object-fit:cover;border-radius:var(--radius-sm);cursor:pointer;border:1px solid var(--border)}
+
+@media(max-width:768px){
+  .a-tbl td,.a-tbl th{padding:.45rem .3rem;font-size:.75rem}
+  .a-stats{gap:.5rem}
+  .a-stat{padding:.6rem .5rem}
+  .a-stat-val{font-size:1.1rem}
+  .hide-mobile{display:none}
+  .detail-grid{grid-template-columns:1fr}
+}
+</style>
+</head>
+<body>
+<nav class="topbar">
+  <div class="topbar-left">
+    <a class="topbar-brand" href="/">Kodspot</a>
+    <div id="topbar-nav"></div>
+  </div>
+  <div class="topbar-right">
+    <span class="topbar-user" id="userName"></span>
+    <button class="btn btn-sm btn-ghost" id="logoutBtn">Logout</button>
+  </div>
+</nav>
+
+<main class="main-content">
+  <div class="page-title">
+    <h1>🔧 Asset Management</h1>
+    <div class="page-actions">
+      <button class="btn btn-sm btn-outline" onclick="exportCSV()">CSV</button>
+      <button class="btn btn-sm btn-primary" onclick="openCreateModal()">+ Add Asset</button>
+    </div>
+  </div>
+
+  <!-- Stats -->
+  <div class="a-stats">
+    <div class="a-stat"><div class="a-stat-val" id="statTotal">0</div><div class="a-stat-label">Total</div></div>
+    <div class="a-stat"><div class="a-stat-val" id="statOperational">0</div><div class="a-stat-label">Operational</div></div>
+    <div class="a-stat stat-faulty"><div class="a-stat-val" id="statFaulty">0</div><div class="a-stat-label">Faulty</div></div>
+    <div class="a-stat stat-maint"><div class="a-stat-val" id="statMaint">0</div><div class="a-stat-label">Under Maint.</div></div>
+    <div class="a-stat stat-overdue"><div class="a-stat-val" id="statOverdue">0</div><div class="a-stat-label">Overdue Maint.</div></div>
+  </div>
+
+  <!-- Filters -->
+  <div class="a-filters">
+    <div class="a-filter-row">
+      <input class="form-input" style="flex:2;min-width:140px" id="fSearch" placeholder="Search code, name, serial…" oninput="debounceSearch()">
+      <select class="form-select" style="flex:1;min-width:110px" id="fCategory" onchange="loadAssets(1)"><option value="">All Categories</option></select>
+      <select class="form-select" style="flex:1;min-width:110px" id="fStatus" onchange="loadAssets(1)">
+        <option value="">All Status</option>
+        <option value="OPERATIONAL">Operational</option><option value="FAULTY">Faulty</option>
+        <option value="UNDER_MAINTENANCE">Under Maintenance</option><option value="DECOMMISSIONED">Decommissioned</option>
+      </select>
+      <select class="form-select" style="flex:1;min-width:110px" id="fLocation" onchange="loadAssets(1)"><option value="">All Locations</option></select>
+      <select class="form-select" style="flex:1;min-width:100px" id="fSort" onchange="loadAssets(1)">
+        <option value="">Newest</option><option value="name">Name</option><option value="code">Code</option>
+        <option value="category">Category</option><option value="status">Status</option>
+        <option value="maintenance">Next Maint.</option>
+      </select>
+      <button class="btn btn-sm btn-ghost" onclick="clearFilters()">Clear</button>
+    </div>
+  </div>
+
+  <!-- Table -->
+  <div class="section">
+    <div class="table-wrap">
+      <table class="a-tbl">
+        <thead>
+          <tr>
+            <th>Code</th><th>Name</th><th>Category</th><th>Location</th>
+            <th class="hide-mobile">Make/Model</th><th>Status</th><th>Condition</th>
+            <th class="hide-mobile">Next Maint.</th><th>Actions</th>
+          </tr>
+        </thead>
+        <tbody id="tableBody"><tr><td colspan="9" class="empty">Loading…</td></tr></tbody>
+      </table>
+    </div>
+    <div class="a-pager" id="pager"></div>
+  </div>
+</main>
+
+<!-- Create/Edit Modal -->
+<div class="modal-overlay" id="assetModal">
+  <div class="modal" style="max-width:620px">
+    <h2 class="modal-title" id="modalTitle">Add Asset</h2>
+    <div id="modalError" class="error-msg"></div>
+    <form id="assetForm">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:.5rem .75rem">
+        <div><label class="form-label">Asset Code *</label><input class="form-input" id="fAssetCode" required maxlength="50" placeholder="ELE-TFR-001"></div>
+        <div><label class="form-label">Name *</label><input class="form-input" id="fName" required maxlength="200" placeholder="Main Transformer"></div>
+        <div><label class="form-label">Category *</label><select class="form-select" id="fCategoryInput" required></select></div>
+        <div><label class="form-label">Location *</label><select class="form-select" id="fLocationInput" required></select></div>
+        <div><label class="form-label">Make</label><input class="form-input" id="fMake" maxlength="200" placeholder="ABB"></div>
+        <div><label class="form-label">Model</label><input class="form-input" id="fModel" maxlength="200" placeholder="TFRM-100"></div>
+        <div><label class="form-label">Serial No</label><input class="form-input" id="fSerialNo" maxlength="200"></div>
+        <div><label class="form-label">Rated Capacity</label><input class="form-input" id="fRatedCapacity" maxlength="100" placeholder="100 KVA"></div>
+        <div><label class="form-label">Status</label>
+          <select class="form-select" id="fStatusInput">
+            <option value="OPERATIONAL">Operational</option><option value="UNDER_MAINTENANCE">Under Maintenance</option>
+            <option value="FAULTY">Faulty</option><option value="DECOMMISSIONED">Decommissioned</option>
+          </select>
+        </div>
+        <div><label class="form-label">Condition</label>
+          <select class="form-select" id="fConditionInput">
+            <option value="NEW">New</option><option value="GOOD" selected>Good</option><option value="FAIR">Fair</option>
+            <option value="POOR">Poor</option><option value="CRITICAL">Critical</option>
+          </select>
+        </div>
+        <div><label class="form-label">Install Date</label><input class="form-input" id="fInstallDate" type="date"></div>
+        <div><label class="form-label">Warranty Expiry</label><input class="form-input" id="fWarrantyExpiry" type="date"></div>
+        <div><label class="form-label">Next Maintenance</label><input class="form-input" id="fNextMaint" type="date"></div>
+        <div><label class="form-label">Maint. Cycle (days)</label><input class="form-input" id="fMaintCycle" type="number" min="1" max="3650" placeholder="90"></div>
+        <div style="grid-column:1/-1"><label class="form-label">Description</label><textarea class="form-textarea" id="fDescription" rows="2" maxlength="2000" placeholder="Additional details…"></textarea></div>
+        <div><label class="form-label">Purchase Cost (₹)</label><input class="form-input" id="fPurchaseCost" type="number" min="0" step="0.01"></div>
+      </div>
+      <div class="modal-actions">
+        <button type="button" class="btn btn-outline" onclick="App.closeModal('assetModal')">Cancel</button>
+        <button type="submit" class="btn btn-primary" id="saveBtn">Create Asset</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Detail Modal -->
+<div class="modal-overlay" id="detailModal">
+  <div class="modal" style="max-width:640px;max-height:90vh;overflow-y:auto">
+    <h2 class="modal-title" id="detailTitle">Asset Details</h2>
+    <div id="detailContent"></div>
+    <div id="timelineSection" style="margin-top:.75rem">
+      <div style="font-weight:700;font-size:.85rem;margin-bottom:.4rem">📋 Timeline</div>
+      <div id="timelineList" style="max-height:260px;overflow-y:auto"></div>
+    </div>
+    <div class="modal-actions">
+      <button type="button" class="btn btn-outline" onclick="App.closeModal('detailModal')">Close</button>
+      <button type="button" class="btn btn-primary" id="editFromDetailBtn">Edit</button>
+    </div>
+  </div>
+</div>
+
+<script src="/js/offline-sync.js?v=1"></script>
+<script src="/js/app.js?v=11"></script>
+<script>
+if (!App.initAdmin('assets')) throw '';
+App.initNotifications(App.apiFetch);
+var esc = App.esc, $ = App.$;
+var currentPage = 1, totalPages = 1, PAGE_SIZE = 25;
+var searchTimer = null, editingId = null;
+var locationsCache = [], categoriesCache = [];
+
+function debounceSearch() { clearTimeout(searchTimer); searchTimer = setTimeout(function(){ loadAssets(1); }, 300); }
+
+// ── Status/condition helpers ──
+var STATUS_LABELS = { OPERATIONAL:'Operational', FAULTY:'Faulty', UNDER_MAINTENANCE:'Under Maint.', DECOMMISSIONED:'Decommissioned' };
+var STATUS_CLS = { OPERATIONAL:'st-operational', FAULTY:'st-faulty', UNDER_MAINTENANCE:'st-maintenance', DECOMMISSIONED:'st-decommissioned' };
+var COND_CLS = { NEW:'cond-new', GOOD:'cond-good', FAIR:'cond-fair', POOR:'cond-poor', CRITICAL:'cond-critical' };
+
+// ── Load assets ──
+async function loadAssets(page) {
+  currentPage = page || 1;
+  var params = ['page=' + currentPage, 'limit=' + PAGE_SIZE];
+  var s = $('fSearch').value.trim(); if(s) params.push('search='+encodeURIComponent(s));
+  var cat = $('fCategory').value; if(cat) params.push('category='+encodeURIComponent(cat));
+  var st = $('fStatus').value; if(st) params.push('status='+st);
+  var loc = $('fLocation').value; if(loc) params.push('locationId='+loc);
+  var sort = $('fSort').value; if(sort) params.push('sort='+sort);
+
+  var res = await App.apiFetch('/assets?'+params.join('&'));
+  if(!res) return;
+  var data = await res.json();
+  var assets = data.assets || [];
+  totalPages = data.pages || 1;
+
+  // Stats
+  var bs = data.stats?.byStatus || {};
+  $('statTotal').textContent = data.total || 0;
+  $('statOperational').textContent = bs.OPERATIONAL || 0;
+  $('statFaulty').textContent = bs.FAULTY || 0;
+  $('statMaint').textContent = bs.UNDER_MAINTENANCE || 0;
+  $('statOverdue').textContent = data.stats?.overdueMaintenance || 0;
+
+  if(!assets.length){
+    $('tableBody').innerHTML = '<tr><td colspan="9" class="empty">No assets found</td></tr>';
+    $('pager').innerHTML = '';
+    return;
+  }
+
+  $('tableBody').innerHTML = assets.map(function(a){
+    var stCls = STATUS_CLS[a.status]||'';
+    var condCls = COND_CLS[a.condition]||'';
+    var makeModel = [a.make, a.model].filter(Boolean).join(' ') || '—';
+    var nextMaint = a.nextMaintenanceDue ? App.fmtDateShort(a.nextMaintenanceDue) : '—';
+    var isOverdue = a.nextMaintenanceDue && new Date(a.nextMaintenanceDue) < new Date() && a.status !== 'DECOMMISSIONED';
+    return '<tr>'+
+      '<td><span class="a-code">'+esc(a.assetCode)+'</span></td>'+
+      '<td class="a-name">'+esc(a.name)+'</td>'+
+      '<td><span class="badge badge-muted">'+esc(a.category)+'</span></td>'+
+      '<td>'+esc(a.location?a.location.name:'—')+'</td>'+
+      '<td class="hide-mobile" style="font-size:.72rem">'+esc(makeModel)+'</td>'+
+      '<td><span class="badge '+stCls+'">'+(STATUS_LABELS[a.status]||a.status)+'</span></td>'+
+      '<td><span class="'+condCls+'">'+a.condition+'</span></td>'+
+      '<td class="hide-mobile" style="font-size:.72rem'+(isOverdue?';color:var(--danger);font-weight:600':'')+'">'+nextMaint+(isOverdue?' ⚠':'')+'</td>'+
+      '<td><button class="btn btn-sm btn-outline" onclick="viewDetail(\''+a.id+'\')">View</button></td>'+
+    '</tr>';
+  }).join('');
+  renderPager();
+}
+
+function renderPager(){
+  if(totalPages<=1){$('pager').innerHTML='';return;}
+  var h='<button'+(currentPage<=1?' disabled':'')+' onclick="loadAssets('+(currentPage-1)+')">← Prev</button>';
+  for(var i=1;i<=totalPages&&i<=10;i++){h+='<button class="'+(i===currentPage?'active':'')+'" onclick="loadAssets('+i+')">'+i+'</button>';}
+  h+='<button'+(currentPage>=totalPages?' disabled':'')+' onclick="loadAssets('+(currentPage+1)+')">Next →</button>';
+  $('pager').innerHTML=h;
+}
+
+function clearFilters(){
+  $('fSearch').value='';$('fCategory').value='';$('fStatus').value='';$('fLocation').value='';$('fSort').value='';
+  loadAssets(1);
+}
+
+// ── Detail view ──
+async function viewDetail(id){
+  var res = await App.apiFetch('/assets/'+id);
+  if(!res) return;
+  var a = await res.json();
+
+  $('detailTitle').textContent = a.assetCode + ' — ' + a.name;
+
+  var stCls=STATUS_CLS[a.status]||'';
+  var condCls=COND_CLS[a.condition]||'';
+  var h = '<div class="detail-grid">';
+  h += '<div><div class="detail-label">Asset Code</div><div class="detail-val a-code">'+esc(a.assetCode)+'</div></div>';
+  h += '<div><div class="detail-label">Category</div><div class="detail-val">'+esc(a.category)+'</div></div>';
+  h += '<div><div class="detail-label">Location</div><div class="detail-val">'+esc(a.location?a.location.name:'—')+'</div></div>';
+  h += '<div><div class="detail-label">Status</div><div class="detail-val"><span class="badge '+stCls+'">'+(STATUS_LABELS[a.status]||a.status)+'</span></div></div>';
+  h += '<div><div class="detail-label">Condition</div><div class="detail-val"><span class="'+condCls+'">'+a.condition+'</span></div></div>';
+  h += '<div><div class="detail-label">Make / Model</div><div class="detail-val">'+esc([a.make,a.model].filter(Boolean).join(' ')||'—')+'</div></div>';
+  if(a.serialNo) h += '<div><div class="detail-label">Serial No</div><div class="detail-val">'+esc(a.serialNo)+'</div></div>';
+  if(a.ratedCapacity) h += '<div><div class="detail-label">Rated Capacity</div><div class="detail-val">'+esc(a.ratedCapacity)+'</div></div>';
+  if(a.installDate) h += '<div><div class="detail-label">Install Date</div><div class="detail-val">'+App.fmtDateShort(a.installDate)+'</div></div>';
+  if(a.warrantyExpiry) h += '<div><div class="detail-label">Warranty Expiry</div><div class="detail-val">'+App.fmtDateShort(a.warrantyExpiry)+'</div></div>';
+  if(a.nextMaintenanceDue) h += '<div><div class="detail-label">Next Maintenance</div><div class="detail-val">'+App.fmtDateShort(a.nextMaintenanceDue)+'</div></div>';
+  if(a.maintenanceCycleDays) h += '<div><div class="detail-label">Maint. Cycle</div><div class="detail-val">'+a.maintenanceCycleDays+' days</div></div>';
+  if(a.purchaseCost) h += '<div><div class="detail-label">Purchase Cost</div><div class="detail-val">₹'+Number(a.purchaseCost).toLocaleString('en-IN')+'</div></div>';
+  h += '</div>';
+  if(a.description) h += '<div style="font-size:.78rem;color:var(--text-muted);margin-bottom:.5rem">'+esc(a.description)+'</div>';
+
+  // Images
+  if(a.images && a.images.length){
+    h += '<div style="font-weight:600;font-size:.82rem;margin-bottom:.3rem">Photos ('+a.images.length+')</div>';
+    h += '<div class="img-grid">';
+    a.images.forEach(function(img){ h+='<img src="'+esc(img.imageUrl)+'" title="'+(img.caption?esc(img.caption):'')+'">'; });
+    h += '</div>';
+  }
+
+  $('detailContent').innerHTML = h;
+  $('editFromDetailBtn').onclick = function(){ App.closeModal('detailModal'); openEditModal(a); };
+
+  // Load timeline
+  loadTimeline(a.id);
+  App.openModal('detailModal');
+}
+
+async function loadTimeline(assetId){
+  $('timelineList').innerHTML = '<div style="text-align:center;padding:.75rem;color:var(--text-muted);font-size:.78rem">Loading…</div>';
+  var res = await App.apiFetch('/assets/'+assetId+'/timeline?limit=30');
+  if(!res) return;
+  var timeline = await res.json();
+  if(!timeline.length){ $('timelineList').innerHTML='<div style="padding:.5rem;color:var(--text-muted);font-size:.78rem">No events yet</div>'; return; }
+
+  var DOT_COLORS = {
+    event: { INSTALLED:'#0891b2', INSPECTED:'#8b5cf6', MAINTAINED:'#10b981', REPAIRED:'#f59e0b', RELOCATED:'#6366f1', DECOMMISSIONED:'#6b7280', RECOMMISSIONED:'#0891b2', NOTE:'#94a3b8' },
+    failure: '#ef4444'
+  };
+
+  $('timelineList').innerHTML = timeline.map(function(item){
+    var dot = item.kind==='failure' ? DOT_COLORS.failure : (DOT_COLORS.event[item.type]||'#94a3b8');
+    var title = item.kind==='failure' ? '🔴 '+esc(item.title) : esc(item.summary);
+    var sub = '';
+    if(item.kind==='failure') sub = '<span class="badge badge-danger" style="font-size:.58rem">'+item.severity+' — '+item.status+'</span>';
+    if(item.statusAfter) sub += ' <span style="font-size:.68rem">→ '+item.statusAfter+'</span>';
+    if(item.cost) sub += ' · ₹'+Number(item.cost).toLocaleString('en-IN');
+    var by = item.loggedBy ? item.loggedBy.name : '';
+    return '<div class="timeline-item">'+
+      '<div class="timeline-dot" style="background:'+dot+'"></div>'+
+      '<div class="timeline-content"><div>'+title+'</div>'+(sub?'<div>'+sub+'</div>':'')+
+      '<div class="timeline-date">'+App.fmtDateShort(item.date)+(by?' · '+esc(by):'')+'</div></div></div>';
+  }).join('');
+}
+
+// ── Create / Edit Modal ──
+function openCreateModal(){
+  editingId = null;
+  $('modalTitle').textContent = 'Add Asset';
+  $('saveBtn').textContent = 'Create Asset';
+  $('assetForm').reset();
+  $('fConditionInput').value = 'GOOD';
+  $('fStatusInput').value = 'OPERATIONAL';
+  App.hideError('modalError');
+  App.openModal('assetModal');
+}
+
+function openEditModal(a){
+  editingId = a.id;
+  $('modalTitle').textContent = 'Edit Asset';
+  $('saveBtn').textContent = 'Save Changes';
+  $('fAssetCode').value = a.assetCode;
+  $('fName').value = a.name;
+  $('fCategoryInput').value = a.category;
+  $('fLocationInput').value = a.locationId;
+  $('fMake').value = a.make||'';
+  $('fModel').value = a.model||'';
+  $('fSerialNo').value = a.serialNo||'';
+  $('fRatedCapacity').value = a.ratedCapacity||'';
+  $('fStatusInput').value = a.status;
+  $('fConditionInput').value = a.condition;
+  $('fInstallDate').value = a.installDate ? a.installDate.split('T')[0] : '';
+  $('fWarrantyExpiry').value = a.warrantyExpiry ? a.warrantyExpiry.split('T')[0] : '';
+  $('fNextMaint').value = a.nextMaintenanceDue ? a.nextMaintenanceDue.split('T')[0] : '';
+  $('fMaintCycle').value = a.maintenanceCycleDays||'';
+  $('fDescription').value = a.description||'';
+  $('fPurchaseCost').value = a.purchaseCost||'';
+  App.hideError('modalError');
+  App.openModal('assetModal');
+}
+
+$('assetForm').addEventListener('submit', async function(e){
+  e.preventDefault();
+  App.hideError('modalError');
+  var body = {
+    assetCode: $('fAssetCode').value.trim(),
+    name: $('fName').value.trim(),
+    category: $('fCategoryInput').value,
+    locationId: $('fLocationInput').value,
+    make: $('fMake').value.trim()||undefined,
+    model: $('fModel').value.trim()||undefined,
+    serialNo: $('fSerialNo').value.trim()||undefined,
+    ratedCapacity: $('fRatedCapacity').value.trim()||undefined,
+    status: $('fStatusInput').value,
+    condition: $('fConditionInput').value,
+    installDate: $('fInstallDate').value||undefined,
+    warrantyExpiry: $('fWarrantyExpiry').value||undefined,
+    nextMaintenanceDue: $('fNextMaint').value||undefined,
+    maintenanceCycleDays: $('fMaintCycle').value ? parseInt($('fMaintCycle').value) : undefined,
+    description: $('fDescription').value.trim()||undefined,
+    purchaseCost: $('fPurchaseCost').value ? parseFloat($('fPurchaseCost').value) : undefined
+  };
+
+  var btn = $('saveBtn');
+  btn.disabled = true;
+  try{
+    var url = editingId ? '/assets/'+editingId : '/assets';
+    var method = editingId ? 'PATCH' : 'POST';
+    var res = await App.apiFetch(url, { method:method, headers:{'Content-Type':'application/json'}, body:JSON.stringify(body) });
+    if(!res) { btn.disabled=false; return; }
+    if(!res.ok){ var d=await res.json(); App.showError('modalError', d.error||'Failed'); btn.disabled=false; return; }
+    App.closeModal('assetModal');
+    App.toast(editingId?'Asset updated':'Asset created','success');
+    loadAssets(currentPage);
+  }catch(err){
+    App.showError('modalError','Network error');
+  }
+  btn.disabled=false;
+});
+
+// ── Delete ──
+async function deleteAsset(id, name){
+  if(!confirm('Delete/decommission "'+name+'"?')) return;
+  var res = await App.apiFetch('/assets/'+id, {method:'DELETE'});
+  if(res && res.ok){ var d=await res.json(); App.toast(d.message,'success'); loadAssets(currentPage); }
+}
+
+// ── CSV ──
+async function exportCSV(){
+  var params=[];
+  var cat=$('fCategory').value; if(cat) params.push('category='+encodeURIComponent(cat));
+  var st=$('fStatus').value; if(st) params.push('status='+st);
+  var loc=$('fLocation').value; if(loc) params.push('locationId='+loc);
+  var res = await App.apiFetch('/assets/export?'+params.join('&'));
+  if(!res) return;
+  var blob = await res.blob();
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a'); a.href=url; a.download='assets-'+new Date().toISOString().split('T')[0]+'.csv'; a.click();
+  URL.revokeObjectURL(url);
+}
+
+// ── Bootstrap: load locations + categories for filters and form ──
+async function bootstrap(){
+  var [locRes, catRes] = await Promise.all([
+    App.apiFetch('/locations/tree?active=true'),
+    App.apiFetch('/assets/categories')
+  ]);
+
+  // Locations
+  if(locRes && locRes.ok){
+    var tree = await locRes.json();
+    var opts='<option value="">All Locations</option>';
+    var formOpts='<option value="">Select location…</option>';
+    function flatten(nodes,prefix){
+      for(var i=0;i<nodes.length;i++){
+        var o='<option value="'+nodes[i].id+'">'+esc(prefix+nodes[i].name)+'</option>';
+        opts+=o; formOpts+=o;
+        if(nodes[i].children) flatten(nodes[i].children, prefix+nodes[i].name+' → ');
+      }
+    }
+    flatten(tree,'');
+    $('fLocation').innerHTML=opts;
+    $('fLocationInput').innerHTML=formOpts;
+  }
+
+  // Categories
+  if(catRes && catRes.ok){
+    categoriesCache = await catRes.json();
+    var catOpts = '<option value="">All Categories</option>';
+    var catFormOpts = '';
+    categoriesCache.forEach(function(c){
+      catOpts += '<option value="'+esc(c)+'">'+esc(c)+'</option>';
+      catFormOpts += '<option value="'+esc(c)+'">'+esc(c)+'</option>';
+    });
+    $('fCategory').innerHTML = catOpts;
+    $('fCategoryInput').innerHTML = catFormOpts;
+  }
+
+  loadAssets(1);
+}
+bootstrap();
+</script>
+</body>
+</html>

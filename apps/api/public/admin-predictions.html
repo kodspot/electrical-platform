@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
+<link rel="manifest" href="/site.webmanifest">
+<meta name="theme-color" content="#1a7f64">
+<title>Predictive Maintenance — Kodspot</title>
+<link rel="stylesheet" href="/css/design-system.css?v=9">
+<style>
+.pred-header{display:flex;align-items:center;justify-content:space-between;gap:1rem;margin-bottom:1.5rem;flex-wrap:wrap}
+.pred-title{display:flex;align-items:center;gap:.6rem}
+.pred-title h1{font-size:1.35rem;font-weight:700;color:var(--text);margin:0}
+.pred-badge{font-size:.58rem;background:linear-gradient(135deg,#f59e0b,#ea580c);color:#fff;padding:.2rem .6rem;border-radius:10px;font-weight:700;letter-spacing:.5px;text-transform:uppercase}
+
+/* Summary cards */
+.pred-summary{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:.75rem;margin-bottom:1.5rem}
+.pred-stat{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:1rem;text-align:center}
+.pred-stat-value{font-size:1.8rem;font-weight:800;line-height:1}
+.pred-stat-label{font-size:.68rem;color:var(--text-muted);margin-top:.3rem;text-transform:uppercase;letter-spacing:.4px}
+.stat-critical .pred-stat-value{color:#ef4444}
+.stat-high .pred-stat-value{color:#f59e0b}
+.stat-medium .pred-stat-value{color:#3b82f6}
+.stat-low .pred-stat-value{color:#10b981}
+
+/* Sections */
+.pred-section{margin-bottom:2rem}
+.pred-section-title{font-size:1rem;font-weight:700;color:var(--text);display:flex;align-items:center;gap:.5rem;margin-bottom:1rem}
+.pred-section-title .icon{font-size:1.1rem}
+
+/* Risk table */
+.risk-table{width:100%;border-collapse:separate;border-spacing:0;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden;font-size:.78rem}
+.risk-table th{background:var(--bg);padding:.65rem .75rem;text-align:left;font-weight:600;color:var(--text-muted);text-transform:uppercase;font-size:.65rem;letter-spacing:.4px;border-bottom:1px solid var(--border)}
+.risk-table td{padding:.65rem .75rem;border-bottom:1px solid var(--border);color:var(--text)}
+.risk-table tr:last-child td{border-bottom:none}
+.risk-table tr:hover td{background:var(--bg)}
+.risk-badge{display:inline-block;padding:.15rem .5rem;border-radius:10px;font-size:.62rem;font-weight:700;text-transform:uppercase;letter-spacing:.3px}
+.risk-CRITICAL{background:#fef2f2;color:#dc2626;border:1px solid #fecaca}
+.risk-HIGH{background:#fffbeb;color:#d97706;border:1px solid #fde68a}
+.risk-MEDIUM{background:#eff6ff;color:#2563eb;border:1px solid #bfdbfe}
+.risk-LOW{background:#ecfdf5;color:#059669;border:1px solid #a7f3d0}
+
+/* Risk bar */
+.risk-bar{width:80px;height:8px;background:var(--bg);border-radius:4px;overflow:hidden;display:inline-block;vertical-align:middle;margin-left:.4rem}
+.risk-bar-fill{height:100%;border-radius:4px;transition:width .3s}
+
+/* Anomaly cards */
+.anomaly-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:.75rem}
+.anomaly-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:1rem;border-left:4px solid}
+.anomaly-card.sev-CRITICAL{border-left-color:#ef4444}
+.anomaly-card.sev-HIGH{border-left-color:#f59e0b}
+.anomaly-card.sev-MEDIUM{border-left-color:#3b82f6}
+.anomaly-card .anomaly-title{font-weight:600;font-size:.82rem;color:var(--text);margin-bottom:.3rem}
+.anomaly-card .anomaly-desc{font-size:.72rem;color:var(--text-muted);line-height:1.45}
+
+/* AI Summary */
+.ai-summary-box{background:linear-gradient(135deg,#f0fdfa,#f5f3ff);border:1px solid var(--border);border-radius:var(--radius-lg);padding:1.2rem;margin-bottom:1rem}
+.ai-summary-box .ai-label{font-size:.65rem;text-transform:uppercase;letter-spacing:.5px;color:var(--text-muted);font-weight:700;margin-bottom:.5rem;display:flex;align-items:center;gap:.4rem}
+.ai-summary-text{font-size:.82rem;color:var(--text);line-height:1.55}
+
+/* Prediction cards */
+.prediction-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:.75rem}
+.prediction-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:1rem}
+.prediction-card .pred-asset{font-weight:700;font-size:.85rem;color:var(--text);margin-bottom:.3rem}
+.prediction-card .pred-asset code{font-size:.7rem;color:var(--text-muted);font-weight:500;margin-left:.3rem}
+.prediction-card .pred-probs{display:flex;gap:.75rem;margin:.5rem 0}
+.prediction-card .pred-prob{text-align:center}
+.prediction-card .pred-prob-label{font-size:.58rem;color:var(--text-muted);text-transform:uppercase}
+.prediction-card .pred-prob-val{font-size:.72rem;font-weight:700}
+.prediction-card .pred-action{font-size:.72rem;color:var(--text-muted);line-height:1.4;padding:.5rem;background:var(--bg);border-radius:var(--radius);margin-top:.5rem}
+.prediction-card .pred-urgency{display:inline-block;padding:.12rem .4rem;border-radius:8px;font-size:.6rem;font-weight:600;text-transform:uppercase}
+.urgency-immediate{background:#fef2f2;color:#dc2626}
+.urgency-days{background:#fffbeb;color:#d97706}
+.urgency-weeks{background:#ecfdf5;color:#059669}
+
+/* Trend chart container */
+.trend-container{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:1.2rem;overflow-x:auto}
+.trend-bars{display:flex;align-items:flex-end;gap:4px;height:160px;min-width:500px}
+.trend-bar-group{flex:1;display:flex;flex-direction:column;align-items:center;gap:2px}
+.trend-bar-stack{display:flex;align-items:flex-end;gap:2px;height:140px}
+.trend-bar{width:12px;border-radius:3px 3px 0 0;transition:height .3s;min-height:2px}
+.trend-bar.bar-inspections{background:#3b82f6}
+.trend-bar.bar-faults{background:#f59e0b}
+.trend-bar.bar-failures{background:#ef4444}
+.trend-label{font-size:.55rem;color:var(--text-muted);writing-mode:vertical-lr;transform:rotate(180deg);max-height:40px;overflow:hidden;text-overflow:ellipsis}
+.trend-legend{display:flex;gap:1rem;margin-top:.75rem;justify-content:center}
+.trend-legend-item{display:flex;align-items:center;gap:.3rem;font-size:.68rem;color:var(--text-muted)}
+.trend-legend-dot{width:10px;height:10px;border-radius:2px}
+
+.empty-state{text-align:center;padding:3rem 1rem;color:var(--text-muted)}
+.empty-state .empty-icon{font-size:2.5rem;margin-bottom:.75rem}
+.empty-state .empty-text{font-size:.85rem}
+</style>
+</head>
+<body>
+<div class="layout">
+  <nav class="sidebar" id="sidebar"></nav>
+  <main class="main-content" id="content">
+    <div class="pred-header">
+      <div class="pred-title">
+        <h1>🔮 Predictive Maintenance</h1>
+        <span class="pred-badge">AI-Powered</span>
+      </div>
+      <button class="btn btn-outline btn-sm" id="refreshBtn" onclick="loadAll()">↻ Refresh</button>
+    </div>
+
+    <div class="alert alert-info" id="loadingMsg">Loading predictions…</div>
+
+    <!-- Summary Stats -->
+    <div class="pred-summary" id="summaryCards" style="display:none">
+      <div class="pred-stat stat-critical"><div class="pred-stat-value" id="critCount">0</div><div class="pred-stat-label">Critical Risk</div></div>
+      <div class="pred-stat stat-high"><div class="pred-stat-value" id="highCount">0</div><div class="pred-stat-label">High Risk</div></div>
+      <div class="pred-stat stat-medium"><div class="pred-stat-value" id="medCount">0</div><div class="pred-stat-label">Medium Risk</div></div>
+      <div class="pred-stat stat-low"><div class="pred-stat-value" id="lowCount">0</div><div class="pred-stat-label">Low Risk</div></div>
+      <div class="pred-stat"><div class="pred-stat-value" id="anomalyCount" style="color:#8b5cf6">0</div><div class="pred-stat-label">Anomalies</div></div>
+    </div>
+
+    <!-- AI Analysis Section -->
+    <div class="pred-section" id="aiSection" style="display:none">
+      <div class="pred-section-title"><span class="icon">🤖</span> AI Predictions</div>
+      <div class="ai-summary-box">
+        <div class="ai-label">✨ AI Analysis Summary</div>
+        <div class="ai-summary-text" id="aiSummary">Generating predictions…</div>
+      </div>
+      <div class="prediction-grid" id="predictionGrid"></div>
+    </div>
+
+    <!-- Anomalies -->
+    <div class="pred-section" id="anomalySection" style="display:none">
+      <div class="pred-section-title"><span class="icon">⚠️</span> Detected Anomalies</div>
+      <div class="anomaly-grid" id="anomalyGrid"></div>
+    </div>
+
+    <!-- Risk Table -->
+    <div class="pred-section" id="riskSection" style="display:none">
+      <div class="pred-section-title"><span class="icon">📊</span> Asset Risk Scores</div>
+      <div style="overflow-x:auto">
+        <table class="risk-table">
+          <thead>
+            <tr>
+              <th>Asset</th>
+              <th>Category</th>
+              <th>Risk</th>
+              <th>Score</th>
+              <th>Condition</th>
+              <th>Failures (90d)</th>
+              <th>Maint. Overdue</th>
+              <th>Key Factors</th>
+            </tr>
+          </thead>
+          <tbody id="riskTableBody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Trends -->
+    <div class="pred-section" id="trendSection" style="display:none">
+      <div class="pred-section-title"><span class="icon">📈</span> 12-Week Trends</div>
+      <div class="trend-container">
+        <div class="trend-bars" id="trendBars"></div>
+        <div class="trend-legend">
+          <span class="trend-legend-item"><span class="trend-legend-dot" style="background:#3b82f6"></span> Inspections</span>
+          <span class="trend-legend-item"><span class="trend-legend-dot" style="background:#f59e0b"></span> Faults</span>
+          <span class="trend-legend-item"><span class="trend-legend-dot" style="background:#ef4444"></span> Failures</span>
+        </div>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<div id="toast-container"></div>
+
+<script src="/js/offline-sync.js?v=1"></script>
+<script src="/js/app.js?v=11"></script>
+<script>
+var $ = App.$, esc = App.esc;
+
+App.initAdmin('predictions');
+
+async function loadAll() {
+  $('loadingMsg').style.display = '';
+  $('summaryCards').style.display = 'none';
+  $('riskSection').style.display = 'none';
+  $('anomalySection').style.display = 'none';
+  $('aiSection').style.display = 'none';
+  $('trendSection').style.display = 'none';
+  $('refreshBtn').disabled = true;
+
+  try {
+    // Load risk scores, anomalies, and trends in parallel
+    var [riskData, anomalyData, trendData] = await Promise.all([
+      App.apiFetchJson('/predictions/risk-scores'),
+      App.apiFetchJson('/predictions/anomalies'),
+      App.apiFetchJson('/predictions/trends?weeks=12')
+    ]);
+
+    $('loadingMsg').style.display = 'none';
+    $('summaryCards').style.display = '';
+
+    if (riskData) renderRiskScores(riskData);
+    if (anomalyData) renderAnomalies(anomalyData);
+    if (trendData) renderTrends(trendData);
+
+    // Load AI analysis (slower, separate call)
+    loadAiAnalysis();
+
+  } catch (err) {
+    $('loadingMsg').textContent = 'Failed to load predictions. Please try again.';
+    $('loadingMsg').className = 'alert alert-error';
+  } finally {
+    $('refreshBtn').disabled = false;
+  }
+}
+
+function renderRiskScores(data) {
+  $('critCount').textContent = data.critical || 0;
+  $('highCount').textContent = data.high || 0;
+  $('medCount').textContent = data.medium || 0;
+  $('lowCount').textContent = data.low || 0;
+
+  var assets = data.assets || [];
+  if (assets.length === 0) {
+    $('riskTableBody').innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--text-muted);padding:2rem">No assets found</td></tr>';
+    $('riskSection').style.display = '';
+    return;
+  }
+
+  var html = '';
+  assets.forEach(function(a) {
+    var barColor = a.riskLevel === 'CRITICAL' ? '#ef4444' : a.riskLevel === 'HIGH' ? '#f59e0b' : a.riskLevel === 'MEDIUM' ? '#3b82f6' : '#10b981';
+    html += '<tr>' +
+      '<td><strong>' + esc(a.assetCode) + '</strong><br><span style="font-size:.68rem;color:var(--text-muted)">' + esc(a.name) + '</span></td>' +
+      '<td>' + esc(a.category) + '</td>' +
+      '<td><span class="risk-badge risk-' + a.riskLevel + '">' + a.riskLevel + '</span></td>' +
+      '<td>' + a.riskScore + '<div class="risk-bar"><div class="risk-bar-fill" style="width:' + a.riskScore + '%;background:' + barColor + '"></div></div></td>' +
+      '<td>' + esc(a.condition) + '</td>' +
+      '<td>' + a.failureCount90d + '</td>' +
+      '<td>' + (a.maintenanceOverdue ? '<span style="color:#ef4444;font-weight:600">Yes</span>' : 'No') + '</td>' +
+      '<td style="font-size:.68rem;max-width:200px">' + (a.factors.length > 0 ? a.factors.slice(0, 3).map(function(f) { return esc(f); }).join('<br>') : '—') + '</td>' +
+      '</tr>';
+  });
+  $('riskTableBody').innerHTML = html;
+  $('riskSection').style.display = '';
+}
+
+function renderAnomalies(data) {
+  $('anomalyCount').textContent = data.total || 0;
+  var anomalies = data.anomalies || [];
+  if (anomalies.length === 0) {
+    $('anomalyGrid').innerHTML = '<div class="empty-state"><div class="empty-icon">✅</div><div class="empty-text">No anomalies detected — everything looks normal</div></div>';
+    $('anomalySection').style.display = '';
+    return;
+  }
+
+  var html = '';
+  anomalies.forEach(function(a) {
+    html += '<div class="anomaly-card sev-' + a.severity + '">' +
+      '<div class="anomaly-title">' + esc(a.title) + '</div>' +
+      '<div class="anomaly-desc">' + esc(a.description) + '</div>' +
+      '</div>';
+  });
+  $('anomalyGrid').innerHTML = html;
+  $('anomalySection').style.display = '';
+}
+
+function renderTrends(data) {
+  var trends = data.trends || [];
+  if (trends.length === 0) {
+    $('trendBars').innerHTML = '<div class="empty-state"><div class="empty-text">Not enough data for trends</div></div>';
+    $('trendSection').style.display = '';
+    return;
+  }
+
+  var maxVal = 1;
+  trends.forEach(function(t) {
+    maxVal = Math.max(maxVal, t.inspections, t.faults, t.failures);
+  });
+
+  var html = '';
+  trends.forEach(function(t) {
+    var iH = Math.round((t.inspections / maxVal) * 130);
+    var fH = Math.round((t.faults / maxVal) * 130);
+    var flH = Math.round((t.failures / maxVal) * 130);
+    var label = t.weekStart.slice(5); // MM-DD
+    html += '<div class="trend-bar-group">' +
+      '<div class="trend-bar-stack">' +
+      '<div class="trend-bar bar-inspections" style="height:' + iH + 'px" title="Inspections: ' + t.inspections + '"></div>' +
+      '<div class="trend-bar bar-faults" style="height:' + fH + 'px" title="Faults: ' + t.faults + '"></div>' +
+      '<div class="trend-bar bar-failures" style="height:' + flH + 'px" title="Failures: ' + t.failures + '"></div>' +
+      '</div>' +
+      '<div class="trend-label">' + esc(label) + '</div>' +
+      '</div>';
+  });
+  $('trendBars').innerHTML = html;
+  $('trendSection').style.display = '';
+}
+
+async function loadAiAnalysis() {
+  $('aiSection').style.display = '';
+  $('aiSummary').textContent = 'Generating AI predictions…';
+  $('predictionGrid').innerHTML = '';
+
+  try {
+    var data = await App.apiFetchJson('/predictions/ai-analysis');
+    if (!data || data.error) {
+      $('aiSummary').textContent = data?.error || 'AI analysis not available.';
+      return;
+    }
+
+    $('aiSummary').textContent = data.summary || 'No summary available.';
+
+    var predictions = data.predictions || [];
+    if (predictions.length === 0) {
+      $('predictionGrid').innerHTML = '<div style="font-size:.78rem;color:var(--text-muted)">No specific asset predictions generated.</div>';
+      return;
+    }
+
+    var html = '';
+    predictions.forEach(function(p) {
+      var urgClass = p.urgency === 'immediate' ? 'urgency-immediate' : p.urgency === 'days' ? 'urgency-days' : 'urgency-weeks';
+      html += '<div class="prediction-card">' +
+        '<div class="pred-asset">' + esc(p.assetName || '') + ' <code>' + esc(p.assetCode || '') + '</code></div>' +
+        '<div class="pred-probs">' +
+        '<div class="pred-prob"><div class="pred-prob-label">7-day</div><div class="pred-prob-val risk-badge risk-' + (p.failureProbability7d || 'LOW') + '">' + (p.failureProbability7d || 'LOW') + '</div></div>' +
+        '<div class="pred-prob"><div class="pred-prob-label">30-day</div><div class="pred-prob-val risk-badge risk-' + (p.failureProbability30d || 'LOW') + '">' + (p.failureProbability30d || 'LOW') + '</div></div>' +
+        '<div class="pred-prob"><div class="pred-prob-label">Urgency</div><div class="pred-prob-val pred-urgency ' + urgClass + '">' + esc(p.urgency || '?') + '</div></div>' +
+        '</div>' +
+        '<div class="pred-action">💡 ' + esc(p.recommendedAction || 'No recommendation') + '</div>' +
+        (p.reasoning ? '<div style="font-size:.68rem;color:var(--text-muted);margin-top:.4rem">' + esc(p.reasoning) + '</div>' : '') +
+        '</div>';
+    });
+    $('predictionGrid').innerHTML = html;
+  } catch (err) {
+    $('aiSummary').textContent = 'Failed to generate AI predictions. The service may be temporarily unavailable.';
+  }
+}
+
+loadAll();
+</script>
+</body>
+</html>

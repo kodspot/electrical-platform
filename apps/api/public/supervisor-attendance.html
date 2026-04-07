@@ -1,0 +1,635 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
+<link rel="manifest" href="/site.webmanifest">
+<meta name="theme-color" content="#1a7f64">
+<title>Attendance — Kodspot</title>
+<link rel="stylesheet" href="/css/design-system.css?v=9">
+<style>
+.sv-shell{max-width:640px;margin:0 auto;padding:1rem .75rem;min-height:calc(100dvh - 56px)}
+
+/* Filter bar */
+.att-filters{display:flex;gap:.4rem;margin-bottom:.85rem;flex-wrap:wrap}
+.att-filters select,.att-filters input[type=date]{flex:1;min-width:0;font-size:.82rem;padding:.5rem .6rem;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);min-height:var(--touch-min)}
+
+/* Setup card */
+.setup-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:1.5rem 1rem;text-align:center}
+.setup-card h3{font-size:1rem;font-weight:700;margin:0 0 .25rem}
+.setup-card p{font-size:.8rem;color:var(--text-muted);margin:0 0 1rem}
+.setup-loc-list{text-align:left;max-height:320px;overflow-y:auto;margin-bottom:1rem}
+.setup-loc-group{margin-bottom:.3rem}
+.setup-loc-hdr{font-size:.68rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.04em;padding:.35rem .4rem .2rem;display:flex;align-items:center;gap:.35rem}
+.setup-loc-item{display:flex;align-items:center;gap:.5rem;padding:.55rem .7rem;border-radius:var(--radius);cursor:pointer;transition:all .12s;border:1.5px solid transparent;margin:.15rem 0}
+.setup-loc-item:hover{background:rgba(14,165,164,.06);border-color:var(--border)}
+.setup-loc-item.selected{background:rgba(14,165,164,.1);border-color:var(--primary)}
+.setup-loc-item .loc-radio{width:18px;height:18px;border-radius:50%;border:2px solid var(--border);display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all .12s}
+.setup-loc-item.selected .loc-radio{border-color:var(--primary);background:var(--primary)}
+.setup-loc-item.selected .loc-radio::after{content:'';width:8px;height:8px;border-radius:50%;background:#fff}
+.setup-loc-name{font-size:.85rem;font-weight:500;color:var(--text)}
+.setup-loc-type{font-size:.6rem;color:var(--text-muted);background:var(--bg);padding:.1rem .3rem;border-radius:var(--radius-sm);text-transform:uppercase}
+.setup-loc-indent{padding-left:1.2rem}
+
+/* Roster header */
+.roster-hdr{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:.65rem .8rem;margin-bottom:.75rem;display:flex;align-items:center;gap:.6rem}
+.roster-hdr-icon{width:36px;height:36px;border-radius:var(--radius);background:rgba(14,165,164,.12);display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.roster-hdr-icon svg{color:var(--primary)}
+.roster-hdr-info{flex:1;min-width:0}
+.roster-hdr-loc{font-size:.9rem;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.roster-hdr-meta{font-size:.68rem;color:var(--text-muted)}
+.roster-hdr-actions{display:flex;gap:.3rem;flex-shrink:0}
+
+/* Summary stats */
+.att-stats{display:flex;gap:.35rem;margin-bottom:.85rem;flex-wrap:wrap}
+.att-stat{flex:1;text-align:center;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:.5rem .25rem;min-width:55px}
+.att-stat-val{font-size:1.15rem;font-weight:700;line-height:1}
+.att-stat-lbl{font-size:.58rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.04em;margin-top:.1rem}
+.att-stat.present .att-stat-val{color:var(--success)}
+.att-stat.absent .att-stat-val{color:#ef4444}
+.att-stat.leave .att-stat-val{color:#f59e0b}
+.att-stat.half .att-stat-val{color:#3b82f6}
+.att-stat.unmarked .att-stat-val{color:var(--text-muted)}
+
+/* Quick action buttons */
+.att-quick{display:flex;gap:.35rem;margin-bottom:.75rem}
+.att-quick-btn{flex:1;font-size:.72rem;font-weight:600;padding:.45rem .3rem;border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--surface);color:var(--text-muted);cursor:pointer;text-align:center;transition:all .15s;min-height:var(--touch-min)}
+.att-quick-btn:hover{border-color:var(--primary);color:var(--text)}
+
+/* Worker attendance list */
+.att-worker{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:.7rem .8rem;transition:border-color .15s;margin-bottom:.4rem}
+.att-worker.marked{border-color:rgba(16,185,129,.3)}
+.att-worker-top{display:flex;align-items:center;gap:.55rem;margin-bottom:.5rem}
+.att-worker-avatar{width:34px;height:34px;border-radius:50%;background:var(--primary);color:#fff;display:flex;align-items:center;justify-content:center;font-size:.72rem;font-weight:700;flex-shrink:0}
+.att-worker-info{flex:1;min-width:0}
+.att-worker-name{font-size:.88rem;font-weight:600;color:var(--text);line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.att-worker-id{font-size:.68rem;color:var(--text-muted)}
+.att-worker-saved{font-size:.62rem;color:var(--success);display:none}
+.att-worker.marked .att-worker-saved{display:inline}
+
+/* Radio row */
+.att-options{display:flex;gap:.3rem}
+.att-opt{flex:1}
+.att-opt input{display:none}
+.att-opt label{display:block;text-align:center;font-size:.68rem;font-weight:600;padding:.4rem .15rem;border-radius:var(--radius-sm);border:1.5px solid var(--border);cursor:pointer;transition:all .15s;color:var(--text-muted);min-height:var(--touch-min);display:flex;align-items:center;justify-content:center}
+.att-opt input:checked + label{color:#fff}
+.att-opt.present input:checked + label{background:#10b981;border-color:#10b981}
+.att-opt.absent input:checked + label{background:#ef4444;border-color:#ef4444}
+.att-opt.leave input:checked + label{background:#f59e0b;border-color:#f59e0b}
+.att-opt.half input:checked + label{background:#3b82f6;border-color:#3b82f6}
+
+/* Submit bar */
+.att-submit-bar{position:sticky;bottom:0;background:var(--bg);padding:.75rem 0 .35rem;z-index:5;display:flex;gap:.5rem;align-items:center}
+.att-submit-bar .btn{flex:1}
+.att-changed-count{font-size:.72rem;color:var(--text-muted);white-space:nowrap}
+
+/* Worker selection modal */
+.ws-search{width:100%;font-size:.82rem;padding:.5rem .65rem;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);margin-bottom:.65rem}
+.ws-list{max-height:350px;overflow-y:auto;display:flex;flex-direction:column;gap:.25rem;margin-bottom:.75rem}
+.ws-item{display:flex;align-items:center;gap:.55rem;padding:.45rem .55rem;border-radius:var(--radius);cursor:pointer;transition:background .1s}
+.ws-item:hover{background:rgba(14,165,164,.06)}
+.ws-item input{width:16px;height:16px;accent-color:var(--primary);flex-shrink:0}
+.ws-item-name{font-size:.84rem;font-weight:500;color:var(--text)}
+.ws-item-id{font-size:.68rem;color:var(--text-muted)}
+.ws-item-badge{font-size:.58rem;background:rgba(14,165,164,.12);color:var(--primary);padding:.1rem .3rem;border-radius:var(--radius-sm);font-weight:600}
+.ws-count{font-size:.72rem;color:var(--text-muted);margin-bottom:.5rem}
+
+/* Success */
+.att-success{display:none;text-align:center;padding:2rem 1rem}
+.att-success-check{width:64px;height:64px;border-radius:50%;background:var(--success);display:flex;align-items:center;justify-content:center;margin:0 auto 1rem;font-size:1.8rem;color:#fff;box-shadow:0 4px 16px rgba(16,185,129,.25)}
+
+/* Empty state */
+.att-empty{text-align:center;padding:2.5rem 1rem;color:var(--text-muted)}
+.att-empty svg{opacity:.5;margin-bottom:.5rem}
+
+@media(max-width:480px){
+  .sv-shell{padding:.6rem .5rem}
+  .att-filters{gap:.3rem}
+  .att-filters select,.att-filters input[type=date]{font-size:.78rem;padding:.4rem .5rem}
+  .att-stats{gap:.25rem}
+  .att-stat{padding:.4rem .15rem}
+  .att-stat-val{font-size:.95rem}
+  .att-worker{padding:.6rem .65rem}
+  .att-opt label{font-size:.62rem;padding:.35rem .1rem}
+}
+</style>
+</head>
+<body>
+<nav class="topbar">
+  <div class="topbar-left">
+    <span class="topbar-brand">Kodspot</span>
+    <div class="sv-nav" id="sv-nav">
+      <a href="/supervisor-scan" class="sv-nav-link"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7V5a2 2 0 012-2h2"/><path d="M17 3h2a2 2 0 012 2v2"/><path d="M21 17v2a2 2 0 01-2 2h-2"/><path d="M7 21H5a2 2 0 01-2-2v-2"/><rect x="7" y="7" width="10" height="10" rx="1"/></svg>Scan</a>
+      <a href="/supervisor-tickets" class="sv-nav-link"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 5H9a2 2 0 00-2 2v10a2 2 0 002 2h6a2 2 0 002-2V7a2 2 0 00-2-2z"/><path d="M12 11h.01"/><path d="M12 15h.01"/></svg>Tickets</a>
+      <a href="/supervisor-attendance" class="sv-nav-link active"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 00-4-4H5a4 4 0 00-4-4v2"/><circle cx="8.5" cy="7" r="4"/><polyline points="17 11 19 13 23 9"/></svg>Attendance</a>
+    </div>
+  </div>
+  <div class="topbar-right">
+    <span class="topbar-user" id="userName"></span>
+    <button class="btn btn-sm btn-ghost" onclick="App.logoutSup()">Logout</button>
+  </div>
+</nav>
+
+<div class="sv-shell">
+  <!-- Date/Shift selector — always visible -->
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.6rem">
+    <h2 style="font-size:1.05rem;font-weight:700;margin:0">Attendance</h2>
+    <div style="display:inline-flex;align-items:center;gap:.2rem;font-size:.72rem;color:var(--text-light);cursor:pointer;padding:.25rem .5rem;border-radius:var(--radius-sm)" onclick="refreshAll()" title="Refresh"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 11-2.12-9.36L23 10"/></svg> Refresh</div>
+  </div>
+
+  <div class="att-filters">
+    <input type="date" id="dateSelect" onchange="onDateShiftChange()">
+    <select id="shiftSelect" onchange="onDateShiftChange()"><option value="">Loading…</option></select>
+  </div>
+
+  <!-- Phase 1: Setup — Select Floor -->
+  <div id="setupView" style="display:none">
+    <div class="setup-card">
+      <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="color:var(--primary);margin-bottom:.5rem"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+      <h3>Select Your Floor</h3>
+      <p>Choose the floor or area you're supervising today</p>
+      <div class="setup-loc-list" id="locationList">Loading locations…</div>
+      <button class="btn btn-primary" id="startRosterBtn" onclick="createRoster()" disabled style="width:100%">Start Roster</button>
+    </div>
+  </div>
+
+  <!-- Phase 2: Attendance Marking -->
+  <div id="attendView" style="display:none">
+    <!-- Roster header -->
+    <div class="roster-hdr">
+      <div class="roster-hdr-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg></div>
+      <div class="roster-hdr-info">
+        <div class="roster-hdr-loc" id="rosterLoc">—</div>
+        <div class="roster-hdr-meta" id="rosterMeta">—</div>
+      </div>
+      <div class="roster-hdr-actions">
+        <button class="btn btn-sm btn-outline" onclick="openWorkerModal()" title="Manage workers">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4-4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="22" y1="11" x2="16" y2="11"/></svg>
+        </button>
+        <button class="btn btn-sm btn-ghost" onclick="changeFloor()" title="Change floor">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+        </button>
+      </div>
+    </div>
+
+    <!-- Stats -->
+    <div class="att-stats">
+      <div class="att-stat present"><div class="att-stat-val" id="statPresent">–</div><div class="att-stat-lbl">Present</div></div>
+      <div class="att-stat absent"><div class="att-stat-val" id="statAbsent">–</div><div class="att-stat-lbl">Absent</div></div>
+      <div class="att-stat leave"><div class="att-stat-val" id="statLeave">–</div><div class="att-stat-lbl">Leave</div></div>
+      <div class="att-stat half"><div class="att-stat-val" id="statHalf">–</div><div class="att-stat-lbl">Half Day</div></div>
+      <div class="att-stat unmarked"><div class="att-stat-val" id="statUnmarked">–</div><div class="att-stat-lbl">Unmarked</div></div>
+    </div>
+
+    <!-- Quick actions -->
+    <div class="att-quick" id="quickActions" style="display:none">
+      <button class="att-quick-btn" onclick="markAll('PRESENT')">✓ All Present</button>
+      <button class="att-quick-btn" onclick="markAll('ABSENT')">✗ All Absent</button>
+      <button class="att-quick-btn" onclick="clearAll()">↺ Clear</button>
+    </div>
+
+    <!-- Worker list -->
+    <div id="workerList"></div>
+
+    <!-- Submit bar -->
+    <div class="att-submit-bar" id="submitBar" style="display:none">
+      <span class="att-changed-count" id="changedCount">0 changes</span>
+      <button class="btn btn-primary" id="submitBtn" onclick="submitAttendance()">Save Attendance</button>
+    </div>
+  </div>
+
+  <!-- Success screen -->
+  <div class="att-success" id="successView">
+    <div class="att-success-check">✓</div>
+    <h3 style="font-size:1.1rem;font-weight:700;margin-bottom:.25rem">Attendance Saved</h3>
+    <p style="font-size:.82rem;color:var(--text-muted);margin-bottom:1.25rem" id="successMsg">Marked for 0 workers</p>
+    <button class="btn btn-primary" onclick="resetAfterSave()" style="min-width:180px">Continue</button>
+  </div>
+</div>
+
+<!-- Worker Selection Modal -->
+<div class="modal-overlay" id="workerModal">
+  <div class="modal" style="max-width:480px;padding:0">
+    <div style="padding:1rem 1rem .5rem;display:flex;justify-content:space-between;align-items:center">
+      <h2 class="modal-title" style="margin:0">Manage Workers</h2>
+    </div>
+    <div style="padding:0 1rem .75rem">
+      <input type="text" class="ws-search" id="wsSearch" placeholder="Search workers…" oninput="filterWorkerList()">
+      <div class="ws-count" id="wsCount">0 selected</div>
+      <div class="ws-list" id="wsList">Loading…</div>
+    </div>
+    <div class="modal-actions" style="padding:.75rem 1rem;gap:.5rem">
+      <button class="btn btn-outline" onclick="closeWorkerModal()">Cancel</button>
+      <button class="btn btn-primary" id="wsSaveBtn" onclick="saveWorkers()">Save Workers</button>
+    </div>
+  </div>
+</div>
+
+<script src="/js/offline-sync.js?v=1"></script>
+<script src="/js/app.js?v=11"></script>
+<script>
+if (!App.initSupervisor()) throw '';
+App.initNotifications(App.supFetch, 'supervisor');
+var esc = App.esc, $ = App.$;
+
+var currentRoster = null; // { id, locationId, location, workers }
+var workers = [];
+var changes = {};
+var shiftConfigs = [];
+var selectedLocId = '';
+var allWorkersCache = [];
+
+// ── Init ──
+(async function init() {
+  await loadShifts();
+  setDefaultDate();
+  await checkRoster();
+})();
+
+function setDefaultDate() {
+  var d = new Date();
+  $('dateSelect').value = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+}
+
+function onDateShiftChange() {
+  currentRoster = null;
+  changes = {};
+  checkRoster();
+}
+
+// ── Load shifts ──
+async function loadShifts() {
+  var res = await App.supFetch('/shift-config');
+  if (!res) return;
+  shiftConfigs = await res.json();
+  var sel = $('shiftSelect');
+  sel.innerHTML = '';
+  var now = new Date(), curMin = now.getHours()*60 + now.getMinutes(), detected = '';
+  for (var i = 0; i < shiftConfigs.length; i++) {
+    var s = shiftConfigs[i];
+    sel.innerHTML += '<option value="' + s.shift + '">' + formatShiftLabel(s) + '</option>';
+    var sM = s.startHour*60+s.startMin, eM = s.endHour*60+s.endMin;
+    if (eM > sM ? (curMin >= sM && curMin < eM) : (curMin >= sM || curMin < eM)) detected = s.shift;
+  }
+  if (detected) sel.value = detected;
+}
+
+function formatShiftLabel(s) {
+  if (!s || !s.shift) return '—';
+  var fmtT = function(h,m){ var ap=h<12?'AM':'PM'; return (h%12||12)+':'+String(m).padStart(2,'0')+' '+ap; };
+  return s.shift.charAt(0)+s.shift.slice(1).toLowerCase()+' ('+fmtT(s.startHour,s.startMin)+' – '+fmtT(s.endHour,s.endMin)+')';
+}
+
+function getShiftConfig(shift) {
+  for (var i = 0; i < shiftConfigs.length; i++) if (shiftConfigs[i].shift === shift) return shiftConfigs[i];
+  return null;
+}
+
+// ── View management ──
+function showView(v) {
+  $('setupView').style.display = v === 'setup' ? 'block' : 'none';
+  $('attendView').style.display = v === 'attend' ? 'block' : 'none';
+  $('successView').style.display = v === 'success' ? 'block' : 'none';
+}
+
+// ── Check for existing roster ──
+async function checkRoster() {
+  var date = $('dateSelect').value, shift = $('shiftSelect').value;
+  if (!date || !shift) return;
+  showView('none');
+
+  var res = await App.supFetch('/duty-roster/mine?date=' + encodeURIComponent(date) + '&shift=' + encodeURIComponent(shift));
+  if (!res) { showSetup(); return; }
+
+  var data = await res.json();
+  if (data && data.id) {
+    currentRoster = data;
+    if (!data.workers || !data.workers.length) {
+      showAttendView();
+      openWorkerModal();
+    } else {
+      await loadAttendance();
+    }
+  } else {
+    currentRoster = null;
+    showSetup();
+  }
+}
+
+// ── Setup View — pick a floor ──
+async function showSetup() {
+  showView('setup');
+  selectedLocId = '';
+  $('startRosterBtn').disabled = true;
+  $('locationList').innerHTML = '<div style="text-align:center;padding:1rem;color:var(--text-muted)">Loading…</div>';
+
+  var res = await App.supFetch('/locations?tree=true');
+  if (!res) return;
+  var tree = await res.json();
+  renderLocationTree(tree);
+}
+
+function renderLocationTree(tree) {
+  var el = $('locationList');
+  if (!tree || !tree.length) {
+    el.innerHTML = '<div style="text-align:center;padding:1rem;color:var(--text-muted)">No locations found. Ask admin to add locations.</div>';
+    return;
+  }
+  var html = '';
+  for (var i = 0; i < tree.length; i++) {
+    var bldg = tree[i];
+    html += '<div class="setup-loc-group">';
+    html += '<div class="setup-loc-hdr">' + esc(bldg.name) + '</div>';
+    if (bldg.children && bldg.children.length) {
+      for (var j = 0; j < bldg.children.length; j++) {
+        var floor = bldg.children[j];
+        html += '<div class="setup-loc-item" onclick="selectLocation(this,\'' + esc(floor.id) + '\')">'
+          + '<span>' + esc(floor.name) + '</span>'
+          + (floor.children && floor.children.length ? '<span style="font-size:.7rem;color:var(--text-muted)">' + floor.children.length + ' rooms</span>' : '')
+          + '</div>';
+      }
+    } else {
+      html += '<div class="setup-loc-item" onclick="selectLocation(this,\'' + esc(bldg.id) + '\')">'
+        + '<span>' + esc(bldg.name) + '</span></div>';
+    }
+    html += '</div>';
+  }
+  el.innerHTML = html;
+}
+
+function selectLocation(el, locId) {
+  var items = document.querySelectorAll('.setup-loc-item');
+  for (var i = 0; i < items.length; i++) items[i].classList.remove('selected');
+  el.classList.add('selected');
+  selectedLocId = locId;
+  $('startRosterBtn').disabled = false;
+}
+
+// ── Create / update roster ──
+async function createRoster() {
+  if (!selectedLocId) return;
+  var date = $('dateSelect').value, shift = $('shiftSelect').value;
+  if (!date || !shift) { App.toast('Select date and shift', 'error'); return; }
+
+  var btn = $('startRosterBtn');
+  btn.disabled = true; btn.textContent = 'Creating…';
+
+  var res;
+  if (currentRoster) {
+    res = await App.supFetch('/duty-roster/' + encodeURIComponent(currentRoster.id), {
+      method: 'PATCH', body: JSON.stringify({ locationId: selectedLocId })
+    });
+  } else {
+    res = await App.supFetch('/duty-roster', {
+      method: 'POST', body: JSON.stringify({ date: date, shift: shift, locationId: selectedLocId })
+    });
+  }
+
+  btn.disabled = false; btn.textContent = 'Start Roster';
+  if (!res) return;
+  var data = await res.json();
+  if (data.error) { App.toast(data.error, 'error'); return; }
+
+  currentRoster = data;
+  if (!data.workers || !data.workers.length) {
+    showAttendView();
+    openWorkerModal();
+  } else {
+    await loadAttendance();
+  }
+}
+
+// ── Attendance View ──
+function showAttendView() {
+  showView('attend');
+  if (!currentRoster) return;
+  var loc = currentRoster.location;
+  $('rosterLoc').textContent = loc && loc.parent ? loc.parent.name + ' → ' + loc.name : (loc ? loc.name : '—');
+  var wc = (currentRoster.workers || []).length;
+  var sc = getShiftConfig($('shiftSelect').value);
+  $('rosterMeta').textContent = wc + ' worker' + (wc !== 1 ? 's' : '') + ' · ' + formatShiftLabel(sc);
+}
+
+async function loadAttendance() {
+  if (!currentRoster) return;
+  showAttendView();
+  var date = $('dateSelect').value, shift = $('shiftSelect').value;
+  App.showSkeletonCards('workerList', 4);
+  changes = {};
+
+  var url = '/attendance?date=' + encodeURIComponent(date) + '&shift=' + encodeURIComponent(shift) + '&rosterId=' + encodeURIComponent(currentRoster.id);
+  var res = await App.supFetch(url);
+  if (!res) return;
+  var data = await res.json();
+  workers = data.records || [];
+  updateStats(data.summary || {});
+  renderWorkers();
+}
+
+function updateStats(s) {
+  $('statPresent').textContent = s.present || 0;
+  $('statAbsent').textContent = s.absent || 0;
+  $('statLeave').textContent = s.leave || 0;
+  $('statHalf').textContent = s.halfDay || 0;
+  $('statUnmarked').textContent = s.unmarked || 0;
+}
+
+function renderWorkers() {
+  var el = $('workerList');
+  if (!workers.length) {
+    el.innerHTML = '<div class="att-empty"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4-4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg><p style="margin-top:.5rem">No workers in roster.<br><span style="font-size:.75rem">Tap the + button above to add workers.</span></p></div>';
+    $('quickActions').style.display = 'none';
+    $('submitBar').style.display = 'none';
+    return;
+  }
+  $('quickActions').style.display = 'flex';
+  var html = '';
+  for (var i = 0; i < workers.length; i++) {
+    var w = workers[i], wk = w.worker, wId = wk.id;
+    html += '<div class="att-worker' + (w.status ? ' marked' : '') + '" id="aw-' + wId + '">';
+    html += '<div class="att-worker-top">';
+    html += '<div class="att-worker-avatar">' + esc(getInitials(wk.name)) + '</div>';
+    html += '<div class="att-worker-info">';
+    html += '<div class="att-worker-name">' + esc(wk.name) + '</div>';
+    html += '<div class="att-worker-id">' + esc(wk.employeeId || '—') + ' <span class="att-worker-saved">· ✓ Saved</span></div>';
+    html += '</div></div>';
+    html += '<div class="att-options">';
+    html += radioOpt(wId, 'PRESENT', 'Present', 'present', w.status);
+    html += radioOpt(wId, 'ABSENT', 'Absent', 'absent', w.status);
+    html += radioOpt(wId, 'LEAVE', 'Leave', 'leave', w.status);
+    html += radioOpt(wId, 'HALF_DAY', 'Half Day', 'half', w.status);
+    html += '</div></div>';
+  }
+  el.innerHTML = html;
+  updateSubmitBar();
+}
+
+function radioOpt(wId, val, label, cls, cur) {
+  var nm = 'att_' + wId, id = nm + '_' + val;
+  return '<div class="att-opt ' + cls + '"><input type="radio" name="' + nm + '" id="' + id + '" value="' + val + '"' + (cur === val ? ' checked' : '') + ' onchange="onStatusChange(\'' + wId + '\',\'' + val + '\')"><label for="' + id + '">' + esc(label) + '</label></div>';
+}
+
+function getInitials(name) {
+  var p = (name || '').trim().split(/\s+/);
+  return p.length > 1 ? (p[0][0] + p[p.length - 1][0]).toUpperCase() : (p[0] || '?').substring(0, 2).toUpperCase();
+}
+
+function onStatusChange(workerId, status) {
+  var orig = null;
+  for (var i = 0; i < workers.length; i++) {
+    if (workers[i].worker.id === workerId) { orig = workers[i].status; break; }
+  }
+  if (status === orig) delete changes[workerId]; else changes[workerId] = status;
+  updateSubmitBar();
+}
+
+function markAll(status) {
+  for (var i = 0; i < workers.length; i++) {
+    var wId = workers[i].worker.id;
+    var r = document.getElementById('att_' + wId + '_' + status);
+    if (r) { r.checked = true; onStatusChange(wId, status); }
+  }
+}
+
+function clearAll() {
+  for (var i = 0; i < workers.length; i++) {
+    var wId = workers[i].worker.id;
+    var radios = document.querySelectorAll('input[name="att_' + wId + '"]');
+    for (var j = 0; j < radios.length; j++) radios[j].checked = false;
+    if (workers[i].status) {
+      var o = document.getElementById('att_' + wId + '_' + workers[i].status);
+      if (o) o.checked = true;
+    }
+  }
+  changes = {};
+  updateSubmitBar();
+}
+
+function updateSubmitBar() {
+  var c = Object.keys(changes).length;
+  $('submitBar').style.display = c > 0 ? 'flex' : 'none';
+  $('changedCount').textContent = c + ' change' + (c !== 1 ? 's' : '');
+}
+
+// ── Submit attendance ──
+async function submitAttendance() {
+  var date = $('dateSelect').value, shift = $('shiftSelect').value;
+  if (!date || !shift) { App.toast('Select date and shift', 'error'); return; }
+
+  var records = [];
+  for (var i = 0; i < workers.length; i++) {
+    var wId = workers[i].worker.id;
+    var r = document.querySelector('input[name="att_' + wId + '"]:checked');
+    if (r) records.push({ workerId: wId, status: r.value });
+  }
+  if (!records.length) { App.toast('No attendance to save', 'error'); return; }
+
+  var btn = $('submitBtn');
+  btn.disabled = true; btn.textContent = 'Saving…';
+
+  try {
+    var res = await App.supFetch('/attendance/bulk', {
+      method: 'POST', body: JSON.stringify({ date: date, shift: shift, records: records })
+    });
+    if (!res) { btn.disabled = false; btn.textContent = 'Save Attendance'; return; }
+    var data = await res.json();
+    if (data.error) { App.toast(data.error, 'error'); btn.disabled = false; btn.textContent = 'Save Attendance'; return; }
+
+    showView('success');
+    $('successMsg').textContent = 'Marked attendance for ' + records.length + ' worker' + (records.length !== 1 ? 's' : '');
+  } catch (e) { App.toast('Failed to save', 'error'); }
+  btn.disabled = false; btn.textContent = 'Save Attendance';
+}
+
+function resetAfterSave() { changes = {}; checkRoster(); }
+function refreshAll() { currentRoster ? loadAttendance() : checkRoster(); }
+function changeFloor() { showSetup(); }
+
+// ── Worker Modal ──
+async function openWorkerModal() {
+  App.openModal('workerModal');
+  $('wsSearch').value = '';
+  $('wsList').innerHTML = '<div style="text-align:center;padding:1rem;color:var(--text-muted)">Loading…</div>';
+  if (!currentRoster) return;
+
+  var res = await App.supFetch('/duty-roster/suggested-workers?locationId=' + encodeURIComponent(currentRoster.locationId));
+  if (!res) return;
+  var data = await res.json();
+  allWorkersCache = data.allWorkers || [];
+
+  // Build set of already-rostered worker IDs
+  var rosterIds = {};
+  if (currentRoster.workers) {
+    for (var i = 0; i < currentRoster.workers.length; i++) {
+      var wkr = currentRoster.workers[i];
+      rosterIds[wkr.workerId || (wkr.worker && wkr.worker.id) || ''] = true;
+    }
+  }
+
+  // If roster is empty, pre-check suggested defaults
+  var sugIds = {};
+  if (!currentRoster.workers || !currentRoster.workers.length) {
+    var sug = data.suggested || [];
+    for (var i = 0; i < sug.length; i++) sugIds[sug[i].id] = true;
+  }
+
+  renderWorkerModal(rosterIds, sugIds);
+  updateWsCount();
+}
+
+function renderWorkerModal(rosterIds, sugIds) {
+  var search = ($('wsSearch').value || '').toLowerCase();
+  var html = '';
+  for (var i = 0; i < allWorkersCache.length; i++) {
+    var w = allWorkersCache[i];
+    if (search && w.name.toLowerCase().indexOf(search) === -1 && (w.employeeId || '').toLowerCase().indexOf(search) === -1) continue;
+    var chk = rosterIds[w.id] || sugIds[w.id] || false;
+    html += '<label class="ws-item"><input type="checkbox" value="' + esc(w.id) + '"' + (chk ? ' checked' : '') + ' onchange="updateWsCount()">'
+      + '<div class="att-worker-avatar" style="width:32px;height:32px;font-size:.7rem">' + esc(getInitials(w.name)) + '</div>'
+      + '<div><div style="font-weight:600;font-size:.82rem">' + esc(w.name) + '</div>'
+      + '<div style="font-size:.72rem;color:var(--text-muted)">' + esc(w.employeeId || '—') + '</div></div></label>';
+  }
+  $('wsList').innerHTML = html || '<div style="text-align:center;padding:1rem;color:var(--text-muted)">No workers found</div>';
+}
+
+function filterWorkerList() {
+  if (!allWorkersCache.length) return;
+  var ids = getModalCheckedIds(), r = {};
+  for (var i = 0; i < ids.length; i++) r[ids[i]] = true;
+  renderWorkerModal(r, {});
+}
+
+function getModalCheckedIds() {
+  var ids = [], boxes = document.querySelectorAll('#wsList input[type="checkbox"]');
+  for (var i = 0; i < boxes.length; i++) if (boxes[i].checked) ids.push(boxes[i].value);
+  return ids;
+}
+
+function updateWsCount() { $('wsCount').textContent = getModalCheckedIds().length + ' selected'; }
+function closeWorkerModal() { App.closeModal('workerModal'); }
+
+async function saveWorkers() {
+  if (!currentRoster) return;
+  var ids = getModalCheckedIds();
+  var btn = $('wsSaveBtn');
+  btn.disabled = true; btn.textContent = 'Saving…';
+
+  var res = await App.supFetch('/duty-roster/' + encodeURIComponent(currentRoster.id) + '/workers', {
+    method: 'PUT', body: JSON.stringify({ workerIds: ids })
+  });
+  btn.disabled = false; btn.textContent = 'Save Workers';
+  if (!res) return;
+  var data = await res.json();
+  if (data.error) { App.toast(data.error, 'error'); return; }
+
+  currentRoster = data;
+  closeWorkerModal();
+  App.toast('Workers updated', 'success');
+  await loadAttendance();
+}
+</script>
+</body>
+</html>

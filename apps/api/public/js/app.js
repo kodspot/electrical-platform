@@ -1,0 +1,1207 @@
+/* ========================================================================
+   KODSPOT — Shared Application JavaScript
+   Auth, API, Toast, Nav, Retry, Utilities
+   Module-aware routing: /{org}/{module}/{page}
+   ======================================================================== */
+'use strict';
+window.App = (function () {
+  const API = '/api';
+
+  // ─── Valid Module Codes ───
+  var VALID_MODULES = ['ele', 'civil', 'asset', 'complaints'];
+
+  // ─── Org & Module Routing ───
+  var NON_ORG_PREFIXES = ['superadmin-login', 'superadmin-dashboard', 's', 'api', 'scan'];
+
+  function getOrgSlug() {
+    var parts = location.pathname.split('/').filter(Boolean);
+    if (parts.length >= 2 && NON_ORG_PREFIXES.indexOf(parts[0]) === -1) {
+      var candidate = parts[0];
+      if (/^[a-z0-9][a-z0-9-]*$/.test(candidate)) return candidate;
+    }
+    var stored = localStorage.getItem('orgSlug');
+    if (stored && /^[a-z0-9][a-z0-9-]*$/.test(stored)) return stored;
+    return null;
+  }
+
+  function getModule() {
+    // URL: /{org}/{module}/{page} — module is parts[1]
+    var parts = location.pathname.split('/').filter(Boolean);
+    if (parts.length >= 2) {
+      var mod = parts[1];
+      if (VALID_MODULES.indexOf(mod) !== -1) return mod;
+    }
+    // Fallback to localStorage
+    var stored = localStorage.getItem('activeModule');
+    if (stored && VALID_MODULES.indexOf(stored) !== -1) return stored;
+    return 'ele'; // default
+  }
+
+  // Legacy: orgPath still works but routes through module
+  function orgPath(page) {
+    var slug = getOrgSlug();
+    var mod = getModule();
+    return slug ? '/' + slug + '/' + mod + '/' + page : '/' + page;
+  }
+
+  // Explicit module path builder
+  function modulePath(page, mod) {
+    var slug = getOrgSlug();
+    mod = mod || getModule();
+    return slug ? '/' + slug + '/' + mod + '/' + page : '/' + page;
+  }
+
+  // ─── Module Gating Helpers ───
+  function getEnabledModules() {
+    try { return JSON.parse(localStorage.getItem('enabledModules')) || ['ele']; }
+    catch (e) { return ['ele']; }
+  }
+
+  function isModuleEnabled(mod) {
+    return getEnabledModules().indexOf(mod) !== -1;
+  }
+
+  // ─── DOM Helpers ───
+  function $(id) { return document.getElementById(id); }
+
+  function esc(s) {
+    if (!s) return '';
+    const d = document.createElement('div');
+    d.textContent = s;
+    return d.innerHTML;
+  }
+
+  function fmtDate(s) {
+    if (!s) return '—';
+    return new Date(s).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' });
+  }
+
+  function fmtDateShort(s) {
+    if (!s) return '—';
+    return new Date(s).toLocaleDateString();
+  }
+
+  // ─── Token Management ───
+  function getToken() { return localStorage.getItem('token'); }
+  function getSupToken() { return localStorage.getItem('sup_token'); }
+
+  function getUser() {
+    try { return JSON.parse(localStorage.getItem('user') || '{}'); }
+    catch { return {}; }
+  }
+
+  function getSupUser() {
+    try { return JSON.parse(localStorage.getItem('sup_user') || '{}'); }
+    catch { return {}; }
+  }
+
+  function adminHeaders(includeJson) {
+    const h = { 'Authorization': 'Bearer ' + getToken() };
+    if (includeJson !== false) h['Content-Type'] = 'application/json';
+    const oid = localStorage.getItem('selectedOrgId');
+    if (oid) h['X-Org-Id'] = oid;
+    return h;
+  }
+
+  function supHeaders() {
+    return { 'Authorization': 'Bearer ' + getSupToken() };
+  }
+
+  // ─── API Fetch with Retry ───
+  function _adminLoginRedirect() {
+    try { var u = JSON.parse(localStorage.getItem('user') || '{}'); if (u.role === 'SUPER_ADMIN') return '/superadmin-login'; } catch(e) {}
+    return orgPath('admin-login');
+  }
+
+  async function apiFetch(path, opts) {
+    opts = opts || {};
+    const headers = { ...adminHeaders(!(opts.body instanceof FormData)), ...(opts.headers || {}) };
+    if (opts.body instanceof FormData) delete headers['Content-Type'];
+    const fetchOpts = { ...opts, headers };
+    return _doFetch(path, fetchOpts, _adminLoginRedirect());
+  }
+
+  async function supFetch(path, opts) {
+    opts = opts || {};
+    const headers = { ...supHeaders(), ...(opts.headers || {}) };
+    if (opts.body instanceof FormData) delete headers['Content-Type'];
+    else if (opts.body && typeof opts.body === 'string') headers['Content-Type'] = 'application/json';
+    const fetchOpts = { ...opts, headers };
+    return _doFetch(path, fetchOpts, orgPath('supervisor-login'));
+  }
+
+  async function _doFetch(path, fetchOpts, loginRedirect) {
+    var lastErr;
+    for (var i = 0; i < 3; i++) {
+      try {
+        var res = await fetch(API + path, fetchOpts);
+        if (res.status === 401) {
+          localStorage.removeItem('token'); localStorage.removeItem('user');
+          localStorage.removeItem('sup_token'); localStorage.removeItem('sup_user');
+          localStorage.removeItem('selectedOrgId'); localStorage.removeItem('selectedOrgName');
+          location.href = loginRedirect;
+          return null;
+        }
+        if (res.status === 503) {
+          // Service unavailable (circuit breaker) — retry with backoff
+          lastErr = new Error('Service temporarily unavailable');
+          if (i < 2) await _wait(1000 * Math.pow(2, i) + Math.random() * 500);
+          continue;
+        }
+        return res;
+      } catch (err) {
+        lastErr = err;
+        if (i < 2) await _wait(1000 * Math.pow(2, i) + Math.random() * 500);
+      }
+    }
+    toast('Network error. Please check your connection.', 'error');
+    throw lastErr;
+  }
+
+  function _wait(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
+
+  // JSON convenience — checks Content-Type before parsing
+  async function apiFetchJson(path, opts) {
+    var res = await apiFetch(path, opts);
+    if (!res) return null;
+    var ct = (res.headers.get('content-type') || '');
+    if (!ct.includes('application/json')) return null;
+    return res.json();
+  }
+  async function supFetchJson(path, opts) {
+    var res = await supFetch(path, opts);
+    if (!res) return null;
+    var ct = (res.headers.get('content-type') || '');
+    if (!ct.includes('application/json')) return null;
+    return res.json();
+  }
+
+  // ─── Logout ───
+  function _clearAuthStorage() {
+    ['token','user','sup_token','sup_user','orgSlug','orgName','activeModule','selectedOrgId','selectedOrgName'].forEach(function(k) { localStorage.removeItem(k); });
+  }
+
+  function logout() {
+    var slug = getOrgSlug();
+    var mod = getModule();
+    _clearAuthStorage();
+    location.href = slug ? '/' + slug + '/' + mod + '/admin-login' : '/admin-login';
+  }
+
+  function logoutSA() {
+    _clearAuthStorage();
+    location.href = '/superadmin-login';
+  }
+
+  function logoutSup() {
+    var slug = getOrgSlug();
+    var mod = getModule();
+    localStorage.removeItem('sup_token');
+    localStorage.removeItem('sup_user');
+    location.href = slug ? '/' + slug + '/' + mod + '/supervisor-login' : '/supervisor-login';
+  }
+
+  // ─── Toast Notifications ───
+  var toastWrap = null;
+
+  function _ensureToast() {
+    if (!toastWrap) {
+      toastWrap = document.createElement('div');
+      toastWrap.className = 'toast-wrap';
+      document.body.appendChild(toastWrap);
+    }
+  }
+
+  function toast(msg, type, duration) {
+    type = type || 'info';
+    duration = duration || 4000;
+    _ensureToast();
+    var el = document.createElement('div');
+    el.className = 'toast toast-' + type;
+    var icons = { success: '✓', error: '✕', warning: '⚠', info: 'ℹ' };
+    el.innerHTML = '<span>' + (icons[type] || '') + '</span><span>' + esc(msg) + '</span>';
+    toastWrap.appendChild(el);
+    setTimeout(function () {
+      el.classList.add('removing');
+      setTimeout(function () { el.remove(); }, 300);
+    }, duration);
+  }
+
+  // ─── Confirm Dialog ───
+  function confirmDialog(msg) {
+    return new Promise(function (resolve) {
+      var overlay = document.createElement('div');
+      overlay.className = 'modal-overlay show';
+      overlay.style.zIndex = '150';
+      overlay.innerHTML =
+        '<div class="modal" style="max-width:380px;text-align:center;animation:modalSlideIn .25s ease">' +
+        '<div style="font-size:2rem;margin-bottom:.75rem">⚠️</div>' +
+        '<p style="margin-bottom:1.25rem;font-size:.95rem;line-height:1.5;color:var(--text)">' + esc(msg) + '</p>' +
+        '<div class="modal-actions" style="justify-content:center;border-top:none;padding-top:0">' +
+        '<button class="btn btn-outline" id="_cfmNo">Cancel</button>' +
+        '<button class="btn btn-danger" id="_cfmYes">Confirm</button>' +
+        '</div></div>';
+      document.body.appendChild(overlay);
+      overlay.querySelector('#_cfmYes').onclick = function () { overlay.remove(); resolve(true); };
+      overlay.querySelector('#_cfmNo').onclick = function () { overlay.remove(); resolve(false); };
+      overlay.addEventListener('click', function (e) { if (e.target === overlay) { overlay.remove(); resolve(false); } });
+    });
+  }
+
+  // ─── Org Branding in Topbar ───
+  function _applyOrgBrand() {
+    var orgName = localStorage.getItem('orgName') || localStorage.getItem('selectedOrgName');
+    if (!orgName) return;
+    var brandEl = document.querySelector('.topbar-brand');
+    if (!brandEl) return;
+    brandEl.innerHTML = esc(orgName) + '<span class="topbar-powered"> · Kodspot</span>';
+  }
+
+  // ─── Admin Navigation ───
+  var NAV_ITEMS = [
+    { page: 'admin-dashboard', label: 'Dashboard' },
+    { page: 'admin-analytics', label: 'Analytics' },
+    { page: 'admin-locations', label: 'Locations' },
+    { page: 'admin-workers', label: 'Workers' },
+    { page: 'admin-supervisors', label: 'Supervisors' },
+    { page: 'admin-electrical', label: 'Electrical' },
+    { page: 'admin-templates', label: 'Templates' },
+    { page: 'admin-assets', label: 'Assets', mod: 'asset' },
+    { page: 'admin-failures', label: 'Failures', mod: 'asset' },
+    { page: 'admin-alerts', label: 'Alerts' },
+    { page: 'admin-predictions', label: 'Predictions', mod: 'asset' },
+    { page: 'admin-tickets', label: 'Tickets' },
+    { page: 'admin-attendance', label: 'Attendance' },
+    { page: 'admin-audit-logs', label: 'Audit Logs' }
+  ];
+
+  // AI nav item — injected dynamically when AI is enabled for org
+  function _maybeAddAiNav(activePage) {
+    apiFetch('/ai/status').then(function(res) {
+      if (!res || !res.ok) return;
+      return res.json();
+    }).then(function(data) {
+      if (!data || !data.enabled) return;
+      var navEl = $('topbar-nav');
+      if (!navEl || navEl.querySelector('[data-ai-nav]')) return;
+      // Insert before Audit Logs
+      var auditLink = navEl.querySelector('a[href*="admin-audit-logs"]');
+      var a = document.createElement('a');
+      a.href = orgPath('admin-ai');
+      a.textContent = 'AI Assistant';
+      if (activePage === 'admin-ai') a.className = 'active';
+      a.setAttribute('data-ai-nav', '1');
+      if (auditLink) navEl.insertBefore(a, auditLink);
+      else navEl.appendChild(a);
+    }).catch(function() { /* AI disabled or error — skip */ });
+  }
+
+  function initAdmin(activePage) {
+    if (!getToken()) { location.href = orgPath('admin-login'); return false; }
+    var user = getUser();
+    if (user.role === 'SUPER_ADMIN' && !localStorage.getItem('selectedOrgId')) {
+      location.href = '/superadmin-dashboard'; return false;
+    }
+
+    // Store active module from URL
+    var mod = getModule();
+    localStorage.setItem('activeModule', mod);
+
+    // Init module PWA (manifest + SW)
+    initModulePWA();
+
+    // Show org name in topbar
+    _applyOrgBrand();
+
+    // Build nav
+    var navEl = $('topbar-nav');
+    if (navEl) {
+      var enabledMods = getEnabledModules();
+      var html = '';
+      for (var i = 0; i < NAV_ITEMS.length; i++) {
+        var n = NAV_ITEMS[i];
+        // Skip module-specific nav items if module is not enabled
+        if (n.mod && enabledMods.indexOf(n.mod) === -1) continue;
+        var href = orgPath(n.page);
+        var cls = n.page.indexOf(activePage) !== -1 ? ' class="active"' : '';
+        html += '<a href="' + href + '"' + cls + '>' + n.label + '</a>';
+      }
+      navEl.innerHTML = html;
+    }
+
+    // Build user menu
+    _buildUserMenu(user, 'admin');
+
+    // SA Banner
+    if (user.role === 'SUPER_ADMIN') {
+      var banner = $('sa-banner');
+      if (banner) {
+        var orgName = localStorage.getItem('selectedOrgName') || 'Org';
+        banner.innerHTML = '<span>Viewing as Super Admin: <b>' + esc(orgName) + '</b></span><a href="/superadmin-dashboard">\u2190 Back to Super Admin</a>';
+        banner.style.display = 'flex';
+      }
+    }
+
+    // Mobile nav toggle
+    _setupMobileNav();
+
+    // Check AI status and add nav item if enabled
+    _maybeAddAiNav(activePage);
+
+    return true;
+  }
+
+  function initSupervisor() {
+    if (!getSupToken()) { location.href = orgPath('supervisor-login'); return false; }
+    var user = getSupUser();
+
+    // Store active module from URL
+    var mod = getModule();
+    localStorage.setItem('activeModule', mod);
+
+    // Init module PWA (manifest + SW)
+    initModulePWA();
+
+    _applyOrgBrand();
+
+    // Rewrite supervisor nav links to module-scoped paths + hide disabled modules
+    var svNav = $('sv-nav');
+    if (svNav) {
+      var enabledMods = getEnabledModules();
+      var links = svNav.querySelectorAll('a[href]');
+      for (var i = 0; i < links.length; i++) {
+        var linkMod = links[i].getAttribute('data-mod');
+        if (linkMod && enabledMods.indexOf(linkMod) === -1) {
+          links[i].style.display = 'none';
+          continue;
+        }
+        var page = links[i].getAttribute('href').replace(/^\//, '');
+        if (page) links[i].href = orgPath(page);
+      }
+    }
+    // Also fix standalone links like "Scan Next Location"
+    var scanNext = $('scanNextLink');
+    if (scanNext) scanNext.href = orgPath('supervisor-scan');
+
+    _buildUserMenu(user, 'supervisor');
+    return true;
+  }
+
+  function _buildUserMenu(user, role) {
+    var topRight = document.querySelector('.topbar-right');
+    if (!topRight) return;
+    var nameEl = $('userName');
+    var logoutBtn = topRight.querySelector('.btn-ghost, [onclick*="logout"]');
+
+    // Get initials (first letter of first & last name)
+    var name = user.name || 'User';
+    var parts = name.trim().split(/\s+/);
+    var initials = parts.length > 1 ? (parts[0][0] + parts[parts.length - 1][0]).toUpperCase() : parts[0].substring(0, 2).toUpperCase();
+
+    var roleLabel = user.role === 'SUPER_ADMIN' ? 'Super Admin' : role === 'supervisor' ? 'Supervisor' : 'Admin';
+
+    // Build user menu wrap
+    var wrap = document.createElement('div');
+    wrap.className = 'user-menu-wrap';
+    wrap.innerHTML =
+      '<button class="user-menu-trigger" id="userMenuTrigger">' +
+        '<span class="user-avatar">' + esc(initials) + '</span>' +
+        '<span class="user-menu-name">' + esc(name) + '</span>' +
+        '<svg class="user-menu-chevron" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>' +
+      '</button>' +
+      '<div class="user-menu-dropdown" id="userMenuDropdown">' +
+        '<div class="user-menu-header">' +
+          '<div class="user-menu-fullname">' + esc(name) + '</div>' +
+          '<div class="user-menu-role">' + esc(roleLabel) + '</div>' +
+        '</div>' +
+        '<div class="user-menu-divider"></div>' +
+        '<button class="user-menu-item" id="userMenuProfile">' +
+          '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>' +
+          'Profile' +
+        '</button>' +
+        '<div class="user-menu-divider"></div>' +
+        '<button class="user-menu-item user-menu-logout" id="userMenuLogout">' +
+          '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>' +
+          'Logout' +
+        '</button>' +
+      '</div>';
+
+    // Replace old elements
+    if (nameEl) nameEl.remove();
+    if (logoutBtn) logoutBtn.remove();
+
+    // Insert before notification bell (if present) or at the end
+    var bellWrap = topRight.querySelector('.notif-bell-wrap');
+    if (bellWrap) {
+      topRight.insertBefore(wrap, bellWrap);
+    } else {
+      topRight.appendChild(wrap);
+    }
+
+    // Toggle dropdown
+    var trigger = wrap.querySelector('#userMenuTrigger');
+    var dropdown = wrap.querySelector('#userMenuDropdown');
+    trigger.addEventListener('click', function(e) {
+      e.stopPropagation();
+      dropdown.classList.toggle('open');
+    });
+
+    // Close on outside click
+    document.addEventListener('click', function(e) {
+      if (!e.target.closest('.user-menu-wrap')) {
+        dropdown.classList.remove('open');
+      }
+    });
+
+    // Profile
+    var profileEl = wrap.querySelector('#userMenuProfile');
+    profileEl.addEventListener('click', function() {
+      dropdown.classList.remove('open');
+      _openProfileModal(role);
+    });
+
+    // Logout
+    var logoutEl = wrap.querySelector('#userMenuLogout');
+    logoutEl.addEventListener('click', function() {
+      if (role === 'supervisor') { logoutSup(); }
+      else if (role === 'superadmin') { logoutSA(); }
+      else { logout(); }
+    });
+  }
+
+  // ─── Profile Modal ───
+  function _openProfileModal(role) {
+    // Determine fetcher and token
+    var fetcher = role === 'supervisor' ? supFetch : apiFetch;
+    _showProfileLoading();
+    fetcher('/auth/me').then(function(res) {
+      if (!res || !res.ok) { _showProfileError(); return; }
+      return res.json();
+    }).then(function(data) {
+      if (!data) return;
+      _renderProfileModal(data, role);
+    }).catch(function() {
+      _showProfileError();
+    });
+  }
+
+  function _showProfileLoading() {
+    _ensureProfileModal();
+    $('profileContent').innerHTML =
+      '<div style="text-align:center;padding:2rem;color:var(--text-muted)">' +
+        '<div class="skeleton skeleton-text" style="width:60%;margin:0 auto .5rem"></div>' +
+        '<div class="skeleton skeleton-text" style="width:80%;margin:0 auto .5rem"></div>' +
+        '<div class="skeleton skeleton-text" style="width:40%;margin:0 auto"></div>' +
+      '</div>';
+    openModal('profileModal');
+  }
+
+  function _showProfileError() {
+    $('profileContent').innerHTML =
+      '<div style="text-align:center;padding:2rem;color:var(--danger)">Failed to load profile</div>';
+  }
+
+  function _ensureProfileModal() {
+    if ($('profileModal')) return;
+    var overlay = document.createElement('div');
+    overlay.className = 'modal-overlay';
+    overlay.id = 'profileModal';
+    overlay.innerHTML =
+      '<div class="modal" style="max-width:440px">' +
+        '<div id="profileContent"></div>' +
+      '</div>';
+    document.body.appendChild(overlay);
+  }
+
+  function _renderProfileModal(data, role) {
+    var name = data.name || 'User';
+    var parts = name.trim().split(/\s+/);
+    var initials = parts.length > 1 ? (parts[0][0] + parts[parts.length - 1][0]).toUpperCase() : parts[0].substring(0, 2).toUpperCase();
+    var roleLabel = data.role === 'SUPER_ADMIN' ? 'Super Admin' : data.role === 'SUPERVISOR' ? 'Supervisor' : 'Admin';
+    var since = data.createdAt ? new Date(data.createdAt).toLocaleDateString('en-IN', { year: 'numeric', month: 'long', day: 'numeric' }) : '—';
+
+    var html =
+      '<div class="profile-card">' +
+        '<div class="profile-header">' +
+          '<div class="profile-avatar">' + esc(initials) + '</div>' +
+          '<div class="profile-name">' + esc(name) + '</div>' +
+          '<div class="profile-role-badge">' + esc(roleLabel) + '</div>' +
+        '</div>' +
+        '<div class="profile-details">' +
+          _profileRow('Email', data.email, 'M4 4h16c1.1 0 2 .9 2 2v12a2 2 0 01-2 2H4a2 2 0 01-2-2V6c0-1.1.9-2 2-2Z|m0 2 8 5 8-5') +
+          _profileRow('Phone', data.phone || '—', 'M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07 19.5 19.5 0 01-6-6A19.79 19.79 0 012.12 4.18 2 2 0 014.11 2h3a2 2 0 012 1.72c.13.81.36 1.6.68 2.35a2 2 0 01-.45 2.11L8.09 9.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45c.75.32 1.54.55 2.35.68A2 2 0 0122 16.92Z') +
+          (data.org ? _profileRow('Organization', data.org.name, 'M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z|M9 22V12h6v10') : '') +
+          _profileRow('Member Since', since, 'M8 2v4|M16 2v4|M3 10h18|M21 8v13a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h14a2 2 0 012 2z') +
+        '</div>' +
+        '<div class="profile-footer">' +
+          '<button class="btn btn-outline btn-sm" onclick="App.closeModal(\'profileModal\')" style="width:100%">Close</button>' +
+        '</div>' +
+      '</div>';
+
+    $('profileContent').innerHTML = html;
+  }
+
+  function _profileRow(label, value, iconPaths) {
+    var pathParts = iconPaths.split('|');
+    var svgPaths = pathParts.map(function(p) { return '<path d="' + p + '"/>'; }).join('');
+    return '<div class="profile-row">' +
+        '<div class="profile-row-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">' + svgPaths + '</svg></div>' +
+        '<div class="profile-row-body">' +
+          '<div class="profile-row-label">' + esc(label) + '</div>' +
+          '<div class="profile-row-value">' + esc(value || '—') + '</div>' +
+        '</div>' +
+      '</div>';
+  }
+
+  function _setupMobileNav() {
+    var toggle = $('nav-toggle');
+    var navEl = $('topbar-nav');
+    if (!toggle || !navEl) return;
+    toggle.addEventListener('click', function (e) {
+      e.stopPropagation();
+      navEl.classList.toggle('open');
+    });
+    document.addEventListener('click', function (e) {
+      if (!e.target.closest('.topbar')) navEl.classList.remove('open');
+    });
+  }
+
+  // ─── Loading Skeletons ───
+  function showSkeleton(el, count) {
+    if (typeof el === 'string') el = $(el);
+    if (!el) return;
+    count = count || 3;
+    var html = '';
+    for (var i = 0; i < count; i++) {
+      var w = 60 + Math.floor(Math.random() * 40);
+      html += '<div class="skeleton skeleton-text" style="width:' + w + '%"></div>';
+    }
+    el.innerHTML = html;
+  }
+
+  function showSkeletonCards(el, count) {
+    if (typeof el === 'string') el = $(el);
+    if (!el) return;
+    count = count || 4;
+    var html = '';
+    for (var i = 0; i < count; i++) {
+      html += '<div class="skeleton skeleton-card"></div>';
+    }
+    el.innerHTML = html;
+  }
+
+  function showSkeletonRows(el, count) {
+    if (typeof el === 'string') el = $(el);
+    if (!el) return;
+    count = count || 5;
+    var html = '';
+    for (var i = 0; i < count; i++) {
+      html += '<div class="skeleton skeleton-row"></div>';
+    }
+    el.innerHTML = html;
+  }
+
+  // ─── Retry Queue (persistent IndexedDB via offline-sync.js) ───
+  // KodspotSync is loaded from /js/offline-sync.js before app.js
+
+  function enqueueRetry(fn, requestData) {
+    // If we have serialisable request data, persist to IndexedDB
+    if (requestData && window.KodspotSync) {
+      window.KodspotSync.enqueue(requestData).then(function () {
+        toast('Saved offline — will sync when back online', 'warning');
+        _updateOfflineBadge();
+        // Register Background Sync if supported
+        if ('serviceWorker' in navigator && 'SyncManager' in window) {
+          navigator.serviceWorker.ready.then(function (reg) {
+            return reg.sync.register('kodspot-offline-sync');
+          }).catch(function () {});
+        }
+      }).catch(function () {
+        toast('Could not save offline', 'error');
+      });
+    } else {
+      // Fallback for non-serialisable function closures
+      _memQueue.push(fn);
+      toast('Saved for retry when back online', 'warning');
+    }
+    if (navigator.onLine) _processQueue();
+  }
+
+  var _memQueue = []; // Fallback for closures that can't be serialised
+
+  function _processQueue() {
+    // Process IndexedDB queue first
+    if (window.KodspotSync) {
+      window.KodspotSync.getAll().then(function (entries) {
+        if (!entries.length && !_memQueue.length) return;
+        _replayEntries(entries, 0);
+      }).catch(function () {
+        _processMemQueue();
+      });
+    } else {
+      _processMemQueue();
+    }
+  }
+
+  function _replayEntries(entries, idx) {
+    if (idx >= entries.length) {
+      _updateOfflineBadge();
+      _processMemQueue();
+      return;
+    }
+    var entry = entries[idx];
+    // Re-attach current auth token
+    var headers = entry.headers || {};
+    var token = getToken() || getSupToken();
+    if (token) headers['Authorization'] = 'Bearer ' + token;
+    fetch(entry.url, { method: entry.method, headers: headers, body: entry.body || undefined })
+      .then(function (res) {
+        if (res.ok || res.status === 409) {
+          // Success or duplicate — remove from queue
+          window.KodspotSync.remove(entry.id).catch(function () {});
+          toast('Queued submission completed', 'success');
+          _replayEntries(entries, idx + 1);
+        } else if (res.status === 401) {
+          // Token expired — stop processing, user will need to re-login
+          toast('Session expired. Please log in again.', 'error');
+        } else {
+          // Server error — stop, will retry later
+          _replayEntries(entries, idx + 1);
+        }
+      })
+      .catch(function () {
+        // Network error — stop processing, still offline
+      });
+  }
+
+  function _processMemQueue() {
+    if (_memQueue.length === 0) return;
+    var fn = _memQueue[0];
+    fn().then(function () {
+      _memQueue.shift();
+      toast('Queued submission completed', 'success');
+      _processMemQueue();
+    }).catch(function () { /* will retry on next online event */ });
+  }
+
+  function _updateOfflineBadge() {
+    if (!window.KodspotSync) return;
+    window.KodspotSync.count().then(function (n) {
+      var badge = document.getElementById('offline-queue-badge');
+      if (badge) {
+        badge.textContent = n;
+        badge.style.display = n > 0 ? 'inline-block' : 'none';
+      }
+    }).catch(function () {});
+  }
+
+  // Online/offline events
+  window.addEventListener('online', function () {
+    toast('Back online — syncing queued data...', 'success');
+    _processQueue();
+  });
+  window.addEventListener('offline', function () {
+    toast('You are offline. Submissions will be queued.', 'warning', 6000);
+  });
+
+  // Show pending count on load
+  if (window.KodspotSync) {
+    _updateOfflineBadge();
+  }
+
+  // ─── Error Helpers ───
+  function showError(id, msg, details) {
+    var el = $(id);
+    if (!el) return;
+    if (details && details.length) {
+      el.innerHTML = details.map(function(d) { return esc(d); }).join('<br>');
+    } else {
+      el.textContent = msg;
+    }
+    el.classList.add('show');
+    el.style.display = 'block';
+  }
+
+  function hideError(id) {
+    var el = $(id);
+    if (!el) return;
+    el.classList.remove('show');
+    el.style.display = 'none';
+  }
+
+  // ─── Modal Helpers ───
+  function openModal(id) {
+    var el = $(id);
+    if (!el) return;
+    el.classList.add('show');
+    document.body.style.overflow = 'hidden';
+    // Close on backdrop click
+    el._backdropHandler = function (e) { if (e.target === el) closeModal(id); };
+    el.addEventListener('click', el._backdropHandler);
+    // Close on Escape
+    el._escHandler = function (e) { if (e.key === 'Escape') closeModal(id); };
+    document.addEventListener('keydown', el._escHandler);
+  }
+  function closeModal(id) {
+    var el = $(id);
+    if (!el) return;
+    el.classList.remove('show');
+    document.body.style.overflow = '';
+    if (el._backdropHandler) { el.removeEventListener('click', el._backdropHandler); el._backdropHandler = null; }
+    if (el._escHandler) { document.removeEventListener('keydown', el._escHandler); el._escHandler = null; }
+  }
+
+  // ─── Image URL with auth token ───
+  function imgUrl(src) {
+    if (!src) return '';
+    var t = getToken() || getSupToken();
+    if (!t || !src.startsWith('/images/')) return src;
+    // Image proxy lives at /api/images/* but stored URLs omit /api prefix
+    return '/api' + src + (src.includes('?') ? '&' : '?') + 'token=' + t;
+  }
+
+  // ─── Notification Bell System ───
+  var _notifInterval = null;
+  var _notifFetcher = null; // apiFetch or supFetch
+  var _notifBadgeEl = null;
+  var _notifPanelEl = null;
+  var _notifUnread = 0;
+  var _notifPage = null; // which admin/supervisor page context
+  var _notifSSE = null; // SSE EventSource connection
+
+  function initNotifications(fetcher, pageContext) {
+    _notifFetcher = fetcher;
+    _notifPage = pageContext || null;
+    // Create bell in topbar-right (before logout button)
+    var topRight = document.querySelector('.topbar-right');
+    if (!topRight) return;
+
+    var bellWrap = document.createElement('div');
+    bellWrap.className = 'notif-bell-wrap';
+    bellWrap.innerHTML = '<button class="notif-bell" id="notifBell" aria-label="Notifications">' +
+      '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">' +
+      '<path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/>' +
+      '</svg><span class="notif-badge" id="notifBadge"></span></button>';
+    topRight.insertBefore(bellWrap, topRight.firstChild);
+
+    _notifBadgeEl = $('notifBadge');
+
+    // Create dropdown panel
+    _notifPanelEl = document.createElement('div');
+    _notifPanelEl.className = 'notif-panel';
+    _notifPanelEl.id = 'notifPanel';
+    _notifPanelEl.innerHTML =
+      '<div class="notif-panel-header">' +
+        '<div class="notif-header-left"><b>Notifications</b><span class="notif-header-count" id="notifHeaderCount"></span></div>' +
+        '<div class="notif-header-actions">' +
+          '<button class="notif-action-btn" id="notifMarkAll" title="Mark all read">' +
+            '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>' +
+          '</button>' +
+          '<button class="notif-action-btn" id="notifClearRead" title="Clear read notifications">' +
+            '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>' +
+          '</button>' +
+        '</div>' +
+      '</div>' +
+      '<div class="notif-panel-body" id="notifList"><div class="notif-empty-state">Loading…</div></div>' +
+      '<div class="notif-panel-footer" id="notifFooter" style="display:none">' +
+        '<button class="notif-load-more" id="notifLoadMore">Load more</button>' +
+      '</div>';
+    bellWrap.appendChild(_notifPanelEl);
+
+    // Toggle panel
+    $('notifBell').addEventListener('click', function(e) {
+      e.stopPropagation();
+      var isOpen = _notifPanelEl.classList.toggle('open');
+      if (isOpen) _loadNotifications();
+    });
+
+    // Close on outside click
+    document.addEventListener('click', function(e) {
+      if (_notifPanelEl && !e.target.closest('.notif-bell-wrap')) {
+        _notifPanelEl.classList.remove('open');
+      }
+    });
+
+    // Close on Escape
+    document.addEventListener('keydown', function(e) {
+      if (e.key === 'Escape' && _notifPanelEl) _notifPanelEl.classList.remove('open');
+    });
+
+    // Mark all read
+    $('notifMarkAll').addEventListener('click', async function(e) {
+      e.stopPropagation();
+      await _notifFetcher('/notifications/read-all', { method: 'PATCH' });
+      _pollUnreadCount();
+      _loadNotifications();
+    });
+
+    // Clear read
+    $('notifClearRead').addEventListener('click', async function(e) {
+      e.stopPropagation();
+      await _notifFetcher('/notifications/clear-read', { method: 'DELETE' });
+      _loadNotifications();
+    });
+
+    // Load more
+    $('notifLoadMore').addEventListener('click', function(e) {
+      e.stopPropagation();
+      var items = document.querySelectorAll('.notif-item');
+      _loadNotifications(items.length);
+    });
+
+    // Initial poll
+    _pollUnreadCount();
+
+    // Try SSE real-time connection, fall back to 30s polling
+    _connectSSE();
+  }
+
+  function _connectSSE() {
+    // Determine auth token and SSE endpoint
+    var token = getToken() || getSupToken();
+    if (!token || typeof EventSource === 'undefined') {
+      // Browser doesn't support SSE or no token — use polling fallback
+      _startPolling();
+      return;
+    }
+
+    var sseUrl = '/api/notifications/stream';
+    // EventSource doesn't support custom headers, so we pass token as query param
+    // Note: SSE endpoint expects Authorization header, so we use a workaround with Fastify
+    // For simplicity, fall back to polling (standard SSE limitation with JWT)
+    // Use fetch-based SSE reader instead
+    _startSSEFetch(token, sseUrl);
+  }
+
+  function _startSSEFetch(token, sseUrl) {
+    try {
+      var ctrl = new AbortController();
+      _notifSSE = ctrl;
+
+      fetch(sseUrl, {
+        headers: { 'Authorization': 'Bearer ' + token },
+        signal: ctrl.signal
+      }).then(function(response) {
+        if (!response.ok || !response.body) {
+          _startPolling(); // Fallback to polling
+          return;
+        }
+
+        var reader = response.body.getReader();
+        var decoder = new TextDecoder();
+        var buffer = '';
+
+        function pump() {
+          reader.read().then(function(result) {
+            if (result.done) {
+              // Reconnect after 5 seconds
+              setTimeout(function() { _connectSSE(); }, 5000);
+              return;
+            }
+
+            buffer += decoder.decode(result.value, { stream: true });
+            var lines = buffer.split('\n');
+            buffer = lines.pop() || '';
+
+            var evt = null, data = null;
+            for (var i = 0; i < lines.length; i++) {
+              var line = lines[i];
+              if (line.startsWith('event: ')) evt = line.substring(7);
+              else if (line.startsWith('data: ')) {
+                data = line.substring(6);
+                if (evt === 'notification') {
+                  _handleSSENotification(data);
+                } else if (evt === 'alert') {
+                  _handleSSEAlert(data);
+                }
+                evt = null; data = null;
+              }
+            }
+
+            pump();
+          }).catch(function() {
+            // Connection lost, reconnect after 5s
+            setTimeout(function() { _connectSSE(); }, 5000);
+          });
+        }
+
+        pump();
+      }).catch(function() {
+        _startPolling(); // Fallback to polling
+      });
+    } catch (e) {
+      _startPolling();
+    }
+  }
+
+  function _handleSSENotification(dataStr) {
+    try {
+      var n = JSON.parse(dataStr);
+      _notifUnread++;
+      _updateBadge(_notifUnread);
+      // Animate bell
+      var bell = $('notifBell');
+      if (bell) { bell.classList.add('notif-bell-ring'); setTimeout(function() { bell.classList.remove('notif-bell-ring'); }, 600); }
+      // If panel is open, prepend the notification
+      if (_notifPanelEl && _notifPanelEl.classList.contains('open')) {
+        _loadNotifications();
+      }
+    } catch (e) { /* silent */ }
+  }
+
+  function _handleSSEAlert(dataStr) {
+    try {
+      var a = JSON.parse(dataStr);
+      // Show a toast for real-time alerts
+      var sevColors = { CRITICAL: 'var(--danger)', HIGH: '#f97316', WARNING: 'var(--warning-text)', INFO: '#818cf8' };
+      toast(a.title || 'New Alert', sevColors[a.severity] ? 'warning' : 'info');
+    } catch (e) { /* silent */ }
+  }
+
+  function _startPolling() {
+    if (_notifInterval) return; // Already polling
+    _notifInterval = setInterval(_pollUnreadCount, 30000);
+  }
+
+  async function _pollUnreadCount() {
+    try {
+      var res = await _notifFetcher('/notifications/unread-count');
+      if (!res || !res.ok) return;
+      var data = await res.json();
+      var prev = _notifUnread;
+      _notifUnread = data.count || 0;
+      _updateBadge(_notifUnread);
+      // Animate bell on new notification
+      if (_notifUnread > prev && prev >= 0) {
+        var bell = $('notifBell');
+        if (bell) { bell.classList.add('notif-bell-ring'); setTimeout(function() { bell.classList.remove('notif-bell-ring'); }, 600); }
+      }
+    } catch (e) { /* silent */ }
+  }
+
+  function _updateBadge(count) {
+    if (!_notifBadgeEl) return;
+    if (count > 0) {
+      _notifBadgeEl.textContent = count > 99 ? '99+' : count;
+      _notifBadgeEl.style.display = 'flex';
+    } else {
+      _notifBadgeEl.style.display = 'none';
+    }
+    // Update header count
+    var hc = $('notifHeaderCount');
+    if (hc) hc.textContent = count > 0 ? count + ' unread' : '';
+  }
+
+  async function _loadNotifications(offset) {
+    var listEl = $('notifList');
+    if (!listEl) return;
+    var isAppend = offset && offset > 0;
+    if (!isAppend) listEl.innerHTML = '<div class="notif-empty-state">Loading…</div>';
+    try {
+      var res = await _notifFetcher('/notifications?limit=20&offset=' + (offset || 0));
+      if (!res || !res.ok) { if (!isAppend) listEl.innerHTML = '<div class="notif-empty-state">Could not load notifications</div>'; return; }
+      var data = await res.json();
+      var notifs = data.notifications || [];
+      _notifUnread = data.unread || 0;
+      _updateBadge(_notifUnread);
+
+      if (!notifs.length && !isAppend) {
+        listEl.innerHTML = '<div class="notif-empty-state">' +
+          '<svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="var(--text-light)" stroke-width="1.5" style="margin-bottom:.4rem"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg>' +
+          '<div>No notifications yet</div>' +
+          '<div style="font-size:.7rem;margin-top:.15rem;color:var(--text-light)">You\'ll be notified about tickets & complaints</div>' +
+          '</div>';
+        $('notifFooter').style.display = 'none';
+        return;
+      }
+
+      var html = isAppend ? '' : '';
+      var lastDateGroup = isAppend ? (listEl.querySelector('.notif-date-group:last-of-type')?.textContent || '') : '';
+      for (var i = 0; i < notifs.length; i++) {
+        var n = notifs[i];
+        var dateGroup = _getDateGroup(n.createdAt);
+        if (dateGroup !== lastDateGroup) {
+          html += '<div class="notif-date-group">' + dateGroup + '</div>';
+          lastDateGroup = dateGroup;
+        }
+        var icon = _getNotifIcon(n.type);
+        var ago = _timeAgo(n.createdAt);
+        var readCls = n.isRead ? ' read' : '';
+        var typeLabel = _getTypeLabel(n.type);
+        html += '<div class="notif-item' + readCls + '" data-id="' + n.id + '" data-entity="' + (n.entityId || '') + '" data-type="' + (n.type || '') + '">' +
+          '<div class="notif-icon-wrap"><span class="notif-icon">' + icon + '</span></div>' +
+          '<div class="notif-content">' +
+            '<div class="notif-item-header"><span class="notif-type-label">' + typeLabel + '</span><span class="notif-time">' + ago + '</span></div>' +
+            '<div class="notif-title">' + esc(n.title) + '</div>' +
+            (n.body ? '<div class="notif-body">' + esc(n.body) + '</div>' : '') +
+          '</div>' +
+          '<button class="notif-delete-btn" title="Delete" data-nid="' + n.id + '">&times;</button>' +
+        '</div>';
+      }
+
+      if (isAppend) {
+        listEl.insertAdjacentHTML('beforeend', html);
+      } else {
+        listEl.innerHTML = html;
+      }
+
+      // Show/hide load more
+      var totalLoaded = (offset || 0) + notifs.length;
+      $('notifFooter').style.display = totalLoaded < data.total ? '' : 'none';
+
+      // Bind click handlers
+      _bindNotifClicks(listEl);
+    } catch (e) { if (!isAppend) listEl.innerHTML = '<div class="notif-empty-state">Error loading notifications</div>'; }
+  }
+
+  function _bindNotifClicks(listEl) {
+    listEl.querySelectorAll('.notif-item').forEach(function(el) {
+      if (el._bound) return;
+      el._bound = true;
+      el.addEventListener('click', function(e) {
+        if (e.target.closest('.notif-delete-btn')) return;
+        var nId = el.dataset.id;
+        var entityId = el.dataset.entity;
+        var type = el.dataset.type;
+        if (!el.classList.contains('read')) {
+          _notifFetcher('/notifications/' + nId + '/read', { method: 'PATCH' }).then(function() { _pollUnreadCount(); });
+          el.classList.add('read');
+        }
+        // Navigate to relevant page
+        if (entityId && (type === 'ticket_assigned' || type === 'ticket_resolved' || type === 'public_complaint')) {
+          _notifPanelEl.classList.remove('open');
+          var base = _notifPage === 'supervisor' ? orgPath('supervisor-tickets') : orgPath('admin-tickets');
+          window.location.href = base;
+        }
+      });
+      // Delete button
+      var delBtn = el.querySelector('.notif-delete-btn');
+      if (delBtn) {
+        delBtn.addEventListener('click', function(e) {
+          e.stopPropagation();
+          var nId = delBtn.dataset.nid;
+          el.style.opacity = '0'; el.style.height = '0'; el.style.padding = '0'; el.style.overflow = 'hidden';
+          el.style.transition = 'all .2s ease';
+          setTimeout(function() { el.remove(); }, 200);
+          _notifFetcher('/notifications/' + nId, { method: 'DELETE' }).then(function() { _pollUnreadCount(); });
+        });
+      }
+    });
+  }
+
+  function _getNotifIcon(type) {
+    switch (type) {
+      case 'ticket_assigned': return '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2"><path d="M16 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="8.5" cy="7" r="4"/><polyline points="17 11 19 13 23 9"/></svg>';
+      case 'ticket_resolved': return '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--success)" stroke-width="2"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>';
+      case 'public_complaint': return '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--warning-text)" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>';
+      case 'escalation': return '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--danger)" stroke-width="2"><path d="M12 2v10l4.5 4.5"/><circle cx="12" cy="12" r="10"/></svg>';
+      default:
+        if (type && type.startsWith('alert_')) return '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--warning-text)" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>';
+        return '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" stroke-width="2"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg>';
+    }
+  }
+
+  function _getTypeLabel(type) {
+    switch (type) {
+      case 'ticket_assigned': return 'Assigned';
+      case 'ticket_resolved': return 'Resolved';
+      case 'public_complaint': return 'Complaint';
+      case 'escalation': return 'Escalation';
+      default:
+        if (type && type.startsWith('alert_')) return 'Alert';
+        return 'Notification';
+    }
+  }
+
+  function _getDateGroup(dateStr) {
+    var d = new Date(dateStr);
+    var today = new Date();
+    today.setHours(0,0,0,0);
+    var yest = new Date(today); yest.setDate(yest.getDate() - 1);
+    var ts = new Date(d); ts.setHours(0,0,0,0);
+    if (ts.getTime() === today.getTime()) return 'Today';
+    if (ts.getTime() === yest.getTime()) return 'Yesterday';
+    return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+  }
+
+  function _timeAgo(dateStr) {
+    var ms = Date.now() - new Date(dateStr).getTime();
+    var mins = Math.floor(ms / 60000);
+    if (mins < 1) return 'Just now';
+    if (mins < 60) return mins + ' min ago';
+    var hrs = Math.floor(mins / 60);
+    if (hrs < 24) return hrs + 'h ago';
+    var days = Math.floor(hrs / 24);
+    if (days < 7) return days + 'd ago';
+    return new Date(dateStr).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+  }
+
+  function stopNotifications() {
+    if (_notifInterval) { clearInterval(_notifInterval); _notifInterval = null; }
+    if (_notifSSE) {
+      try { _notifSSE.abort(); } catch (e) { /* silent */ }
+      _notifSSE = null;
+    }
+  }
+
+  // ─── Dynamic Manifest & SW Registration ───
+  function initModulePWA() {
+    var slug = getOrgSlug();
+    var mod = getModule();
+    if (!slug || !mod) return;
+
+    var scope = '/' + slug + '/' + mod + '/';
+
+    // Set manifest link dynamically
+    var manifestLink = document.querySelector('link[rel="manifest"]');
+    if (manifestLink) {
+      manifestLink.href = scope + 'manifest.json';
+    } else {
+      var link = document.createElement('link');
+      link.rel = 'manifest';
+      link.href = scope + 'manifest.json';
+      document.head.appendChild(link);
+    }
+
+    // Register module-scoped service worker
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register(scope + 'sw.js', { scope: scope }).catch(function() {});
+    }
+  }
+
+  // ─── Public API ───
+  return {
+    $: $, esc: esc, fmtDate: fmtDate, fmtDateShort: fmtDateShort,
+    getOrgSlug: getOrgSlug, orgPath: orgPath,
+    getModule: getModule, modulePath: modulePath,
+    getEnabledModules: getEnabledModules, isModuleEnabled: isModuleEnabled,
+    getToken: getToken, getSupToken: getSupToken, getUser: getUser, getSupUser: getSupUser,
+    adminHeaders: adminHeaders, supHeaders: supHeaders,
+    apiFetch: apiFetch, apiFetchJson: apiFetchJson,
+    supFetch: supFetch, supFetchJson: supFetchJson,
+    logout: logout, logoutSA: logoutSA, logoutSup: logoutSup,
+    toast: toast, confirmDialog: confirmDialog,
+    initAdmin: initAdmin, initSupervisor: initSupervisor,
+    initModulePWA: initModulePWA,
+    buildUserMenu: _buildUserMenu,
+    initNotifications: initNotifications, stopNotifications: stopNotifications,
+    showSkeleton: showSkeleton, showSkeletonCards: showSkeletonCards, showSkeletonRows: showSkeletonRows,
+    showError: showError, hideError: hideError,
+    openModal: openModal, closeModal: closeModal,
+    enqueueRetry: enqueueRetry,
+    imgUrl: imgUrl
+  };
+})();
+
+// Register service worker — for module-scoped pages, initModulePWA handles it
+// This fallback is for non-module pages (landing, superadmin, etc.)
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('/sw.js').then(function (reg) {
+    // Listen for Background Sync completion messages from SW
+    navigator.serviceWorker.addEventListener('message', function (e) {
+      if (e.data && e.data.type === 'SYNC_COMPLETE') {
+        window.App && window.App.toast('Offline submission synced', 'success');
+      }
+    });
+  }).catch(function() {});
+}

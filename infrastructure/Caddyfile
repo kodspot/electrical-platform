@@ -1,0 +1,58 @@
+# ═══════════════════════════════════════════════════════════
+# Kodspot Electrical Platform — Caddy Reverse Proxy
+# Domain: electrical.kodspot.in (separate VM from HK system)
+#
+# NOTE: Naked domain (kodspot.in) and www.kodspot.in redirects
+# are handled by the HOUSEKEEPING VM's Caddy — NOT here.
+# This VM only handles electrical.kodspot.in.
+# ═══════════════════════════════════════════════════════════
+
+# Primary electrical subdomain — automatic HTTPS via Let's Encrypt
+electrical.{$DOMAIN:kodspot.in} {
+    reverse_proxy api:3000 {
+        header_up Host {host}
+        header_up X-Real-IP {remote}
+        header_up X-Forwarded-For {remote}
+        header_up X-Forwarded-Proto {scheme}
+    }
+
+    encode gzip
+
+    # No-cache for org-scoped pages (security-sensitive)
+    # Matches both /:slug/admin-* (legacy) and /:slug/:mod/admin-* (new)
+    @orgAdmin path_regexp orgAdmin ^/[a-z0-9-]+/([a-z]+/)?admin
+    header @orgAdmin Cache-Control "no-cache, no-store, must-revalidate"
+    header @orgAdmin X-Robots-Tag "noindex, nofollow"
+
+    @orgSupervisor path_regexp orgSup ^/[a-z0-9-]+/([a-z]+/)?supervisor
+    header @orgSupervisor Cache-Control "no-cache, no-store, must-revalidate"
+    header @orgSupervisor X-Robots-Tag "noindex, nofollow"
+
+    header /superadmin* Cache-Control "no-cache, no-store, must-revalidate"
+    header /superadmin* X-Robots-Tag "noindex, nofollow"
+
+    # Service worker + manifest must never be cached
+    header /sw.js Cache-Control "no-cache, no-store, must-revalidate"
+    header /site.webmanifest Cache-Control "no-cache, no-store, must-revalidate"
+    # Dynamic module SW/manifest have cache headers set by API, but ensure no caching for SW
+    @moduleSw path_regexp modSw ^/[a-z0-9-]+/[a-z]+/sw\.js$
+    header @moduleSw Cache-Control "no-cache, no-store, must-revalidate"
+
+    # Long cache for static assets
+    header /css/* Cache-Control "public, max-age=86400"
+    header /js/* Cache-Control "public, max-age=86400"
+
+    # Security headers (CSP is set by Helmet in Node.js, not duplicated here)
+    header {
+        Strict-Transport-Security "max-age=63072000; includeSubDomains; preload"
+        X-Content-Type-Options "nosniff"
+        X-Frame-Options "DENY"
+        X-XSS-Protection "0"
+        Referrer-Policy "strict-origin-when-cross-origin"
+        Permissions-Policy "accelerometer=(), camera=(self), geolocation=(), gyroscope=(), magnetometer=(), microphone=(), usb=(), interest-cohort=()"
+        Cross-Origin-Opener-Policy "same-origin"
+        Cross-Origin-Resource-Policy "same-site"
+        -Server
+        -X-Powered-By
+    }
+}

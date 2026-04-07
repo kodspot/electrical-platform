@@ -1,0 +1,140 @@
+name: Deploy to Production
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy to GCP VM
+        uses: appleboy/ssh-action@v1.2.0
+        env:
+          NODE_ENV: production
+          PORT: "3000"
+          DOMAIN: kodspot.in
+          APP_URL: ${{ secrets.APP_URL }}
+          COOKIE_DOMAIN: ${{ secrets.COOKIE_DOMAIN }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          DB_USER: ${{ secrets.DB_USER }}
+          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+          DB_NAME: ${{ secrets.DB_NAME }}
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
+          COOKIE_SECRET: ${{ secrets.COOKIE_SECRET }}
+          ADMIN_KEY: ${{ secrets.ADMIN_KEY }}
+          R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          R2_BUCKET_NAME: ${{ secrets.R2_BUCKET_NAME }}
+          CORS_ORIGINS: ${{ secrets.CORS_ORIGINS }}
+          SES_SMTP_HOST: ${{ secrets.SES_SMTP_HOST }}
+          SES_SMTP_USER: ${{ secrets.SES_SMTP_USER }}
+          SES_SMTP_PASS: ${{ secrets.SES_SMTP_PASS }}
+          SES_FROM_EMAIL: ${{ secrets.SES_FROM_EMAIL }}
+          DATA_ENCRYPTION_KEY: ${{ secrets.DATA_ENCRYPTION_KEY }}
+          ALERT_TELEGRAM_BOT_TOKEN: ${{ secrets.ALERT_TELEGRAM_BOT_TOKEN }}
+          ALERT_TELEGRAM_CHAT_ID: ${{ secrets.ALERT_TELEGRAM_CHAT_ID }}
+          ALERT_WEBHOOK_URL: ${{ secrets.ALERT_WEBHOOK_URL }}
+          GLOBAL_AI_API_KEY: ${{ secrets.GLOBAL_AI_API_KEY }}
+          GLOBAL_AI_PROVIDER: ${{ secrets.GLOBAL_AI_PROVIDER }}
+          GLOBAL_AI_MODEL: ${{ secrets.GLOBAL_AI_MODEL }}
+        with:
+          host: ${{ secrets.GCP_HOST }}
+          username: ${{ secrets.GCP_USERNAME }}
+          key: ${{ secrets.GCP_SSH_PRIVATE_KEY }}
+          timeout: 30m
+          command_timeout: 30m
+          envs: NODE_ENV,PORT,DOMAIN,APP_URL,COOKIE_DOMAIN,DATABASE_URL,DB_USER,DB_PASSWORD,DB_NAME,JWT_SECRET,COOKIE_SECRET,ADMIN_KEY,R2_ACCOUNT_ID,R2_ACCESS_KEY_ID,R2_SECRET_ACCESS_KEY,R2_BUCKET_NAME,CORS_ORIGINS,SES_SMTP_HOST,SES_SMTP_USER,SES_SMTP_PASS,SES_FROM_EMAIL,DATA_ENCRYPTION_KEY,ALERT_TELEGRAM_BOT_TOKEN,ALERT_TELEGRAM_CHAT_ID,ALERT_WEBHOOK_URL,GLOBAL_AI_API_KEY,GLOBAL_AI_PROVIDER,GLOBAL_AI_MODEL
+          script: |
+            cd ~/electrical-platform
+            git pull origin main
+
+            # Write .env securely from environment variables
+            cat > .env << EOF
+            NODE_ENV=${NODE_ENV}
+            PORT=${PORT}
+            DOMAIN=${DOMAIN}
+            APP_URL=${APP_URL}
+            COOKIE_DOMAIN=${COOKIE_DOMAIN}
+            DATABASE_URL=${DATABASE_URL}
+            DB_USER=${DB_USER}
+            DB_PASSWORD=${DB_PASSWORD}
+            DB_NAME=${DB_NAME}
+            JWT_SECRET=${JWT_SECRET}
+            COOKIE_SECRET=${COOKIE_SECRET}
+            ADMIN_KEY=${ADMIN_KEY}
+            R2_ACCOUNT_ID=${R2_ACCOUNT_ID}
+            R2_ACCESS_KEY_ID=${R2_ACCESS_KEY_ID}
+            R2_SECRET_ACCESS_KEY=${R2_SECRET_ACCESS_KEY}
+            R2_BUCKET_NAME=${R2_BUCKET_NAME}
+            CORS_ORIGINS=${CORS_ORIGINS}
+            SES_SMTP_HOST=${SES_SMTP_HOST}
+            SES_SMTP_USER=${SES_SMTP_USER}
+            SES_SMTP_PASS=${SES_SMTP_PASS}
+            SES_FROM_EMAIL=${SES_FROM_EMAIL}
+            DATA_ENCRYPTION_KEY=${DATA_ENCRYPTION_KEY}
+            ALERT_TELEGRAM_BOT_TOKEN=${ALERT_TELEGRAM_BOT_TOKEN}
+            ALERT_TELEGRAM_CHAT_ID=${ALERT_TELEGRAM_CHAT_ID}
+            ALERT_WEBHOOK_URL=${ALERT_WEBHOOK_URL}
+            GLOBAL_AI_API_KEY=${GLOBAL_AI_API_KEY}
+            GLOBAL_AI_PROVIDER=${GLOBAL_AI_PROVIDER}
+            GLOBAL_AI_MODEL=${GLOBAL_AI_MODEL}
+            EOF
+
+            chmod 600 .env
+
+            # Detect first-time vs update deployment
+            if docker compose ps --format '{{.Name}}' 2>/dev/null | grep -q "electrical-db"; then
+              echo "=== UPDATE DEPLOYMENT ==="
+              echo "Building new API image..."
+              docker compose build api
+
+              echo "Deploying new API container..."
+              docker compose up -d --no-deps --remove-orphans api
+            else
+              echo "=== FIRST-TIME DEPLOYMENT ==="
+              echo "Building all images..."
+              docker compose build
+
+              echo "Starting all services..."
+              docker compose up -d
+            fi
+
+            # Wait for services to be healthy
+            echo "Waiting for services to start..."
+            sleep 30
+
+            # Verify deployment
+            echo "=== DEPLOYMENT STATUS ==="
+            docker compose ps
+            echo ""
+            echo "=== HEALTH CHECK ==="
+            curl -sf http://localhost:3000/health || echo "WARNING: Health check failed"
+
+            # Health check — fail deploy if API is not responding
+            echo "Running health check..."
+            docker compose exec -T api wget -qO- http://127.0.0.1:3000/health || {
+              echo "❌ Health check FAILED!"
+              docker compose logs --tail 50 api
+              exit 1
+            }
+            echo "✅ API is healthy!"
+
+            # Clean up old Docker images to prevent disk growth
+            echo "Cleaning up unused Docker images..."
+            docker image prune -f
+
+            # Force Caddy to re-provision TLS certificates
+            echo "Restarting Caddy for TLS certificate provisioning..."
+            docker compose restart caddy
+            sleep 15
+
+            # Show Caddy status and logs
+            echo "--- Caddy Status ---"
+            docker compose ps caddy
+            echo "--- Caddy Logs ---"
+            docker compose logs --tail 30 caddy
+
+            echo "✅ Deployment successful!"
