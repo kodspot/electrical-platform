@@ -366,6 +366,84 @@ async function supervisorRoutes(fastify, opts) {
 
     return { success: true, message: 'Supervisor permanently deleted' };
   });
+
+  // ── Supervisor Location Assignments ──
+
+  // Get assignments for a supervisor
+  fastify.get('/supervisors/:id/assignments', async (request, reply) => {
+    const { id } = request.params;
+    const orgId = request.user.orgId;
+
+    const user = await prisma.user.findFirst({ where: { id, orgId, role: 'SUPERVISOR' } });
+    if (!user) return reply.code(404).send({ error: 'Supervisor not found' });
+
+    const assignments = await prisma.supervisorAssignment.findMany({
+      where: { supervisorId: id, orgId },
+      include: { location: { select: { id: true, name: true, type: true, parent: { select: { name: true } } } } },
+      orderBy: { createdAt: 'asc' }
+    });
+
+    return { assignments };
+  });
+
+  // Set assignments for a supervisor (replace all)
+  fastify.put('/supervisors/:id/assignments', async (request, reply) => {
+    const { id } = request.params;
+    const orgId = request.user.orgId;
+
+    const schema = z.object({
+      locationIds: z.array(z.string().uuid()),
+      coverChildren: z.boolean().default(true)
+    });
+
+    const data = schema.parse(request.body);
+
+    const user = await prisma.user.findFirst({ where: { id, orgId, role: 'SUPERVISOR' } });
+    if (!user) return reply.code(404).send({ error: 'Supervisor not found' });
+
+    // Validate locations
+    if (data.locationIds.length > 0) {
+      const locations = await prisma.location.findMany({
+        where: { id: { in: data.locationIds }, orgId, isActive: true }
+      });
+      if (locations.length !== data.locationIds.length) {
+        return reply.code(400).send({ error: 'One or more locations not found' });
+      }
+    }
+
+    // Delete existing and create new
+    await prisma.supervisorAssignment.deleteMany({ where: { supervisorId: id, orgId } });
+
+    if (data.locationIds.length > 0) {
+      await prisma.supervisorAssignment.createMany({
+        data: data.locationIds.map(locId => ({
+          orgId,
+          supervisorId: id,
+          locationId: locId,
+          coverChildren: data.coverChildren !== false
+        }))
+      });
+    }
+
+    await prisma.auditLog.create({
+      data: {
+        orgId,
+        actorType: 'admin',
+        actorId: request.user.id,
+        action: 'supervisor_assignments_updated',
+        entityType: 'User',
+        entityId: id,
+        newValue: { locationIds: data.locationIds }
+      }
+    });
+
+    const assignments = await prisma.supervisorAssignment.findMany({
+      where: { supervisorId: id, orgId },
+      include: { location: { select: { id: true, name: true, type: true, parent: { select: { name: true } } } } }
+    });
+
+    return { success: true, assignments };
+  });
 }
 
 module.exports = supervisorRoutes;

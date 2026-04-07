@@ -277,10 +277,10 @@
     <div id="ticketLocations"></div>
   </div>
 
-  <!-- Row 3: Worker + Supervisor Performance -->
+  <!-- Row 3: Electrician + Supervisor Performance -->
   <div class="an-grid-2">
     <div class="an-section">
-      <div class="an-title">Top Workers <span style="font-size:.68rem;font-weight:400;color:var(--text-muted);margin-left:auto">by inspection count</span></div>
+      <div class="an-title">Top Electricians <span style="font-size:.68rem;font-weight:400;color:var(--text-muted);margin-left:auto">by inspection count</span></div>
       <div id="workerPerf"></div>
     </div>
     <div class="an-section">
@@ -427,7 +427,7 @@ function renderSummary(s) {
     card('sc-ticket', s.totalTickets, 'Tickets Raised', ticketChange, null) +
     card('sc-photo', s.totalImages, 'Photos Taken', null, null) +
     card('sc-comp', compVal, 'Completion Rate', null, compSub) +
-    card('sc-avg', s.avgPerDay, 'Avg / Day', null, s.totalLocations + ' rooms · ' + s.totalWorkers + 'W / ' + s.totalSupervisors + 'S');
+    card('sc-avg', s.avgPerDay, 'Avg / Day', null, s.totalLocations + ' locations · ' + s.totalWorkers + 'E / ' + s.totalSupervisors + 'S');
 }
 
 function renderTrend(trend, periodDays) {
@@ -602,7 +602,7 @@ async function loadHeatmap(from, to) {
 
   // Toolbar
   $('hmToolbar').innerHTML = '<div class="hm-toolbar">' +
-    '<input type="text" class="hm-search" id="hmSearchInput" placeholder="Search rooms...">' +
+    '<input type="text" class="hm-search" id="hmSearchInput" placeholder="Search locations...">' +
     '<select class="form-select hm-sort" id="hmSortSelect">' +
       '<option value="score-asc">Worst score first</option>' +
       '<option value="score-desc">Best score first</option>' +
@@ -614,9 +614,9 @@ async function loadHeatmap(from, to) {
 
   // Legend
   $('hmLegend').innerHTML = '<div class="hm-legend">' +
-    '<div class="hm-legend-item"><div class="hm-legend-dot hm-cleaned"></div>Cleaned</div>' +
+    '<div class="hm-legend-item"><div class="hm-legend-dot hm-cleaned"></div>Inspected</div>' +
     '<div class="hm-legend-item"><div class="hm-legend-dot hm-partial"></div>Partial</div>' +
-    '<div class="hm-legend-item"><div class="hm-legend-dot hm-dirty"></div>Not cleaned</div>' +
+    '<div class="hm-legend-item"><div class="hm-legend-dot hm-dirty"></div>Not inspected</div>' +
     '<div class="hm-legend-item"><div class="hm-legend-dot hm-upcoming"></div>Upcoming</div>' +
     '<div class="hm-legend-item"><div class="hm-legend-dot hm-nosched"></div>No schedule</div>' +
   '</div>';
@@ -649,12 +649,12 @@ function renderHeatmap() {
   }
 
   var el = $('hmCount');
-  if (el) el.textContent = '(' + locs.length + ' rooms)';
+  if (el) el.textContent = '(' + locs.length + ' locations)';
 
-  if (!locs.length) { $('hmBody').innerHTML = '<div class="an-empty">No matching rooms</div>'; return; }
+  if (!locs.length) { $('hmBody').innerHTML = '<div class="an-empty">No matching locations</div>'; return; }
 
   var statusCls = { CLEANED: 'hm-cleaned', PARTIAL: 'hm-partial', NOT_CLEANED: 'hm-dirty', UPCOMING: 'hm-upcoming', NO_SCHEDULE: 'hm-nosched' };
-  var statusTip = { CLEANED: 'Cleaned', PARTIAL: 'Partial', NOT_CLEANED: 'Not cleaned', UPCOMING: 'Upcoming', NO_SCHEDULE: 'No schedule' };
+  var statusTip = { CLEANED: 'Inspected', PARTIAL: 'Partial', NOT_CLEANED: 'Not inspected', UPCOMING: 'Upcoming', NO_SCHEDULE: 'No schedule' };
 
   var dates = data.dates;
   var showLabels = dates.length <= 31;
@@ -686,7 +686,7 @@ function renderHeatmap() {
   }
 
   html += '</tbody></table>';
-  if (locs.length > count) html += '<div style="text-align:center;padding:.5rem;font-size:.72rem;color:var(--text-muted)">Showing ' + count + ' of ' + locs.length + ' rooms</div>';
+  if (locs.length > count) html += '<div style="text-align:center;padding:.5rem;font-size:.72rem;color:var(--text-muted)">Showing ' + count + ' of ' + locs.length + ' locations</div>';
   $('hmBody').innerHTML = html;
 }
 
@@ -703,7 +703,7 @@ function renderLocations(locs) {
     '<select class="form-select loc-sort" id="locSortSelect">' +
       '<option value="completion-asc"' + (_locSort === 'completion-asc' ? ' selected' : '') + '>Worst completion first</option>' +
       '<option value="completion-desc"' + (_locSort === 'completion-desc' ? ' selected' : '') + '>Best completion first</option>' +
-      '<option value="cleaned-desc"' + (_locSort === 'cleaned-desc' ? ' selected' : '') + '>Most cleaned</option>' +
+      '<option value="cleaned-desc"' + (_locSort === 'cleaned-desc' ? ' selected' : '') + '>Most inspected</option>' +
       '<option value="tickets-desc"' + (_locSort === 'tickets-desc' ? ' selected' : '') + '>Most tickets</option>' +
       '<option value="name-asc"' + (_locSort === 'name-asc' ? ' selected' : '') + '>Name A→Z</option>' +
     '</select></div>';
@@ -743,11 +743,11 @@ function renderLocTable(locs) {
   }
   filtered = filtered.slice().sort(sortFn);
 
-  $('locCount').textContent = filtered.length + ' of ' + locs.length + ' rooms';
+  $('locCount').textContent = filtered.length + ' of ' + locs.length + ' locations';
 
   if (!filtered.length) { $('locTable').innerHTML = '<div class="an-empty">No matching locations</div>'; return; }
 
-  var html = '<table class="loc-tbl"><thead><tr><th>Location</th><th>Cleaned</th><th>Expected</th><th>Completion</th><th>Tickets</th></tr></thead><tbody>';
+  var html = '<table class="loc-tbl"><thead><tr><th>Location</th><th>Inspected</th><th>Expected</th><th>Completion</th><th>Tickets</th></tr></thead><tbody>';
   var shown = Math.min(filtered.length, 100);
   for (var i = 0; i < shown; i++) {
     var l = filtered[i];
@@ -816,7 +816,7 @@ function renderTicketLocations(locs) {
 }
 
 function renderWorkers(workers) {
-  if (!workers || !workers.length) { $('workerPerf').innerHTML = '<div class="an-empty">No worker activity</div>'; return; }
+  if (!workers || !workers.length) { $('workerPerf').innerHTML = '<div class="an-empty">No electrician activity</div>'; return; }
   var max = workers[0].records || 1;
   var html = '<div class="an-perf">';
   for (var i = 0; i < workers.length; i++) {

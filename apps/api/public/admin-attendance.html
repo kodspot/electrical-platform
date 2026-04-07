@@ -110,7 +110,7 @@
 
   <!-- Today KPIs -->
   <div class="att-overview" id="overviewCards">
-    <div class="att-kpi kpi-total"><div class="att-kpi-val" id="kpiTotal">–</div><div class="att-kpi-lbl">Total Workers</div></div>
+    <div class="att-kpi kpi-total"><div class="att-kpi-val" id="kpiTotal">–</div><div class="att-kpi-lbl">Total Electricians</div></div>
     <div class="att-kpi kpi-present"><div class="att-kpi-val" id="kpiPresent">–</div><div class="att-kpi-lbl">Present</div></div>
     <div class="att-kpi kpi-absent"><div class="att-kpi-val" id="kpiAbsent">–</div><div class="att-kpi-lbl">Absent</div></div>
     <div class="att-kpi kpi-leave"><div class="att-kpi-val" id="kpiLeave">–</div><div class="att-kpi-lbl">Leave</div></div>
@@ -133,14 +133,14 @@
       </div>
 
       <div class="att-filters">
-        <select id="dailyFloor" onchange="loadDaily()"><option value="">All Floors</option></select>
+        <select id="dailyFloor" onchange="loadDaily()"><option value="">All Locations</option></select>
         <input type="date" id="dailyDate" onchange="onDailyFilterChange()">
         <select id="dailyShift" onchange="onDailyFilterChange()"><option value="">Loading…</option></select>
       </div>
 
       <div class="att-scroll" id="dailyScroll">
         <table class="att-tbl">
-          <thead><tr><th>Worker</th><th>ID</th><th>Status</th><th>Marked By</th><th>Time</th></tr></thead>
+          <thead><tr><th>Electrician</th><th>ID</th><th>Status</th><th>Marked By</th><th>Time</th></tr></thead>
           <tbody id="dailyBody"></tbody>
         </table>
       </div>
@@ -160,7 +160,7 @@
         <input type="date" id="reportFrom">
         <span style="font-size:.82rem;color:var(--text-muted);align-self:center">to</span>
         <input type="date" id="reportTo">
-        <select id="reportFloor" onchange="loadReport()"><option value="">All Floors</option></select>
+        <select id="reportFloor" onchange="loadReport()"><option value="">All Locations</option></select>
         <select id="reportShift" onchange="loadReport()">
           <option value="">All Shifts</option>
           <option value="MORNING">Morning</option>
@@ -187,7 +187,7 @@
 
       <div class="att-scroll" id="reportScroll">
         <table class="report-tbl">
-          <thead><tr><th>Worker</th><th>ID</th><th>Days</th><th>Present</th><th>Absent</th><th>Leave</th><th>Half</th><th>Unmarked</th><th>Attendance %</th></tr></thead>
+          <thead><tr><th>Electrician</th><th>ID</th><th>Days</th><th>Present</th><th>Absent</th><th>Leave</th><th>Half</th><th>Unmarked</th><th>Attendance %</th></tr></thead>
           <tbody id="reportBody"></tbody>
         </table>
       </div>

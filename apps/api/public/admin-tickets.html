@@ -573,7 +573,7 @@ async function viewDetail(id) {
     html += '<h4>✓ Resolution Proof</h4>';
     if (t.resolvedNote) html += '<p>' + esc(t.resolvedNote) + '</p>';
     if (t.resolvedWorkers && t.resolvedWorkers.length) {
-      html += '<p style="font-size:.75rem"><b>Workers:</b> ' + t.resolvedWorkers.map(function(w) { return esc(w.name); }).join(', ') + '</p>';
+      html += '<p style=\"font-size:.75rem\"><b>Electricians:</b> ' + t.resolvedWorkers.map(function(w) { return esc(w.name); }).join(', ') + '</p>';
     }
     if (t.resolvedImageUrl) html += '<img src="' + esc(App.imgUrl(t.resolvedImageUrl)) + '" onclick="openLightbox(this.src)" alt="Resolution proof">';
     if (t.resolvedAt) html += '<p style="font-size:.72rem;margin-top:.4rem;opacity:.7">Resolved on ' + App.fmtDate(t.resolvedAt) + '</p>';

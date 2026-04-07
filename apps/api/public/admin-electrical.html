@@ -154,7 +154,7 @@
         <thead>
           <tr>
             <th>#</th><th>Location</th><th>Shift</th><th>Faults</th>
-            <th class="hide-mobile">Supervisor</th><th class="hide-mobile">Workers</th>
+            <th class="hide-mobile">Supervisor</th><th class="hide-mobile">Electricians</th>
             <th class="hide-mobile">Date</th><th>Status</th><th>Actions</th>
           </tr>
         </thead>
@@ -292,7 +292,7 @@ async function viewDetail(id) {
   html += '<div class="ei-detail-row"><span class="ei-detail-label">Shift</span><span class="ei-detail-val">' + r.shift + (r.isLate ? ' <span class="badge badge-warning">LATE</span>' : '') + '</span></div>';
   html += '<div class="ei-detail-row"><span class="ei-detail-label">Status</span><span class="ei-detail-val"><span class="badge ' + (r.status === 'FLAGGED' ? 'badge-danger' : 'badge-success') + '">' + r.status + '</span></span></div>';
   html += '<div class="ei-detail-row"><span class="ei-detail-label">Supervisor</span><span class="ei-detail-val">' + esc(r.supervisor ? r.supervisor.name : '—') + '</span></div>';
-  html += '<div class="ei-detail-row"><span class="ei-detail-label">Workers</span><span class="ei-detail-val">' + (r.workers || []).map(function(w){ return esc(w.name); }).join(', ') + '</span></div>';
+  html += '<div class="ei-detail-row"><span class="ei-detail-label">Electricians</span><span class="ei-detail-val">' + (r.workers || []).map(function(w){ return esc(w.name); }).join(', ') + '</span></div>';
   html += '<div class="ei-detail-row"><span class="ei-detail-label">Inspected At</span><span class="ei-detail-val">' + App.fmtDateShort(r.inspectedAt) + '</span></div>';
 
   if (r.isLate && r.lateReason) {

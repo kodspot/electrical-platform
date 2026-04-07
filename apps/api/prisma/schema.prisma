@@ -39,6 +39,7 @@ model Organization {
   notifications         Notification[]
   shiftConfigs          ShiftConfig[]
   workerAssignments     WorkerAssignment[]
+  supervisorAssignments SupervisorAssignment[]
   attendance            Attendance[]
   dutyRosters           DutyRoster[]
   aiUsageLogs           AiUsageLog[]
@@ -93,6 +94,7 @@ model User {
   assetEventsLogged     AssetEvent[]            @relation("AssetEventLogger")
   assetFailuresLogged   AssetFailure[]          @relation("AssetFailureLogger")
   assetFailuresResolved AssetFailure[]          @relation("AssetFailureResolver")
+  supervisorAssignments SupervisorAssignment[]  @relation("SupervisorLocations")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -156,6 +158,7 @@ model Location {
 
   tickets               Ticket[]
   workerAssignments     WorkerAssignment[]
+  supervisorAssignments SupervisorAssignment[]
   dutyRosters           DutyRoster[]
   electricalInspections ElectricalInspection[]
   assets                Asset[]
@@ -299,6 +302,26 @@ enum LocationType {
   KITCHEN
   WARD
   MEETING_ROOM
+  HOSTEL
+  SUBSTATION
+  PANEL_ROOM
+  GENERATOR_ROOM
+  TRANSFORMER
+  UTILITY_AREA
+  LAB
+  SERVER_ROOM
+  STAIRCASE
+  TERRACE
+  PARKING
+  CANTEEN
+  AUDITORIUM
+  LIBRARY
+  OFFICE
+  STORE_ROOM
+  PUMP_ROOM
+  LIFT_ROOM
+  RECEPTION
+  COMMON_AREA
   OTHER
 }
 
@@ -404,7 +427,8 @@ model WorkerAssignment {
   locationId String
   location   Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
 
-  isPrimary Boolean @default(true)
+  isPrimary     Boolean @default(true)
+  coverChildren Boolean @default(true) // true = covers all child locations (floors/rooms under a hostel)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -413,6 +437,27 @@ model WorkerAssignment {
   @@index([orgId])
   @@index([locationId])
   @@index([workerId])
+}
+
+model SupervisorAssignment {
+  id    String       @id @default(uuid())
+  orgId String
+  org   Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  supervisorId String
+  supervisor   User     @relation("SupervisorLocations", fields: [supervisorId], references: [id], onDelete: Cascade)
+  locationId   String
+  location     Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
+
+  coverChildren Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([supervisorId, locationId])
+  @@index([orgId])
+  @@index([locationId])
+  @@index([supervisorId])
 }
 
 model Attendance {

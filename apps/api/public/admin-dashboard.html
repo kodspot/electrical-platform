@@ -338,9 +338,9 @@
     </div>
   </div>
 
-  <!-- Row 3: Worker Performance -->
+  <!-- Row 3: Electrician Performance -->
   <div class="dash-section" style="margin-bottom:1rem">
-    <div class="dash-section-title">Worker Performance</div>
+    <div class="dash-section-title">Electrician Performance</div>
     <div id="workerPerf"></div>
   </div>
 
@@ -456,7 +456,7 @@ async function loadKPIs() {
     kpi('kpi-cleaned', '⚡ Inspections Today', d.todayInspections + inspTrend, inspSub) +
     kpi('kpi-tickets', '⚠ Faults Today', d.todayFaults, d.openFaults > 0 ? d.openFaults + ' open faults' : 'No open faults') +
     kpi('kpi-tickets', 'Active Tickets', d.openTickets, d.openTickets > 0 ? 'Open + In Progress' : 'All clear') +
-    kpi('kpi-workers', 'Workers', d.activeWorkers, 'Active staff') +
+    kpi('kpi-workers', 'Electricians', d.activeWorkers, 'Active staff') +
     kpi('kpi-supervisors', 'Supervisors', d.activeSupervisors, 'Active') +
     kpi('kpi-records', 'Total Inspections', d.totalInspections, d.weeklyAvg > 0 ? 'Avg <b>' + d.weeklyAvg + '</b>/day this week' : 'Lifetime');
 
@@ -678,11 +678,11 @@ async function loadTickets() {
   if (data.total > 0) $('ticketViewAll').style.display = 'block';
 }
 
-// ── Worker Performance (electrical inspections) ──
+// ── Electrician Performance (electrical inspections) ──
 async function loadWorkerPerf() {
   var data = await App.apiFetchJson('/analytics/workers');
   if (!data || !data.length) {
-    $('workerPerf').innerHTML = '<div class="dash-empty"><span class="dash-empty-icon">👷</span><div class="dash-empty-text">No workers yet</div><div class="dash-empty-sub"><a href="' + App.orgPath('admin-workers') + '" style="color:var(--primary)">Add workers →</a></div></div>';
+    $('workerPerf').innerHTML = '<div class="dash-empty"><span class="dash-empty-icon">⚡</span><div class="dash-empty-text">No electricians yet</div><div class="dash-empty-sub"><a href="' + App.orgPath('admin-workers') + '" style="color:var(--primary)">Add electricians →</a></div></div>';
     return;
   }
   var workers = data.slice(0, 10);
@@ -705,7 +705,7 @@ async function loadWorkerPerf() {
     html += '</div></div>';
   }
   html += '</div>';
-  if (data.length > 10) html += '<div style="text-align:center;padding:.3rem;font-size:.72rem"><a href="' + App.orgPath('admin-workers') + '" style="color:var(--primary)">View all ' + data.length + ' workers →</a></div>';
+  if (data.length > 10) html += '<div style="text-align:center;padding:.3rem;font-size:.72rem"><a href="' + App.orgPath('admin-workers') + '" style="color:var(--primary)">View all ' + data.length + ' electricians →</a></div>';
   $('workerPerf').innerHTML = html;
 }
 

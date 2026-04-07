@@ -6,6 +6,7 @@ const { prisma } = require('../lib/prisma');
 const { authenticateJWT, requireRole } = require('../middleware/auth');
 const { encryptWorkerPII, decryptWorkerPII } = require('../lib/crypto');
 const { BCRYPT_COST } = require('../lib/security');
+const { getAssignedWorkerIds } = require('../services/assignment-resolver');
 
 async function workerRoutes(fastify, opts) {
   fastify.addHook('preHandler', authenticateJWT);
@@ -374,7 +375,8 @@ async function workerRoutes(fastify, opts) {
 
     const schema = z.object({
       locationIds: z.array(z.string().uuid()),
-      primaryLocationId: z.string().uuid().optional().nullable()
+      primaryLocationId: z.string().uuid().optional().nullable(),
+      coverChildren: z.boolean().default(true)
     });
 
     const data = schema.parse(request.body);
@@ -401,7 +403,8 @@ async function workerRoutes(fastify, opts) {
           orgId,
           workerId: id,
           locationId: locId,
-          isPrimary: locId === data.primaryLocationId
+          isPrimary: locId === data.primaryLocationId,
+          coverChildren: data.coverChildren !== false
         }))
       });
     }
@@ -427,7 +430,7 @@ async function workerRoutes(fastify, opts) {
     return { success: true, assignments };
   });
 
-  // Get workers assigned to a location (floor-centric view)
+  // Get workers assigned to a location (includes inherited parent assignments)
   fastify.get('/workers/by-location/:locationId', {
     preHandler: [requireRole('ADMIN', 'SUPERVISOR')]
   }, async (request, reply) => {
@@ -437,7 +440,8 @@ async function workerRoutes(fastify, opts) {
     const location = await prisma.location.findFirst({ where: { id: locationId, orgId } });
     if (!location) return reply.code(404).send({ error: 'Location not found' });
 
-    const assignments = await prisma.workerAssignment.findMany({
+    // Get directly assigned workers
+    const directAssignments = await prisma.workerAssignment.findMany({
       where: { locationId, orgId },
       include: {
         worker: {
@@ -447,9 +451,25 @@ async function workerRoutes(fastify, opts) {
       orderBy: [{ isPrimary: 'desc' }, { createdAt: 'asc' }]
     });
 
+    // Also resolve inherited workers (assigned to parent locations with coverChildren)
+    const allWorkerIds = await getAssignedWorkerIds(locationId, orgId);
+    const directIds = new Set(directAssignments.map(a => a.worker.id));
+    const inheritedIds = allWorkerIds.filter(id => !directIds.has(id));
+
+    let inheritedWorkers = [];
+    if (inheritedIds.length) {
+      inheritedWorkers = await prisma.worker.findMany({
+        where: { id: { in: inheritedIds }, isActive: true },
+        select: { id: true, name: true, employeeId: true, phone: true, isActive: true, department: true }
+      });
+    }
+
     return {
       location: { id: location.id, name: location.name, type: location.type },
-      workers: assignments.map(a => ({ ...a.worker, isPrimary: a.isPrimary, assignmentId: a.id }))
+      workers: [
+        ...directAssignments.map(a => ({ ...a.worker, isPrimary: a.isPrimary, assignmentId: a.id, inherited: false })),
+        ...inheritedWorkers.map(w => ({ ...w, isPrimary: false, assignmentId: null, inherited: true }))
+      ]
     };
   });
 

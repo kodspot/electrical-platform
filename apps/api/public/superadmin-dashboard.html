@@ -199,7 +199,7 @@
     <button class="sa-tab active" data-tab="orgs">Organizations</button>
     <button class="sa-tab" data-tab="admins">Admins</button>
     <button class="sa-tab" data-tab="supervisors">Supervisors</button>
-    <button class="sa-tab" data-tab="workers">Workers</button>
+    <button class="sa-tab" data-tab="workers">Electricians</button>
     <button class="sa-tab" data-tab="analytics">Analytics</button>
     <button class="sa-tab" data-tab="audit">Audit Logs</button>
   </div>
@@ -214,7 +214,7 @@
     <div class="table-wrap">
       <table class="sa-table"><thead><tr>
         <th>Name</th><th>Type</th><th class="hide-mobile">Modules</th><th class="hide-mobile">AI</th><th class="hide-mobile">Phone</th><th>Status</th>
-        <th class="hide-mobile">Users</th><th class="hide-mobile">Workers</th><th>Actions</th>
+        <th class="hide-mobile">Users</th><th class="hide-mobile">Electricians</th><th>Actions</th>
       </tr></thead><tbody id="orgBody"><tr><td colspan="9" class="loading-center">Loading…</td></tr></tbody></table>
     </div>
   </div>
@@ -247,12 +247,12 @@
     </div>
   </div>
 
-  <!-- Workers Tab -->
+  <!-- Electricians Tab -->
   <div class="tab-panel" id="tab-workers">
     <div class="sa-toolbar">
       <select class="form-select" id="workerOrgFilter" onchange="loadWorkers()"><option value="">Select Organization</option></select>
       <div class="sa-toolbar-spacer"></div>
-      <button class="btn btn-sa" onclick="openWorkerModal()">+ New Worker</button>
+      <button class="btn btn-sa" onclick="openWorkerModal()">+ New Electrician</button>
     </div>
     <div class="table-wrap">
       <table class="sa-table"><thead><tr>
@@ -289,7 +289,7 @@
         <option value="organization">Organization</option>
         <option value="admin">Admin</option>
         <option value="supervisor">Supervisor</option>
-        <option value="worker">Worker</option>
+        <option value="worker">Electrician</option>
         <option value="password">Password</option>
         <option value="ticket">Ticket</option>
         <option value="inspection">Inspection</option>
@@ -408,10 +408,10 @@
   </div>
 </div>
 
-<!-- Worker Modal -->
+<!-- Electrician Modal -->
 <div class="modal-overlay" id="workerModal">
   <div class="modal">
-    <h2 class="modal-title" id="workerModalTitle">New Worker</h2>
+    <h2 class="modal-title" id="workerModalTitle">New Electrician</h2>
     <div id="workerError" class="error-msg"></div>
     <form id="workerForm">
       <input type="hidden" id="wId">
@@ -613,7 +613,7 @@ async function loadStats() {
     statCard('Organizations', data.totalOrgs, 'Active: ' + data.activeOrgs, '') +
     statCard('Admins', data.totalAdmins, 'Across all orgs', '') +
     statCard('Supervisors', data.totalSupervisors, 'Across all orgs', '') +
-    statCard('Workers', data.totalWorkers, 'Active workers', '') +
+    statCard('Electricians', data.totalWorkers, 'Active electricians', '') +
     statCard('Inspection Records', data.totalRecords, 'Today: ' + data.todayRecords + ' · 7d: ' + (data.recordsLast7Days || 0), 'success') +
     statCard('Images Uploaded', data.totalImages, 'Avg/record: ' + (data.avgImagesPerRecord || '0'), '') +
     statCard('Tickets', data.totalTickets, 'Open: ' + data.openTickets, data.openTickets > 0 ? 'warn' : '') +

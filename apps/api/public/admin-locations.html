@@ -203,10 +203,26 @@
         <div class="form-group"><label class="form-label">Name</label><input class="form-input" type="text" id="locName" required maxlength="200"></div>
         <div class="form-group"><label class="form-label">Type</label>
           <select class="form-select" id="locType" required>
-            <option value="BUILDING">Building</option><option value="FLOOR">Floor</option><option value="ROOM">Room</option>
-            <option value="CORRIDOR">Corridor</option><option value="WASHROOM">Washroom</option><option value="ICU">ICU</option>
-            <option value="LOBBY">Lobby</option><option value="KITCHEN">Kitchen</option><option value="WARD">Ward</option>
-            <option value="MEETING_ROOM">Meeting Room</option><option value="OTHER">Other</option>
+            <optgroup label="Container Types">
+              <option value="BUILDING">Building</option><option value="FLOOR">Floor</option>
+              <option value="HOSTEL">Hostel</option><option value="SUBSTATION">Substation</option>
+              <option value="PANEL_ROOM">Panel Room</option><option value="GENERATOR_ROOM">Generator Room</option>
+              <option value="TRANSFORMER">Transformer</option><option value="UTILITY_AREA">Utility Area</option>
+            </optgroup>
+            <optgroup label="Location Types">
+              <option value="ROOM">Room</option><option value="CORRIDOR">Corridor</option>
+              <option value="WASHROOM">Washroom</option><option value="ICU">ICU</option>
+              <option value="LOBBY">Lobby</option><option value="KITCHEN">Kitchen</option>
+              <option value="WARD">Ward</option><option value="MEETING_ROOM">Meeting Room</option>
+              <option value="LAB">Lab</option><option value="SERVER_ROOM">Server Room</option>
+              <option value="STAIRCASE">Staircase</option><option value="TERRACE">Terrace</option>
+              <option value="PARKING">Parking</option><option value="CANTEEN">Canteen</option>
+              <option value="AUDITORIUM">Auditorium</option><option value="LIBRARY">Library</option>
+              <option value="OFFICE">Office</option><option value="STORE_ROOM">Store Room</option>
+              <option value="PUMP_ROOM">Pump Room</option><option value="LIFT_ROOM">Lift Room</option>
+              <option value="RECEPTION">Reception</option><option value="COMMON_AREA">Common Area</option>
+              <option value="OTHER">Other</option>
+            </optgroup>
           </select>
         </div>
       </div>
@@ -253,12 +269,19 @@ var esc = App.esc, $ = App.$;
 var allLocations = [];
 var _treeData = null;
 var _nodeMap = {};
-var CONTAINER_TYPES = ['BUILDING', 'FLOOR'];
+var CONTAINER_TYPES = ['BUILDING', 'FLOOR', 'HOSTEL', 'SUBSTATION', 'PANEL_ROOM', 'GENERATOR_ROOM', 'TRANSFORMER', 'UTILITY_AREA'];
 var ROOM_ICONS = {
   ROOM:{t:'RM',bg:'#f0fdfa',c:'#0d9488'},CORRIDOR:{t:'CR',bg:'#fff7ed',c:'#ea580c'},
   WASHROOM:{t:'WR',bg:'#eff6ff',c:'#2563eb'},ICU:{t:'IC',bg:'#fef2f2',c:'#dc2626'},
   LOBBY:{t:'LB',bg:'#faf5ff',c:'#9333ea'},KITCHEN:{t:'KT',bg:'#fefce8',c:'#ca8a04'},
   WARD:{t:'WD',bg:'#f0fdf4',c:'#16a34a'},MEETING_ROOM:{t:'MR',bg:'#f8fafc',c:'#475569'},
+  LAB:{t:'LB',bg:'#ecfdf5',c:'#059669'},SERVER_ROOM:{t:'SR',bg:'#eef2ff',c:'#4f46e5'},
+  STAIRCASE:{t:'SC',bg:'#fefce8',c:'#d97706'},TERRACE:{t:'TR',bg:'#f0f9ff',c:'#0284c7'},
+  PARKING:{t:'PK',bg:'#f5f5f4',c:'#78716c'},CANTEEN:{t:'CN',bg:'#fff7ed',c:'#c2410c'},
+  AUDITORIUM:{t:'AU',bg:'#fdf4ff',c:'#a855f7'},LIBRARY:{t:'LI',bg:'#fef2f2',c:'#b91c1c'},
+  OFFICE:{t:'OF',bg:'#f8fafc',c:'#334155'},STORE_ROOM:{t:'ST',bg:'#f1f5f9',c:'#475569'},
+  PUMP_ROOM:{t:'PR',bg:'#ecfeff',c:'#0891b2'},LIFT_ROOM:{t:'LR',bg:'#fef9c3',c:'#a16207'},
+  RECEPTION:{t:'RC',bg:'#fce7f3',c:'#be185d'},COMMON_AREA:{t:'CA',bg:'#f5f3ff',c:'#7c3aed'},
   OTHER:{t:'?',bg:'#f1f5f9',c:'#64748b'}
 };
 var SHIFT_COLORS = {MORNING:'morning',AFTERNOON:'afternoon',NIGHT:'night',GENERAL:'general'};
@@ -305,13 +328,13 @@ async function loadTree() {
     function countAll(nodes){for(var i=0;i<nodes.length;i++){var n=nodes[i];if(!isContainer(n.type)){totals.rooms++;totals.cleans+=n._count.electricalInspections;totals.tickets+=n._count.tickets}if(n.children)countAll(n.children)}}
     countAll(tree);
     var summary = '<div class="loc-summary">' +
-      '<span class="loc-summary-item"><b>' + totals.rooms + '</b> rooms</span>' +
+      '<span class="loc-summary-item"><b>' + totals.rooms + '</b> locations</span>' +
       '<span class="loc-summary-item"><b>' + totals.cleans + '</b> total inspections</span>' +
       '<span class="loc-summary-item"><b>' + totals.tickets + '</b> open tickets</span>' +
     '</div>';
 
     // Search bar
-    $('searchBar').innerHTML = '<div class="loc-search-bar"><input type="text" class="loc-search" id="locSearchInput" placeholder="Search rooms, floors, buildings…"><span class="loc-search-count" id="searchCount"></span></div>';
+    $('searchBar').innerHTML = '<div class="loc-search-bar"><input type="text" class="loc-search" id="locSearchInput" placeholder="Search locations, floors, buildings…"><span class="loc-search-count" id="searchCount"></span></div>';
     $('locSearchInput').addEventListener('input', onSearch);
 
     $('treeContainer').innerHTML = summary + renderNodes(tree, 0);
@@ -376,7 +399,7 @@ function renderNodes(nodes, depth) {
             '<div class="loc-group-icon ' + cls + '">' + icon + '</div>' +
             '<div class="loc-group-title">' +
               '<span class="loc-group-name">' + esc(n.name) + ' ' + inactiveB + '</span>' +
-              '<span class="loc-group-sub">' + n.type.charAt(0) + n.type.slice(1).toLowerCase() + ' · ' + stats.rooms + ' room' + (stats.rooms !== 1 ? 's' : '') + '</span>' +
+              '<span class="loc-group-sub">' + n.type.charAt(0) + n.type.slice(1).toLowerCase() + ' · ' + stats.rooms + ' location' + (stats.rooms !== 1 ? 's' : '') + '</span>' +
             '</div>' +
           '</div>' +
           '<div class="loc-group-right">' +

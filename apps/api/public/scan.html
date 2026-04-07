@@ -89,7 +89,7 @@ body{background:var(--bg);min-height:100dvh}
   }
 
   if (!qrCode) {
-    showError('Invalid QR Code', 'This link does not contain a valid room code. Please scan the QR code again.');
+    showError('Invalid QR Code', 'This link does not contain a valid location code. Please scan the QR code again.');
     return;
   }
 
@@ -159,7 +159,7 @@ body{background:var(--bg);min-height:100dvh}
       if (!res.ok) {
         var err = await res.json().catch(function() { return {}; });
         if (res.status === 404) {
-          showError('Location Not Found', 'This QR code is not linked to any active room. Please contact the front desk.');
+          showError('Location Not Found', 'This QR code is not linked to any active location. Please contact administration.');
         } else if (res.status === 410) {
           showError('Unavailable', err.error || 'This facility is not currently accepting feedback.');
         } else {

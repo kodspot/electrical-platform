@@ -2,8 +2,9 @@
 
 const { prisma } = require('../lib/prisma');
 const { decryptField } = require('../lib/crypto');
-const { notifyAdmins, notifySupervisors } = require('../routes/notifications');
+const { notifyAdmins, notifySupervisors, notifyWorkers } = require('../routes/notifications');
 const { pushAlert } = require('./sse');
+const { getAssignedWorkerIds, getAssignedSupervisorIds, getLocationBreadcrumb } = require('./assignment-resolver');
 
 // ── Severity ordinals ──
 const SEV_ORDER = ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'];
@@ -190,6 +191,44 @@ async function executeAction(action, alert, orgId, data, logger) {
         entityId: alert.id
       });
       break;
+
+    case 'NOTIFY_ASSIGNED_WORKERS': {
+      // Resolve workers assigned to the alert's location (walks up hierarchy)
+      const locId = data.locationId;
+      if (!locId) break;
+      const workerIds = await getAssignedWorkerIds(locId, orgId);
+      if (workerIds.length) {
+        const breadcrumb = await getLocationBreadcrumb(locId);
+        await notifyWorkers(orgId, workerIds, {
+          type: 'alert_' + alert.trigger.toLowerCase(),
+          title: alert.title,
+          body: (alert.body || '') + (breadcrumb ? ` [${breadcrumb}]` : ''),
+          entityId: alert.id
+        });
+      }
+      break;
+    }
+
+    case 'NOTIFY_ASSIGNED_SUPERVISORS': {
+      // Resolve supervisors assigned to the alert's location (walks up hierarchy)
+      const supLocId = data.locationId;
+      if (!supLocId) break;
+      const supervisorIds = await getAssignedSupervisorIds(supLocId, orgId);
+      if (supervisorIds.length) {
+        const breadcrumb = await getLocationBreadcrumb(supLocId);
+        for (const supId of supervisorIds) {
+          await require('../routes/notifications').createNotification({
+            orgId,
+            userId: supId,
+            type: 'alert_' + alert.trigger.toLowerCase(),
+            title: alert.title,
+            body: (alert.body || '') + (breadcrumb ? ` [${breadcrumb}]` : ''),
+            entityId: alert.id
+          });
+        }
+      }
+      break;
+    }
 
     case 'CREATE_TICKET': {
       // Auto-create a ticket from the alert

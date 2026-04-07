@@ -8,7 +8,7 @@
 <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
 <link rel="manifest" href="/site.webmanifest">
 <meta name="theme-color" content="#1a7f64">
-<title>Workers — Kodspot</title>
+<title>Electricians — Kodspot</title>
 <link rel="stylesheet" href="/css/design-system.css?v=9">
 <style>
 /* ── Summary bar ── */
@@ -149,10 +149,10 @@
 
 <main class="container">
   <div class="toolbar">
-    <h2 class="toolbar-title">Workers</h2>
+    <h2 class="toolbar-title">Electricians</h2>
     <div class="flex items-center gap-sm" style="flex-wrap:wrap">
       <label class="form-check"><input type="checkbox" id="showInactive" onchange="loadWorkers(1)"> Show inactive</label>
-      <button class="btn btn-primary" onclick="openAdd()">+ Add Worker</button>
+      <button class="btn btn-primary" onclick="openAdd()">+ Add Electrician</button>
     </div>
   </div>
 
@@ -199,7 +199,7 @@
 <!-- Add/Edit Modal -->
 <div class="modal-overlay" id="modal">
   <div class="modal" style="max-width:560px">
-    <h2 class="modal-title" id="modalTitle">Add Worker</h2>
+    <h2 class="modal-title" id="modalTitle">Add Electrician</h2>
     <div id="modalError" class="error-msg"></div>
     <form id="workerForm" autocomplete="off">
       <input type="hidden" id="wId">
@@ -245,7 +245,7 @@
       </div>
       <!-- Tab: Notes -->
       <div class="wk-form-section" id="tab-notes">
-        <div class="form-group"><label class="form-label">Notes</label><textarea class="form-input" id="wNotes" maxlength="1000" rows="4" placeholder="Any additional notes about this worker…"></textarea></div>
+        <div class="form-group"><label class="form-label">Notes</label><textarea class="form-input" id="wNotes" maxlength="1000" rows="4" placeholder="Any additional notes about this electrician…"></textarea></div>
       </div>
       <div class="modal-actions">
         <button type="button" class="btn btn-outline" onclick="App.closeModal('modal')">Cancel</button>
@@ -258,7 +258,7 @@
 <!-- View Detail Modal -->
 <div class="modal-overlay" id="detailModal">
   <div class="modal" style="max-width:520px">
-    <h2 class="modal-title" id="detailTitle">Worker Details</h2>
+    <h2 class="modal-title" id="detailTitle">Electrician Details</h2>
     <div id="detailContent"><div class="loading-center">Loading…</div></div>
     <div class="modal-actions">
       <button type="button" class="btn btn-outline" onclick="App.closeModal('detailModal')">Close</button>
@@ -281,8 +281,8 @@
 <!-- Floor Assignment Modal -->
 <div class="modal-overlay" id="floorModal">
   <div class="modal" style="max-width:480px">
-    <h2 class="modal-title" id="floorTitle">Assign Floors</h2>
-    <p style="font-size:.78rem;color:var(--text-muted);margin-bottom:.65rem">Select floors/locations this worker is assigned to for attendance tracking.</p>
+    <h2 class="modal-title" id="floorTitle">Assign Locations</h2>
+    <p style="font-size:.78rem;color:var(--text-muted);margin-bottom:.65rem">Select buildings/hostels/floors this electrician is assigned to. Assignments cascade to child locations.</p>
     <div id="floorError" class="error-msg"></div>
     <input type="hidden" id="faWorkerId">
     <div id="floorList" class="fa-loc-list"><div class="loading-center">Loading…</div></div>
@@ -296,9 +296,9 @@
 <!-- Set PIN Modal -->
 <div class="modal-overlay" id="pinModal">
   <div class="modal" style="max-width:380px">
-    <h2 class="modal-title" id="pinModalTitle">Set Worker PIN</h2>
+    <h2 class="modal-title" id="pinModalTitle">Set Electrician PIN</h2>
     <div id="pinError" class="error-msg"></div>
-    <p style="font-size:.78rem;color:var(--text-muted);margin-bottom:.65rem">Set a 4-6 digit numeric PIN for worker login. The worker will use their Employee ID + PIN to log in.</p>
+    <p style="font-size:.78rem;color:var(--text-muted);margin-bottom:.65rem">Set a 6-digit numeric PIN for electrician login. They will use their Employee ID + PIN to log in.</p>
     <div><label class="form-label">New PIN (4-6 digits) *</label><input class="form-input" id="pinInput" type="password" inputmode="numeric" pattern="\d{4,6}" minlength="4" maxlength="6" required placeholder="Enter PIN"></div>
     <div style="margin-top:.5rem"><label class="form-label">Confirm PIN *</label><input class="form-input" id="pinConfirm" type="password" inputmode="numeric" pattern="\d{4,6}" minlength="4" maxlength="6" required placeholder="Confirm PIN"></div>
     <div class="modal-actions">
@@ -367,14 +367,14 @@ async function loadWorkers(page) {
   var deptCount = Object.keys(deptSet).length;
 
   $('summaryBar').innerHTML = '<div class="wk-summary">' +
-    '<span class="wk-summary-item"><b>' + total + '</b> total workers</span>' +
+    '<span class="wk-summary-item"><b>' + total + '</b> total electricians</span>' +
     '<span class="wk-summary-item"><b>' + active + '</b> active' + (showInactive && inactive > 0 ? ' · <b>' + inactive + '</b> inactive' : '') + '</span>' +
     '<span class="wk-summary-item"><b>' + totalCleans + '</b> inspections on this page</span>' +
     (deptCount > 0 ? '<span class="wk-summary-item"><b>' + deptCount + '</b> dept' + (deptCount !== 1 ? 's' : '') + '</span>' : '') +
   '</div>';
 
   if (!workers.length) {
-    $('workerBody').innerHTML = '<tr><td colspan="9" class="empty">' + (search ? 'No workers match "' + esc(search) + '"' : 'No workers found') + '</td></tr>';
+    $('workerBody').innerHTML = '<tr><td colspan="9" class="empty">' + (search ? 'No electricians match "' + esc(search) + '"' : 'No electricians found') + '</td></tr>';
     $('pager').innerHTML = '';
     return;
   }
@@ -391,15 +391,15 @@ async function loadWorkers(page) {
 
     var actions = '<div class="wk-actions">' +
       '<button class="btn btn-sm btn-outline" onclick="viewWorker(\'' + w.id + '\')" title="View details">View</button>' +
-      '<button class="btn btn-sm btn-outline" onclick="openEdit(\'' + w.id + '\')" title="Edit worker">Edit</button>' +
-      '<button class="btn btn-sm btn-outline" onclick="openFloors(\'' + w.id + '\',\'' + esc(w.name).replace(/'/g, "\\'") + '\')" title="Floor assignments">Floors</button>' +
+      '<button class="btn btn-sm btn-outline" onclick="openEdit(\'' + w.id + '\')" title="Edit electrician">Edit</button>' +
+      '<button class="btn btn-sm btn-outline" onclick="openFloors(\'' + w.id + '\',\'' + esc(w.name).replace(/'/g, "\\'") + '\')" title="Location assignments">Locations</button>' +
       '<button class="btn btn-sm btn-outline" onclick="showStats(\'' + w.id + '\',\'' + esc(w.name).replace(/'/g, "\\'") + '\')" title="Inspection stats">Stats</button>' +
       '<button class="btn btn-sm btn-outline" onclick="openSetPin(\'' + w.id + '\',\'' + esc(w.name).replace(/'/g, "\\'") + '\')" title="Set login PIN">🔑 PIN</button>';
 
     if (w.isActive !== false) {
-      actions += '<button class="btn btn-sm btn-danger" onclick="deactivateWorker(\'' + w.id + '\',\'' + esc(w.name).replace(/'/g, "\\'") + '\')" title="Deactivate worker">Deactivate</button>';
+      actions += '<button class="btn btn-sm btn-danger" onclick="deactivateWorker(\'' + w.id + '\',\'' + esc(w.name).replace(/'/g, "\\'") + '\')" title="Deactivate electrician">Deactivate</button>';
     } else {
-      actions += '<button class="btn btn-sm btn-success" onclick="reactivateWorker(\'' + w.id + '\')" title="Reactivate worker">Activate</button>' +
+      actions += '<button class="btn btn-sm btn-success" onclick="reactivateWorker(\'' + w.id + '\')" title="Reactivate electrician">Activate</button>' +
         '<button class="btn btn-sm btn-danger" onclick="permanentDelete(\'' + w.id + '\',\'' + esc(w.name).replace(/'/g, "\\'") + '\')" title="Permanently delete">Delete</button>';
     }
     actions += '</div>';
@@ -447,7 +447,7 @@ function switchTab(tabId, btn) {
 
 /* ── Add / Edit ── */
 function openAdd() {
-  $('modalTitle').textContent = 'Add Worker';
+  $('modalTitle').textContent = 'Add Electrician';
   $('workerForm').reset();
   $('wId').value = '';
   $('wGender').value = '';
@@ -458,9 +458,9 @@ function openAdd() {
 
 async function openEdit(id) {
   var res = await App.apiFetch('/workers/' + id);
-  if (!res || !res.ok) { App.toast('Failed to load worker', 'error'); return; }
+  if (!res || !res.ok) { App.toast('Failed to load electrician', 'error'); return; }
   var w = await res.json();
-  $('modalTitle').textContent = 'Edit Worker';
+  $('modalTitle').textContent = 'Edit Electrician';
   $('wId').value = w.id;
   $('wName').value = w.name || '';
   $('wEmpId').value = w.employeeId || '';
@@ -523,7 +523,7 @@ $('workerForm').addEventListener('submit', async function(e) {
       return;
     }
     App.closeModal('modal');
-    App.toast(id ? 'Worker updated' : 'Worker created', 'success');
+    App.toast(id ? 'Electrician updated' : 'Electrician created', 'success');
     loadWorkers(currentPage);
   } catch (err) {
     App.showError('modalError', 'Network error');
@@ -537,7 +537,7 @@ async function viewWorker(id) {
   $('detailContent').innerHTML = '<div class="loading-center">Loading…</div>';
   App.openModal('detailModal');
   var res = await App.apiFetch('/workers/' + id);
-  if (!res || !res.ok) { $('detailContent').innerHTML = '<div class="error-msg show" style="display:block">Failed to load worker</div>'; return; }
+  if (!res || !res.ok) { $('detailContent').innerHTML = '<div class="error-msg show" style="display:block">Failed to load electrician</div>'; return; }
   var w = await res.json();
   $('detailTitle').textContent = w.name;
   $('detailEditBtn').setAttribute('onclick', 'App.closeModal("detailModal");openEdit("' + w.id + '")');
@@ -574,14 +574,14 @@ async function deactivateWorker(id, name) {
   var res = await App.apiFetch('/workers/' + id, { method: 'PATCH', body: JSON.stringify({ isActive: false }) });
   if (!res) return;
   if (!res.ok) { App.toast('Failed to deactivate', 'error'); return; }
-  App.toast('Worker deactivated', 'success'); loadWorkers(currentPage);
+  App.toast('Electrician deactivated', 'success'); loadWorkers(currentPage);
 }
 
 async function reactivateWorker(id) {
   var res = await App.apiFetch('/workers/' + id, { method: 'PATCH', body: JSON.stringify({ isActive: true }) });
   if (!res) return;
   if (!res.ok) { App.toast('Failed to activate', 'error'); return; }
-  App.toast('Worker activated', 'success'); loadWorkers(currentPage);
+  App.toast('Electrician activated', 'success'); loadWorkers(currentPage);
 }
 
 async function permanentDelete(id, name) {
@@ -593,7 +593,7 @@ async function permanentDelete(id, name) {
     App.toast(d.error || 'Failed to delete', 'error');
     return;
   }
-  App.toast('Worker permanently deleted', 'success'); loadWorkers(currentPage);
+  App.toast('Electrician permanently deleted', 'success'); loadWorkers(currentPage);
 }
 
 /* ── Stats ── */

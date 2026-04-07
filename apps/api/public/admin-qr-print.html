@@ -92,7 +92,7 @@ async function loadQRCodes() {
   if (!Array.isArray(tree)) { $('qrGrid').innerHTML = '<div class="empty">No locations found</div>'; return; }
 
   var locations = [];
-  var CONTAINER_TYPES = ['BUILDING', 'FLOOR'];
+  var CONTAINER_TYPES = ['BUILDING', 'FLOOR', 'HOSTEL', 'SUBSTATION', 'PANEL_ROOM', 'GENERATOR_ROOM', 'TRANSFORMER', 'UTILITY_AREA'];
   function flatten(nodes, prefix) {
     for (var i = 0; i < nodes.length; i++) {
       var n = nodes[i];
