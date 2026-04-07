@@ -208,7 +208,7 @@
   <!-- Orgs Tab -->
   <div class="tab-panel active" id="tab-orgs">
     <div class="sa-toolbar">
-      <input type="text" class="form-input" placeholder="Search organizations…" id="orgSearch" oninput="debouncedOrgSearch()" autocomplete="off">
+      <input type="search" class="form-input" placeholder="Search organizations…" id="orgSearch" oninput="debouncedOrgSearch()" autocomplete="off" name="sa-org-filter" data-form-type="other" data-lpignore="true">
       <div class="sa-toolbar-spacer"></div>
       <button class="btn btn-sa" onclick="openOrgModal()">+ New Organization</button>
     </div>
@@ -1306,6 +1306,11 @@ async function saveAiConfig() {
 $('orgSearch').value = '';
 loadStats();
 loadOrgs();
+// Guard against browser autocomplete overwriting the cleared search field
+setTimeout(function() {
+  var o = $('orgSearch');
+  if (o.value && o.value !== '') { o.value = ''; loadOrgs(); }
+}, 200);
 </script>
 </body>
 </html>
