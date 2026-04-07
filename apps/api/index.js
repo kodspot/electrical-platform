@@ -1,4 +1,4 @@
-﻿// Load env+validate before anything else
+﻿// Load env + validate before anything else
 const { APP_URL } = require('./src/config/env');
 
 const fastify = require('fastify')({
