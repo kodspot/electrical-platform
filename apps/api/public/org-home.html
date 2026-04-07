@@ -6,9 +6,10 @@
 <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
 <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
 <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
-<meta name="theme-color" content="#1a7f64">
+<meta name="theme-color" content="#1E40AF">
 <title>Kodspot</title>
-<link rel="stylesheet" href="/css/design-system.css?v=9">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/css/design-system.css?v=10">
 <style>
 .org-home{max-width:520px;margin:0 auto;padding:2rem 1rem;text-align:center}
 .org-name{font-size:1.5rem;font-weight:700;color:var(--text);margin-bottom:.25rem}
@@ -41,7 +42,7 @@
 <script>
 (function() {
   var MODULE_META = {
-    ele:        { label: 'Electrical',   icon: '⚡', desc: 'Electrical services',    color: '#d97706' },
+    ele:        { label: 'Electrical',   icon: '⚡', desc: 'Electrical services',    color: '#1E40AF' },
     civil:      { label: 'Civil',        icon: '🏗️', desc: 'Civil maintenance',      color: '#6366f1' },
     asset:      { label: 'Assets',       icon: '📦', desc: 'Asset management',       color: '#0891b2' },
     complaints: { label: 'Complaints',   icon: '📝', desc: 'Complaint management',   color: '#e11d48' }
@@ -62,7 +63,7 @@
       '<div class="org-sub">Select a service to continue</div>' +
       '<div class="mod-grid">' +
       modules.map(function(m) {
-        var meta = MODULE_META[m] || { label: m, icon: '📋', desc: '', color: '#1a7f64' };
+        var meta = MODULE_META[m] || { label: m, icon: '📋', desc: '', color: '#1E40AF' };
         return '<a href="/' + slug + '/' + m + '/" class="mod-card" style="border-left:3px solid ' + meta.color + '">' +
           '<span class="mod-icon">' + meta.icon + '</span>' +
           '<span class="mod-label">' + meta.label + '</span>' +

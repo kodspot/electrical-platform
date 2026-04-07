@@ -7,9 +7,10 @@
 <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
 <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
 <link rel="manifest" href="/site.webmanifest">
-<meta name="theme-color" content="#1a7f64">
+<meta name="theme-color" content="#1E40AF">
 <title>Locations — Kodspot</title>
-<link rel="stylesheet" href="/css/design-system.css?v=9">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/css/design-system.css?v=10">
 <style>
 /* ── Location Tree ── */
 .loc-tree{margin-top:.25rem}
@@ -68,7 +69,7 @@
 .room-left{display:flex;align-items:center;gap:.65rem;min-width:0;flex:1;overflow:hidden}
 .room-icon{
   width:36px;height:36px;border-radius:var(--radius-lg);display:flex;align-items:center;justify-content:center;
-  font-size:1rem;flex-shrink:0;background:#f0fdfa;color:#0d9488
+  font-size:1rem;flex-shrink:0;background:#EFF6FF;color:#3B82F6
 }
 .room-info{min-width:0;flex:1;overflow:hidden}
 .room-name{font-weight:500;font-size:.88rem;color:var(--text);line-height:1.25;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -271,7 +272,7 @@ var _treeData = null;
 var _nodeMap = {};
 var CONTAINER_TYPES = ['BUILDING', 'FLOOR', 'HOSTEL', 'SUBSTATION', 'PANEL_ROOM', 'GENERATOR_ROOM', 'TRANSFORMER', 'UTILITY_AREA'];
 var ROOM_ICONS = {
-  ROOM:{t:'RM',bg:'#f0fdfa',c:'#0d9488'},CORRIDOR:{t:'CR',bg:'#fff7ed',c:'#ea580c'},
+  ROOM:{t:'RM',bg:'#EFF6FF',c:'#3B82F6'},CORRIDOR:{t:'CR',bg:'#fff7ed',c:'#ea580c'},
   WASHROOM:{t:'WR',bg:'#eff6ff',c:'#2563eb'},ICU:{t:'IC',bg:'#fef2f2',c:'#dc2626'},
   LOBBY:{t:'LB',bg:'#faf5ff',c:'#9333ea'},KITCHEN:{t:'KT',bg:'#fefce8',c:'#ca8a04'},
   WARD:{t:'WD',bg:'#f0fdf4',c:'#16a34a'},MEETING_ROOM:{t:'MR',bg:'#f8fafc',c:'#475569'},

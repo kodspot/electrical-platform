@@ -685,7 +685,7 @@ async function attendanceRoutes(fastify, opts) {
 
     function drawTableHeader(startY) {
       doc.save();
-      doc.rect(40, startY, pageW, 22).fill('#0d9488');
+      doc.rect(40, startY, pageW, 22).fill('#3B82F6');
       let cx = 40;
       doc.fontSize(7).font('Helvetica-Bold').fillColor('#ffffff');
       for (const col of cols) {
@@ -757,7 +757,7 @@ async function attendanceRoutes(fastify, opts) {
 
       function drawDateHeader(startY) {
         doc.save();
-        doc.rect(40, startY, gridW, 28).fill('#0d9488');
+        doc.rect(40, startY, gridW, 28).fill('#3B82F6');
         doc.fontSize(fs).font('Helvetica-Bold').fillColor('#ffffff');
         doc.text('Worker', 42, startY + 10, { width: nameW - 4 });
         doc.text('ID', 40 + nameW + 2, startY + 10, { width: idW - 4 });

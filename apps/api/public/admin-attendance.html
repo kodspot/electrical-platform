@@ -7,9 +7,10 @@
 <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
 <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
 <link rel="manifest" href="/site.webmanifest">
-<meta name="theme-color" content="#1a7f64">
+<meta name="theme-color" content="#1E40AF">
 <title>Attendance — Kodspot</title>
-<link rel="stylesheet" href="/css/design-system.css?v=9">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/css/design-system.css?v=10">
 <style>
 /* ── Today's Overview ── */
 .att-overview{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:.65rem;margin-bottom:1.25rem}
@@ -20,7 +21,7 @@
 .att-kpi.kpi-leave::before{background:#f59e0b}
 .att-kpi.kpi-half::before{background:#3b82f6}
 .att-kpi.kpi-unmarked::before{background:#94a3b8}
-.att-kpi.kpi-total::before{background:linear-gradient(90deg,#0ea5a4,#14b8a6)}
+.att-kpi.kpi-total::before{background:linear-gradient(90deg,#1E40AF,#3B82F6)}
 .att-kpi-val{font-size:1.6rem;font-weight:700;line-height:1.2;color:var(--text)}
 .att-kpi-lbl{font-size:.68rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.04em;margin-top:.1rem}
 .att-kpi.kpi-present .att-kpi-val{color:#10b981}
@@ -45,7 +46,7 @@
 .att-tbl{width:100%;border-collapse:collapse;font-size:.82rem}
 .att-tbl th{text-align:left;padding:.5rem .6rem;color:var(--text-muted);border-bottom:2px solid var(--border);font-weight:600;font-size:.7rem;text-transform:uppercase;letter-spacing:.04em;white-space:nowrap;position:sticky;top:0;background:var(--surface);z-index:1}
 .att-tbl td{padding:.5rem .6rem;border-bottom:1px solid var(--border-light);vertical-align:middle}
-.att-tbl tr:hover td{background:rgba(14,165,164,.04)}
+.att-tbl tr:hover td{background:rgba(30,64,175,.04)}
 
 /* Status badges */
 .att-status{font-size:.68rem;font-weight:700;padding:.15rem .45rem;border-radius:var(--radius-sm);display:inline-block;text-transform:uppercase;letter-spacing:.03em}
@@ -59,7 +60,7 @@
 .report-tbl{width:100%;border-collapse:collapse;font-size:.82rem}
 .report-tbl th{text-align:left;padding:.5rem .6rem;color:var(--text-muted);border-bottom:2px solid var(--border);font-weight:600;font-size:.7rem;text-transform:uppercase;letter-spacing:.04em;white-space:nowrap;position:sticky;top:0;background:var(--surface);z-index:1}
 .report-tbl td{padding:.5rem .6rem;border-bottom:1px solid var(--border-light);vertical-align:middle}
-.report-tbl tr:hover td{background:rgba(14,165,164,.04)}
+.report-tbl tr:hover td{background:rgba(30,64,175,.04)}
 
 /* Progress bar for attendance % */
 .att-pct-bar{height:18px;background:var(--bg);border-radius:5px;overflow:hidden;min-width:80px}

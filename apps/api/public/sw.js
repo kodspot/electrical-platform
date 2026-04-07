@@ -1,7 +1,7 @@
 // Kodspot Electrical — Service Worker
 // PWA install, offline fallback, API response caching, Background Sync
 
-const CACHE_NAME = 'kodspot-v13';
+const CACHE_NAME = 'kodspot-v14';
 const API_CACHE = 'kodspot-api-v1';
 const OFFLINE_URL = '/offline.html';
 
@@ -23,7 +23,7 @@ self.addEventListener('install', (event) => {
     caches.open(CACHE_NAME).then((cache) =>
       cache.addAll([
         OFFLINE_URL,
-        '/css/design-system.css?v=9',
+        '/css/design-system.css?v=10',
         '/js/app.js?v=11',
         '/js/offline-sync.js?v=1',
         '/site.webmanifest',

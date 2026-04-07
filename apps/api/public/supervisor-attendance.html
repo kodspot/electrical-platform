@@ -7,9 +7,10 @@
 <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
 <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
 <link rel="manifest" href="/site.webmanifest">
-<meta name="theme-color" content="#1a7f64">
+<meta name="theme-color" content="#1E40AF">
 <title>Attendance — Kodspot</title>
-<link rel="stylesheet" href="/css/design-system.css?v=9">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/css/design-system.css?v=10">
 <style>
 .sv-shell{max-width:640px;margin:0 auto;padding:1rem .75rem;min-height:calc(100dvh - 56px)}
 
@@ -25,8 +26,8 @@
 .setup-loc-group{margin-bottom:.3rem}
 .setup-loc-hdr{font-size:.68rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.04em;padding:.35rem .4rem .2rem;display:flex;align-items:center;gap:.35rem}
 .setup-loc-item{display:flex;align-items:center;gap:.5rem;padding:.55rem .7rem;border-radius:var(--radius);cursor:pointer;transition:all .12s;border:1.5px solid transparent;margin:.15rem 0}
-.setup-loc-item:hover{background:rgba(14,165,164,.06);border-color:var(--border)}
-.setup-loc-item.selected{background:rgba(14,165,164,.1);border-color:var(--primary)}
+.setup-loc-item:hover{background:rgba(30,64,175,.06);border-color:var(--border)}
+.setup-loc-item.selected{background:rgba(30,64,175,.1);border-color:var(--primary)}
 .setup-loc-item .loc-radio{width:18px;height:18px;border-radius:50%;border:2px solid var(--border);display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all .12s}
 .setup-loc-item.selected .loc-radio{border-color:var(--primary);background:var(--primary)}
 .setup-loc-item.selected .loc-radio::after{content:'';width:8px;height:8px;border-radius:50%;background:#fff}
@@ -36,7 +37,7 @@
 
 /* Roster header */
 .roster-hdr{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:.65rem .8rem;margin-bottom:.75rem;display:flex;align-items:center;gap:.6rem}
-.roster-hdr-icon{width:36px;height:36px;border-radius:var(--radius);background:rgba(14,165,164,.12);display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.roster-hdr-icon{width:36px;height:36px;border-radius:var(--radius);background:rgba(30,64,175,.12);display:flex;align-items:center;justify-content:center;flex-shrink:0}
 .roster-hdr-icon svg{color:var(--primary)}
 .roster-hdr-info{flex:1;min-width:0}
 .roster-hdr-loc{font-size:.9rem;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -90,11 +91,11 @@
 .ws-search{width:100%;font-size:.82rem;padding:.5rem .65rem;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);margin-bottom:.65rem}
 .ws-list{max-height:350px;overflow-y:auto;display:flex;flex-direction:column;gap:.25rem;margin-bottom:.75rem}
 .ws-item{display:flex;align-items:center;gap:.55rem;padding:.45rem .55rem;border-radius:var(--radius);cursor:pointer;transition:background .1s}
-.ws-item:hover{background:rgba(14,165,164,.06)}
+.ws-item:hover{background:rgba(30,64,175,.06)}
 .ws-item input{width:16px;height:16px;accent-color:var(--primary);flex-shrink:0}
 .ws-item-name{font-size:.84rem;font-weight:500;color:var(--text)}
 .ws-item-id{font-size:.68rem;color:var(--text-muted)}
-.ws-item-badge{font-size:.58rem;background:rgba(14,165,164,.12);color:var(--primary);padding:.1rem .3rem;border-radius:var(--radius-sm);font-weight:600}
+.ws-item-badge{font-size:.58rem;background:rgba(30,64,175,.12);color:var(--primary);padding:.1rem .3rem;border-radius:var(--radius-sm);font-weight:600}
 .ws-count{font-size:.72rem;color:var(--text-muted);margin-bottom:.5rem}
 
 /* Success */

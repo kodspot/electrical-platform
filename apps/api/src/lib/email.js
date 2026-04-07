@@ -50,11 +50,11 @@ async function sendEmail(to, subject, html) {
 <style>body{margin:0;padding:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#f5f5f5;color:#1a1a1a}
 .wrap{max-width:600px;margin:0 auto;padding:20px}
 .card{background:#fff;border-radius:8px;padding:28px 24px;box-shadow:0 1px 3px rgba(0,0,0,.08)}
-.hdr{font-size:18px;font-weight:700;color:#0EA5A4;margin-bottom:16px;padding-bottom:12px;border-bottom:2px solid #f0f0f0}
+.hdr{font-size:18px;font-weight:700;color:#1E40AF;margin-bottom:16px;padding-bottom:12px;border-bottom:2px solid #f0f0f0}
 .body{font-size:14px;line-height:1.7;color:#333}
 .body p{margin:0 0 12px}
 .foot{text-align:center;padding:16px 0 0;font-size:12px;color:#888}
-.btn{display:inline-block;padding:10px 24px;background:#0EA5A4;color:#fff;text-decoration:none;border-radius:6px;font-weight:600;font-size:14px}
+.btn{display:inline-block;padding:10px 24px;background:#1E40AF;color:#fff;text-decoration:none;border-radius:6px;font-weight:600;font-size:14px}
 .label{font-weight:600;color:#555}
 .val{color:#1a1a1a}
 </style></head><body>
