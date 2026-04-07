@@ -411,19 +411,21 @@ async function supervisorRoutes(fastify, opts) {
       }
     }
 
-    // Delete existing and create new
-    await prisma.supervisorAssignment.deleteMany({ where: { supervisorId: id, orgId } });
+    // Delete existing and create new — atomic transaction
+    await prisma.$transaction(async (tx) => {
+      await tx.supervisorAssignment.deleteMany({ where: { supervisorId: id, orgId } });
 
-    if (data.locationIds.length > 0) {
-      await prisma.supervisorAssignment.createMany({
-        data: data.locationIds.map(locId => ({
-          orgId,
-          supervisorId: id,
-          locationId: locId,
-          coverChildren: data.coverChildren !== false
-        }))
-      });
-    }
+      if (data.locationIds.length > 0) {
+        await tx.supervisorAssignment.createMany({
+          data: data.locationIds.map(locId => ({
+            orgId,
+            supervisorId: id,
+            locationId: locId,
+            coverChildren: data.coverChildren !== false
+          }))
+        });
+      }
+    });
 
     await prisma.auditLog.create({
       data: {

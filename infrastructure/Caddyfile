@@ -3,7 +3,7 @@
 # Domain: electrical.kodspot.in (separate VM from HK system)
 #
 # NOTE: Naked domain (kodspot.in) and www.kodspot.in redirects
-# are handled by the HOUSEKEEPING VM's Caddy — NOT here.
+# are handled by the main platform's Caddy — NOT here.
 # This VM only handles electrical.kodspot.in.
 # ═══════════════════════════════════════════════════════════
 

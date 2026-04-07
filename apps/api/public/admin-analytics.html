@@ -117,7 +117,7 @@
 .sc-label{font-size:.7rem;font-weight:600;text-transform:uppercase;letter-spacing:.03em;color:var(--text-muted);margin-bottom:.15rem}
 .sc-detail{font-size:.65rem;color:var(--text-muted);margin-top:.1rem}
 
-/* ── Room Heatmap ── */
+/* ── Location Heatmap ── */
 .hm-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
 .hm-table{border-collapse:collapse;font-size:.72rem;width:100%;min-width:500px}
 .hm-table th{padding:.3rem .4rem;font-size:.62rem;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.02em;text-align:center;white-space:nowrap;position:sticky;top:0;background:var(--surface);z-index:1}
@@ -244,9 +244,9 @@
     <div id="shiftTrendChart"></div>
   </div>
 
-  <!-- Room Status Heatmap -->
+  <!-- Location Status Heatmap -->
   <div class="an-section">
-    <div class="an-title">Room Status Heatmap <span id="hmCount" style="font-size:.7rem;font-weight:400;color:var(--text-muted)"></span></div>
+    <div class="an-title">Location Status Heatmap <span id="hmCount" style="font-size:.7rem;font-weight:400;color:var(--text-muted)"></span></div>
     <div id="hmToolbar"></div>
     <div id="hmLegend"></div>
     <div class="hm-wrap" style="max-height:450px;overflow-y:auto" id="hmBody"></div>
@@ -580,7 +580,7 @@ function renderShiftTrend(st, periodDays) {
   $('shiftTrendChart').innerHTML = html;
 }
 
-// ── Room Status Heatmap ──
+// ── Location Status Heatmap ──
 var _hmSort = 'score-asc';
 var _hmSearch = '';
 var _hmData = null;
@@ -660,7 +660,7 @@ function renderHeatmap() {
   var showLabels = dates.length <= 31;
 
   // Header
-  var html = '<table class="hm-table"><thead><tr><th>Room</th>';
+  var html = '<table class="hm-table"><thead><tr><th>Location</th>';
   for (var i = 0; i < dates.length; i++) {
     var dt = new Date(dates[i] + 'T12:00:00');
     var thLabel = showLabels ? dt.toLocaleDateString(undefined, {day:'numeric'}) : '';
@@ -793,7 +793,7 @@ function renderIssueTypes(ts) {
     $('issueTypes').innerHTML = '<div class="an-empty">No issue types recorded</div>';
     return;
   }
-  var LABELS = { NOT_CLEAN:'Not Clean', BAD_SMELL:'Bad Smell', BROKEN_EQUIPMENT:'Broken Equipment', WATER_ISSUE:'Water Issue', PEST:'Pest Problem', LINEN:'Linen Issue', WASTE:'Waste Issue', OTHER:'Other' };
+  var LABELS = { ELECTRICAL_FAULT:'Electrical Fault', WIRING_ISSUE:'Wiring Issue', POWER_OUTAGE:'Power Outage', SHORT_CIRCUIT:'Short Circuit', LIGHT_NOT_WORKING:'Light Not Working', FAN_NOT_WORKING:'Fan Not Working', AC_NOT_WORKING:'AC Not Working', SWITCH_SOCKET_ISSUE:'Switch/Socket', BROKEN_EQUIPMENT:'Broken Equipment', WATER_ISSUE:'Water Issue', STRUCTURAL_DAMAGE:'Structural Damage', PLUMBING_LEAK:'Plumbing Leak', SAFETY_CONCERN:'Safety Concern', OTHER:'Other' };
   var items = Object.entries(ts.byIssueType).sort(function(a,b) { return b[1]-a[1]; });
   var max = items[0][1];
   var html = '';

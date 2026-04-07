@@ -37,6 +37,14 @@ async function logError(err) {
 const _alertCooldown = new Map(); // route → lastAlertTs (debounce per route)
 const ALERT_COOLDOWN_MS = 60_000; // max 1 alert per route per 60 seconds
 
+// Evict stale cooldown entries every 10 minutes to prevent unbounded growth
+setInterval(() => {
+  const cutoff = Date.now() - ALERT_COOLDOWN_MS * 2;
+  for (const [key, ts] of _alertCooldown) {
+    if (ts < cutoff) _alertCooldown.delete(key);
+  }
+}, 600_000).unref();
+
 async function sendErrorAlert(error, request) {
   try {
     const telegramToken = process.env.ALERT_TELEGRAM_BOT_TOKEN;
@@ -148,8 +156,8 @@ function registerErrorHandlers(fastify) {
     }
 
     reply.status(statusCode).send({
-      error: 'Internal server error',
-      message: isProduction ? 'Something went wrong' : error.message
+      error: statusCode >= 500 ? 'Internal server error' : (error.code || 'Error'),
+      message: (isProduction && statusCode >= 500) ? 'Something went wrong' : error.message
     });
   });
 

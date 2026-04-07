@@ -126,6 +126,12 @@ async function publicRoutes(fastify, opts) {
       return reply.code(400).send({ error: 'locationId and issueType are required' });
     }
 
+    // Validate locationId format (UUID)
+    const uuidRe = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (!uuidRe.test(data.locationId)) {
+      return reply.code(400).send({ error: 'Invalid locationId format' });
+    }
+
     // Validate module
     const mod = data.module || 'ele';
     const allowedIssues = MODULE_ISSUE_TYPES[mod] || ISSUE_TYPES;
@@ -160,14 +166,6 @@ async function publicRoutes(fastify, opts) {
     // Map issue type to a readable title
     const ISSUE_LABELS = {
       // Electrical
-      NOT_CLEAN: 'Room Not Clean',
-      BAD_SMELL: 'Bad Smell / Odor',
-      BROKEN_EQUIPMENT: 'Broken Equipment',
-      WATER_ISSUE: 'Water / Plumbing Issue',
-      PEST: 'Pest Problem',
-      LINEN: 'Linen / Bedding Issue',
-      WASTE: 'Waste Not Cleared',
-      // Electrical
       ELECTRICAL_FAULT: 'Electrical Fault',
       WIRING_ISSUE: 'Wiring Issue',
       POWER_OUTAGE: 'Power Outage',
@@ -176,6 +174,8 @@ async function publicRoutes(fastify, opts) {
       FAN_NOT_WORKING: 'Fan Not Working',
       AC_NOT_WORKING: 'AC Not Working',
       SWITCH_SOCKET_ISSUE: 'Switch / Socket Issue',
+      BROKEN_EQUIPMENT: 'Broken Equipment',
+      WATER_ISSUE: 'Water / Plumbing Issue',
       // Civil
       STRUCTURAL_DAMAGE: 'Structural Damage',
       PLUMBING_LEAK: 'Plumbing Leak',

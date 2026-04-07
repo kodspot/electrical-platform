@@ -284,7 +284,7 @@ function generateSuggestions(orgDataContext) {
   const suggestions = [
     { text: "How's today's inspection progress?", icon: '📊' },
     { text: 'Show me late submissions today', icon: '⏰' },
-    { text: 'Which rooms are still pending?', icon: '🏠' }
+    { text: 'Which locations are still pending?', icon: '🏠' }
   ];
 
   // Dynamic suggestions based on context
@@ -598,7 +598,7 @@ async function aiRoutes(fastify, opts) {
 
     const PROMPTS = {
       'daily-summary': `Provide a comprehensive daily operations summary. Include: overall completion rate, which shifts are performing well, any concerning patterns, and 2-3 actionable items for today. Format with clear headings and bullet points.\n\nDATA:\n${orgDataContext}`,
-      'best-performers': `Identify the best performing supervisors and workers. Look at: who has the most cleaned rooms, who is consistently on time (no late submissions), who covers the most shifts. Rank top performers with specific data points. If not enough data, say so.\n\nDATA:\n${orgDataContext}`,
+      'best-performers': `Identify the best performing supervisors and electricians. Look at: who has the most inspections completed, who is consistently on time (no late submissions), who covers the most shifts. Rank top performers with specific data points. If not enough data, say so.\n\nDATA:\n${orgDataContext}`,
       'underperformers': `Identify areas needing improvement. Look at: supervisors with late submissions, shifts with low completion, locations frequently pending, attendance issues. Be constructive — suggest specific improvements. If data is limited, acknowledge it.\n\nDATA:\n${orgDataContext}`,
       'shift-analysis': `Analyze shift performance in detail. Compare Morning, Afternoon, Night, and General shifts. Which have best completion rates? Which have most late submissions? Are there coverage gaps? Provide specific scheduling recommendations.\n\nDATA:\n${orgDataContext}`,
       'attendance-insights': `Analyze workforce attendance patterns. Overall attendance rate? Concerning absence patterns? How does attendance correlate with inspection completion? Suggest improvements if needed.\n\nDATA:\n${orgDataContext}`,

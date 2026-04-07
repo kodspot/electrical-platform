@@ -38,21 +38,24 @@ async function getLocationAncestors(locationId, maxDepth = 10) {
  * Get all descendant location IDs for a given location.
  * Returns flat array of child + grandchild + ... IDs.
  */
-async function getLocationDescendants(locationId, orgId) {
+async function getLocationDescendants(locationId, orgId, maxDepth = 10) {
   const descendants = [];
+  const visited = new Set();
 
-  async function walkChildren(parentId) {
+  async function walkChildren(parentId, depth) {
+    if (depth >= maxDepth || visited.has(parentId)) return;
+    visited.add(parentId);
     const children = await prisma.location.findMany({
       where: { parentId, orgId, isActive: true },
       select: { id: true }
     });
     for (const child of children) {
       descendants.push(child.id);
-      await walkChildren(child.id);
+      await walkChildren(child.id, depth + 1);
     }
   }
 
-  await walkChildren(locationId);
+  await walkChildren(locationId, 0);
   return descendants;
 }
 

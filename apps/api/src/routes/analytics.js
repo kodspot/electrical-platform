@@ -665,6 +665,101 @@ async function analyticsRoutes(fastify, opts) {
     };
   });
 
+  // Location heatmap — inspection status per location per day
+  fastify.get('/analytics/room-heatmap', async (request, reply) => {
+    const orgId = request.user.orgId;
+    const { from, to } = request.query;
+
+    const dateRe = /^\d{4}-\d{2}-\d{2}$/;
+    if (from && !dateRe.test(from)) return reply.code(400).send({ error: 'Invalid from date format. Use YYYY-MM-DD.' });
+    if (to && !dateRe.test(to)) return reply.code(400).send({ error: 'Invalid to date format. Use YYYY-MM-DD.' });
+
+    const periodStart = from ? new Date(from + 'T00:00:00') : (() => { const d = new Date(); d.setDate(d.getDate() - 6); d.setHours(0,0,0,0); return d; })();
+    const periodEnd = to ? new Date(to + 'T23:59:59.999') : (() => { const d = new Date(); d.setHours(23,59,59,999); return d; })();
+    if (isNaN(periodStart.getTime()) || isNaN(periodEnd.getTime())) return reply.code(400).send({ error: 'Invalid date value.' });
+
+    // Cap at 90 days
+    const maxMs = 90 * 24 * 60 * 60 * 1000;
+    if (periodEnd - periodStart > maxMs) return reply.code(400).send({ error: 'Date range cannot exceed 90 days.' });
+
+    // Build dates array
+    const dates = [];
+    const d = new Date(periodStart);
+    while (d <= periodEnd) {
+      dates.push(d.toISOString().split('T')[0]);
+      d.setDate(d.getDate() + 1);
+    }
+    if (dates.length === 0) return { dates: [], locations: [] };
+
+    const todayStr = new Date().toISOString().split('T')[0];
+
+    // Fetch all leaf locations
+    const locations = await prisma.location.findMany({
+      where: { orgId, isActive: true, type: { notIn: ['BUILDING', 'FLOOR'] } },
+      select: {
+        id: true, name: true, type: true,
+        parent: { select: { name: true } }
+      },
+      orderBy: [{ type: 'asc' }, { name: 'asc' }]
+    });
+
+    if (locations.length === 0) return { dates, locations: [] };
+
+    // Fetch all inspections in the range, grouped by location + date
+    const inspections = await prisma.electricalInspection.findMany({
+      where: { orgId, inspectedAt: { gte: periodStart, lte: periodEnd } },
+      select: { locationId: true, inspectedAt: true, faultyCount: true }
+    });
+
+    // Build lookup: locationId → dateStr → { count, faults }
+    const inspMap = new Map();
+    for (const insp of inspections) {
+      const dateStr = insp.inspectedAt.toISOString().split('T')[0];
+      const key = insp.locationId + '|' + dateStr;
+      if (!inspMap.has(key)) inspMap.set(key, { count: 0, faults: 0 });
+      const entry = inspMap.get(key);
+      entry.count++;
+      entry.faults += insp.faultyCount;
+    }
+
+    // Build response
+    const result = locations.map(loc => {
+      let inspectedDays = 0;
+      let pastDays = 0;
+
+      const days = dates.map(dateStr => {
+        const key = loc.id + '|' + dateStr;
+        const data = inspMap.get(key);
+
+        if (dateStr > todayStr) {
+          return { status: 'UPCOMING', done: 0, required: 1 };
+        }
+
+        pastDays++;
+        if (data && data.count > 0) {
+          inspectedDays++;
+          if (data.faults > 0) {
+            return { status: 'PARTIAL', done: data.count, required: 1 };
+          }
+          return { status: 'CLEANED', done: data.count, required: 1 };
+        }
+        return { status: 'NOT_CLEANED', done: 0, required: 1 };
+      });
+
+      const score = pastDays > 0 ? Math.round(inspectedDays / pastDays * 100) : 0;
+
+      return {
+        id: loc.id,
+        name: loc.name,
+        parentName: loc.parent?.name || null,
+        score,
+        days
+      };
+    });
+
+    return { dates, locations: result };
+  });
+
   // Location inspection history — single location drill-down
   fastify.get('/analytics/location/:id/history', async (request, reply) => {
     const orgId = request.user.orgId;

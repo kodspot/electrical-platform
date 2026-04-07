@@ -7,7 +7,12 @@ const { prisma } = require('../lib/prisma');
 const { authenticateJWT, requireRole } = require('../middleware/auth');
 const { APP_URL } = require('../config/env');
 
-const LOCATION_TYPES = ['BUILDING', 'FLOOR', 'ROOM', 'CORRIDOR', 'WASHROOM', 'ICU', 'LOBBY', 'KITCHEN', 'WARD', 'MEETING_ROOM', 'OTHER'];
+const LOCATION_TYPES = [
+  'BUILDING', 'FLOOR', 'ROOM', 'CORRIDOR', 'WASHROOM', 'ICU', 'LOBBY', 'KITCHEN', 'WARD', 'MEETING_ROOM',
+  'HOSTEL', 'SUBSTATION', 'PANEL_ROOM', 'GENERATOR_ROOM', 'TRANSFORMER', 'UTILITY_AREA',
+  'LAB', 'SERVER_ROOM', 'STAIRCASE', 'TERRACE', 'PARKING', 'CANTEEN', 'AUDITORIUM', 'LIBRARY',
+  'OFFICE', 'STORE_ROOM', 'PUMP_ROOM', 'LIFT_ROOM', 'RECEPTION', 'COMMON_AREA', 'OTHER'
+];
 
 // Generate 8-char alphanumeric QR code
 async function generateUniqueQrCode(maxAttempts = 10) {
