@@ -207,7 +207,7 @@
   <!-- Orgs Tab -->
   <div class="tab-panel active" id="tab-orgs">
     <div class="sa-toolbar">
-      <input type="text" class="form-input" placeholder="Search organizations…" id="orgSearch" oninput="debouncedOrgSearch()">
+      <input type="text" class="form-input" placeholder="Search organizations…" id="orgSearch" oninput="debouncedOrgSearch()" autocomplete="off">
       <div class="sa-toolbar-spacer"></div>
       <button class="btn btn-sa" onclick="openOrgModal()">+ New Organization</button>
     </div>
@@ -1302,6 +1302,7 @@ async function saveAiConfig() {
 }
 
 // ─── Init ───
+$('orgSearch').value = '';
 loadStats();
 loadOrgs();
 </script>
