@@ -43,7 +43,7 @@ async function pageRoutes(fastify) {
   function isStaticFile(str) { return str.includes('.'); }
 
   // Known static asset directories in /public
-  var STATIC_DIRS = new Set(['css', 'js']);
+  var STATIC_DIRS = new Set(['css', 'js', '.well-known']);
 
   // ── Static pages ──
   fastify.get('/', sendPage('index.html'));
