@@ -82,11 +82,18 @@ window.App = (function () {
   }
 
   // ─── Token Management ───
+  // Admin uses 'token'/'user', SuperAdmin uses 'sa_token'/'sa_user', Supervisor uses 'sup_token'/'sup_user'
   function getToken() { return localStorage.getItem('token'); }
+  function getSAToken() { return localStorage.getItem('sa_token'); }
   function getSupToken() { return localStorage.getItem('sup_token'); }
 
   function getUser() {
     try { return JSON.parse(localStorage.getItem('user') || '{}'); }
+    catch { return {}; }
+  }
+
+  function getSAUser() {
+    try { return JSON.parse(localStorage.getItem('sa_user') || '{}'); }
     catch { return {}; }
   }
 
@@ -96,7 +103,9 @@ window.App = (function () {
   }
 
   function adminHeaders(includeJson) {
-    const h = { 'Authorization': 'Bearer ' + getToken() };
+    // SA entering an org uses sa_token, regular admin uses token
+    const t = getToken() || getSAToken();
+    const h = { 'Authorization': 'Bearer ' + t };
     if (includeJson !== false) h['Content-Type'] = 'application/json';
     const oid = localStorage.getItem('selectedOrgId');
     if (oid) h['X-Org-Id'] = oid;
@@ -107,9 +116,18 @@ window.App = (function () {
     return { 'Authorization': 'Bearer ' + getSupToken() };
   }
 
+  function saHeaders(includeJson) {
+    const h = { 'Authorization': 'Bearer ' + getSAToken() };
+    if (includeJson !== false) h['Content-Type'] = 'application/json';
+    const oid = localStorage.getItem('selectedOrgId');
+    if (oid) h['X-Org-Id'] = oid;
+    return h;
+  }
+
   // ─── API Fetch with Retry ───
   function _adminLoginRedirect() {
-    try { var u = JSON.parse(localStorage.getItem('user') || '{}'); if (u.role === 'SUPER_ADMIN') return '/superadmin-login'; } catch(e) {}
+    // If this was an SA-entering-admin context, redirect to SA login
+    if (getSAToken() && !getToken()) return '/superadmin-login';
     return orgPath('admin-login');
   }
 
@@ -117,8 +135,9 @@ window.App = (function () {
     opts = opts || {};
     const headers = { ...adminHeaders(!(opts.body instanceof FormData)), ...(opts.headers || {}) };
     if (opts.body instanceof FormData) delete headers['Content-Type'];
+    var scope = (getSAToken() && !getToken()) ? 'sa' : 'admin';
     const fetchOpts = { ...opts, headers };
-    return _doFetch(path, fetchOpts, _adminLoginRedirect());
+    return _doFetch(path, fetchOpts, _adminLoginRedirect(), scope);
   }
 
   async function supFetch(path, opts) {
@@ -127,18 +146,32 @@ window.App = (function () {
     if (opts.body instanceof FormData) delete headers['Content-Type'];
     else if (opts.body && typeof opts.body === 'string') headers['Content-Type'] = 'application/json';
     const fetchOpts = { ...opts, headers };
-    return _doFetch(path, fetchOpts, orgPath('supervisor-login'));
+    return _doFetch(path, fetchOpts, orgPath('supervisor-login'), 'supervisor');
   }
 
-  async function _doFetch(path, fetchOpts, loginRedirect) {
+  async function saFetch(path, opts) {
+    opts = opts || {};
+    const headers = { ...saHeaders(!(opts.body instanceof FormData)), ...(opts.headers || {}) };
+    if (opts.body instanceof FormData) delete headers['Content-Type'];
+    const fetchOpts = { ...opts, headers };
+    return _doFetch(path, fetchOpts, '/superadmin-login', 'sa');
+  }
+
+  async function _doFetch(path, fetchOpts, loginRedirect, scope) {
     var lastErr;
     for (var i = 0; i < 3; i++) {
       try {
         var res = await fetch(API + path, fetchOpts);
         if (res.status === 401) {
-          localStorage.removeItem('token'); localStorage.removeItem('user');
-          localStorage.removeItem('sup_token'); localStorage.removeItem('sup_user');
-          localStorage.removeItem('selectedOrgId'); localStorage.removeItem('selectedOrgName');
+          // Only clear the token for the scope that got 401
+          if (scope === 'sa') {
+            localStorage.removeItem('sa_token'); localStorage.removeItem('sa_user');
+            localStorage.removeItem('selectedOrgId'); localStorage.removeItem('selectedOrgName');
+          } else if (scope === 'supervisor') {
+            localStorage.removeItem('sup_token'); localStorage.removeItem('sup_user');
+          } else {
+            localStorage.removeItem('token'); localStorage.removeItem('user');
+          }
           location.href = loginRedirect;
           return null;
         }
@@ -175,29 +208,43 @@ window.App = (function () {
     if (!ct.includes('application/json')) return null;
     return res.json();
   }
+  async function saFetchJson(path, opts) {
+    var res = await saFetch(path, opts);
+    if (!res) return null;
+    var ct = (res.headers.get('content-type') || '');
+    if (!ct.includes('application/json')) return null;
+    return res.json();
+  }
 
   // ─── Logout ───
-  function _clearAuthStorage() {
-    ['token','user','sup_token','sup_user','orgSlug','orgName','activeModule','selectedOrgId','selectedOrgName'].forEach(function(k) { localStorage.removeItem(k); });
+  function _clearAdminStorage() {
+    ['token','user','orgSlug','orgName','activeModule','enabledModules'].forEach(function(k) { localStorage.removeItem(k); });
+  }
+
+  function _clearSAStorage() {
+    ['sa_token','sa_user','selectedOrgId','selectedOrgName'].forEach(function(k) { localStorage.removeItem(k); });
+  }
+
+  function _clearSupStorage() {
+    ['sup_token','sup_user'].forEach(function(k) { localStorage.removeItem(k); });
   }
 
   function logout() {
     var slug = getOrgSlug();
     var mod = getModule();
-    _clearAuthStorage();
+    _clearAdminStorage();
     location.href = slug ? '/' + slug + '/' + mod + '/admin-login' : '/admin-login';
   }
 
   function logoutSA() {
-    _clearAuthStorage();
+    _clearSAStorage();
     location.href = '/superadmin-login';
   }
 
   function logoutSup() {
     var slug = getOrgSlug();
     var mod = getModule();
-    localStorage.removeItem('sup_token');
-    localStorage.removeItem('sup_user');
+    _clearSupStorage();
     location.href = slug ? '/' + slug + '/' + mod + '/supervisor-login' : '/supervisor-login';
   }
 
@@ -297,9 +344,10 @@ window.App = (function () {
   }
 
   function initAdmin(activePage) {
-    if (!getToken()) { location.href = orgPath('admin-login'); return false; }
-    var user = getUser();
-    if (user.role === 'SUPER_ADMIN' && !localStorage.getItem('selectedOrgId')) {
+    var isSA = !!getSAToken();
+    if (!getToken() && !isSA) { location.href = orgPath('admin-login'); return false; }
+    var user = isSA ? getSAUser() : getUser();
+    if (isSA && !localStorage.getItem('selectedOrgId')) {
       location.href = '/superadmin-dashboard'; return false;
     }
 
@@ -333,7 +381,7 @@ window.App = (function () {
     _buildUserMenu(user, 'admin');
 
     // SA Banner
-    if (user.role === 'SUPER_ADMIN') {
+    if (isSA) {
       var banner = $('sa-banner');
       if (banner) {
         var orgName = localStorage.getItem('selectedOrgName') || 'Org';
@@ -652,7 +700,7 @@ window.App = (function () {
     var entry = entries[idx];
     // Re-attach current auth token
     var headers = entry.headers || {};
-    var token = getToken() || getSupToken();
+    var token = getToken() || getSAToken() || getSupToken();
     if (token) headers['Authorization'] = 'Bearer ' + token;
     fetch(entry.url, { method: entry.method, headers: headers, body: entry.body || undefined })
       .then(function (res) {
@@ -754,7 +802,7 @@ window.App = (function () {
   // ─── Image URL with auth token ───
   function imgUrl(src) {
     if (!src) return '';
-    var t = getToken() || getSupToken();
+    var t = getToken() || getSAToken() || getSupToken();
     if (!t || !src.startsWith('/images/')) return src;
     // Image proxy lives at /api/images/* but stored URLs omit /api prefix
     return '/api' + src + (src.includes('?') ? '&' : '?') + 'token=' + t;
@@ -858,7 +906,7 @@ window.App = (function () {
 
   function _connectSSE() {
     // Determine auth token and SSE endpoint
-    var token = getToken() || getSupToken();
+    var token = getToken() || getSAToken() || getSupToken();
     if (!token || typeof EventSource === 'undefined') {
       // Browser doesn't support SSE or no token — use polling fallback
       _startPolling();
@@ -1175,9 +1223,11 @@ window.App = (function () {
     getOrgSlug: getOrgSlug, orgPath: orgPath,
     getModule: getModule, modulePath: modulePath,
     getEnabledModules: getEnabledModules, isModuleEnabled: isModuleEnabled,
-    getToken: getToken, getSupToken: getSupToken, getUser: getUser, getSupUser: getSupUser,
-    adminHeaders: adminHeaders, supHeaders: supHeaders,
+    getToken: getToken, getSAToken: getSAToken, getSupToken: getSupToken,
+    getUser: getUser, getSAUser: getSAUser, getSupUser: getSupUser,
+    adminHeaders: adminHeaders, saHeaders: saHeaders, supHeaders: supHeaders,
     apiFetch: apiFetch, apiFetchJson: apiFetchJson,
+    saFetch: saFetch, saFetchJson: saFetchJson,
     supFetch: supFetch, supFetchJson: supFetchJson,
     logout: logout, logoutSA: logoutSA, logoutSup: logoutSup,
     toast: toast, confirmDialog: confirmDialog,

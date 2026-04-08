@@ -571,14 +571,14 @@
 </div>
 
 <script src="/js/offline-sync.js?v=1"></script>
-<script src="/js/app.js?v=11"></script>
+<script src="/js/app.js?v=12"></script>
 <script src="/js/custom-select.js"></script>
 <script>
 var esc = App.esc, $ = App.$, fmtDate = App.fmtDate;
 
 // Auth check
-var token = App.getToken();
-var user = App.getUser();
+var token = App.getSAToken();
+var user = App.getSAUser();
 if (!token || user.role !== 'SUPER_ADMIN') { App.logoutSA(); throw ''; }
 App.buildUserMenu(user, 'superadmin');
 localStorage.removeItem('selectedOrgId');
@@ -608,7 +608,7 @@ document.querySelectorAll('.sa-tab').forEach(function(btn) {
 
 // ─── Load Stats ───
 async function loadStats() {
-  var data = await App.apiFetchJson('/superadmin/analytics');
+  var data = await App.saFetchJson('/superadmin/analytics');
   if (!data) return;
   $('statsGrid').innerHTML =
     statCard('Organizations', data.totalOrgs, 'Active: ' + data.activeOrgs, '') +
@@ -633,7 +633,7 @@ function statCard(label, value, sub, cls) {
 async function loadOrgs() {
   var search = $('orgSearch').value.trim();
   var url = '/superadmin/organizations' + (search ? '?search=' + encodeURIComponent(search) : '');
-  var orgs = await App.apiFetchJson(url);
+  var orgs = await App.saFetchJson(url);
   if (!orgs) return;
   allOrgs = orgs;
   populateOrgSelects();
@@ -748,7 +748,7 @@ $('orgForm').addEventListener('submit', async function(e) {
   v = $('orgAddress').value.trim(); if (v) body.address = v; else body.address = '';
   if (id) body.status = $('orgStatus').value;
   var btn = e.target.querySelector('[type=submit]'); btn.disabled = true; btn.textContent = 'Saving…';
-  var res = await App.apiFetch(id ? '/superadmin/organizations/' + id : '/superadmin/organizations', { method: id ? 'PATCH' : 'POST', body: JSON.stringify(body) });
+  var res = await App.saFetch(id ? '/superadmin/organizations/' + id : '/superadmin/organizations', { method: id ? 'PATCH' : 'POST', body: JSON.stringify(body) });
   btn.disabled = false; btn.textContent = 'Save';
   if (!res) return;
   if (!res.ok) { var d = await res.json(); App.showError('orgError', d.error || 'Failed'); return; }
@@ -758,7 +758,7 @@ $('orgForm').addEventListener('submit', async function(e) {
 
 async function deleteOrg(id) {
   if (!await App.confirmDialog('Delete this organization? It will be purged after 30 days.')) return;
-  var res = await App.apiFetch('/superadmin/organizations/' + id, { method: 'DELETE' });
+  var res = await App.saFetch('/superadmin/organizations/' + id, { method: 'DELETE' });
   if (!res) return;
   if (!res.ok) { App.toast('Failed to delete', 'error'); return; }
   App.toast('Organization deleted', 'success'); loadOrgs(); loadStats();
@@ -771,7 +771,7 @@ async function loadUsers(role) {
   var orgId = filterEl.value;
   var params = ['role=' + role];
   if (orgId) params.push('orgId=' + orgId);
-  var users = await App.apiFetchJson('/superadmin/users?' + params.join('&'));
+  var users = await App.saFetchJson('/superadmin/users?' + params.join('&'));
   if (!users) return;
   if (!users.length) {
     var _emptyIcon = role === 'ADMIN' ? '<svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" opacity=".5"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>' : '<svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" opacity=".5"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>';
@@ -813,7 +813,7 @@ $('editUserForm').addEventListener('submit', async function(e) {
   var phone = $('euPhone').value.trim(); if (phone) body.phone = phone; else body.phone = '';
   var orgId = $('euOrg').value; if (orgId) body.orgId = orgId;
   var btn = $('euSubmitBtn'); btn.disabled = true; btn.textContent = 'Saving…';
-  var res = await App.apiFetch('/superadmin/users/' + id, { method: 'PATCH', body: JSON.stringify(body) });
+  var res = await App.saFetch('/superadmin/users/' + id, { method: 'PATCH', body: JSON.stringify(body) });
   btn.disabled = false; btn.textContent = 'Save Changes';
   if (!res) return;
   if (!res.ok) { var d = await res.json(); App.showError('editUserError', d.error || 'Failed', d.details); return; }
@@ -823,7 +823,7 @@ $('editUserForm').addEventListener('submit', async function(e) {
 
 async function toggleUserActive(id, activate, role) {
   if (!await App.confirmDialog(activate ? 'Activate this user?' : 'Deactivate this user? They will be unable to log in.')) return;
-  var res = await App.apiFetch('/superadmin/users/' + id, { method: 'PATCH', body: JSON.stringify({ isActive: activate }) });
+  var res = await App.saFetch('/superadmin/users/' + id, { method: 'PATCH', body: JSON.stringify({ isActive: activate }) });
   if (!res) return;
   if (!res.ok) { App.toast('Failed', 'error'); return; }
   App.toast(activate ? 'User activated' : 'User deactivated', 'success'); loadUsers(role); loadStats();
@@ -838,7 +838,7 @@ function openPwReset(userId, userName) {
 $('pwForm').addEventListener('submit', async function(e) {
   e.preventDefault();
   var btn = e.target.querySelector('[type=submit]'); btn.disabled = true; btn.textContent = 'Resetting…';
-  var res = await App.apiFetch('/superadmin/users/' + $('pwUserId').value + '/password', { method: 'PATCH', body: JSON.stringify({ password: $('pwNew').value }) });
+  var res = await App.saFetch('/superadmin/users/' + $('pwUserId').value + '/password', { method: 'PATCH', body: JSON.stringify({ password: $('pwNew').value }) });
   btn.disabled = false; btn.textContent = 'Reset Password';
   if (!res) return;
   if (!res.ok) { var d = await res.json(); App.showError('pwError', d.error || 'Failed', d.details); return; }
@@ -860,7 +860,7 @@ $('adminForm').addEventListener('submit', async function(e) {
   var body = { name: $('adminName').value.trim(), email: $('adminEmail').value.trim(), password: $('adminPw').value };
   var phone = $('adminPhone').value.trim(); if (phone) body.phone = phone;
   var btn = e.target.querySelector('[type=submit]'); btn.disabled = true; btn.textContent = 'Creating…';
-  var res = await App.apiFetch('/superadmin/organizations/' + orgId + '/admins', { method: 'POST', body: JSON.stringify(body) });
+  var res = await App.saFetch('/superadmin/organizations/' + orgId + '/admins', { method: 'POST', body: JSON.stringify(body) });
   btn.disabled = false; btn.textContent = 'Create Admin';
   if (!res) return;
   if (!res.ok) { var d = await res.json(); App.showError('adminError', d.error || 'Failed', d.details); return; }
@@ -882,7 +882,7 @@ $('supForm').addEventListener('submit', async function(e) {
   var body = { name: $('supName').value.trim(), email: $('supEmail').value.trim(), password: $('supPw').value };
   var phone = $('supPhone').value.trim(); if (phone) body.phone = phone;
   var btn = e.target.querySelector('[type=submit]'); btn.disabled = true; btn.textContent = 'Creating…';
-  var res = await App.apiFetch('/superadmin/organizations/' + orgId + '/supervisors', { method: 'POST', body: JSON.stringify(body) });
+  var res = await App.saFetch('/superadmin/organizations/' + orgId + '/supervisors', { method: 'POST', body: JSON.stringify(body) });
   btn.disabled = false; btn.textContent = 'Create Supervisor';
   if (!res) return;
   if (!res.ok) { var d = await res.json(); App.showError('supError', d.error || 'Failed', d.details); return; }
@@ -893,7 +893,7 @@ $('supForm').addEventListener('submit', async function(e) {
 async function loadWorkers() {
   var orgId = $('workerOrgFilter').value;
   if (!orgId) { $('workerBody').innerHTML = '<tr><td colspan="6"><div class="empty-state"><div class="empty-state-icon"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" opacity=".5"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg></div>Select an organization above</div></td></tr>'; return; }
-  var workers = await App.apiFetchJson('/superadmin/organizations/' + orgId + '/workers');
+  var workers = await App.saFetchJson('/superadmin/organizations/' + orgId + '/workers');
   if (!workers) return;
   if (!workers.length) {
     $('workerBody').innerHTML = '<tr><td colspan="6"><div class="empty-state"><div class="empty-state-icon"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" opacity=".5"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg></div>No workers in this org</div></td></tr>';
@@ -946,7 +946,7 @@ $('workerForm').addEventListener('submit', async function(e) {
   if (id) { url = '/superadmin/workers/' + id; method = 'PATCH'; }
   else { url = '/superadmin/organizations/' + $('wOrg').value + '/workers'; method = 'POST'; }
   var btn = e.target.querySelector('[type=submit]'); btn.disabled = true; btn.textContent = 'Saving…';
-  var res = await App.apiFetch(url, { method: method, body: JSON.stringify(body) });
+  var res = await App.saFetch(url, { method: method, body: JSON.stringify(body) });
   btn.disabled = false; btn.textContent = 'Save';
   if (!res) return;
   if (!res.ok) { var d = await res.json(); App.showError('workerError', d.error || 'Failed', d.details); return; }
@@ -955,7 +955,7 @@ $('workerForm').addEventListener('submit', async function(e) {
 
 async function toggleWorker(id, activate) {
   if (!await App.confirmDialog(activate ? 'Activate this worker?' : 'Deactivate this worker?')) return;
-  var res = await App.apiFetch('/superadmin/workers/' + id, { method: 'PATCH', body: JSON.stringify({ isActive: activate }) });
+  var res = await App.saFetch('/superadmin/workers/' + id, { method: 'PATCH', body: JSON.stringify({ isActive: activate }) });
   if (!res) return;
   if (!res.ok) { App.toast('Failed', 'error'); return; }
   App.toast(activate ? 'Worker activated' : 'Worker deactivated', 'success'); loadWorkers();
@@ -963,7 +963,7 @@ async function toggleWorker(id, activate) {
 
 // ─── Analytics ───
 async function loadAnalyticsTab() {
-  var data = await App.apiFetchJson('/superadmin/analytics');
+  var data = await App.saFetchJson('/superadmin/analytics');
   if (!data) return;
 
   // System metrics
@@ -991,7 +991,7 @@ async function loadAnalyticsTab() {
   }
 
   // Per-org breakdown
-  var orgsData = await App.apiFetchJson('/superadmin/analytics/orgs');
+  var orgsData = await App.saFetchJson('/superadmin/analytics/orgs');
   if (orgsData && orgsData.length) {
     $('orgBreakdown').innerHTML = orgsData.map(function(o) {
       var c = o._count || {};
@@ -1025,7 +1025,7 @@ async function loadAuditLogs(reset) {
   if (orgId) params.push('orgId=' + orgId);
   if (action) params.push('action=' + encodeURIComponent(action));
 
-  var data = await App.apiFetchJson('/superadmin/audit-logs?' + params.join('&'));
+  var data = await App.saFetchJson('/superadmin/audit-logs?' + params.join('&'));
   if (!data) return;
 
   $('auditCount').textContent = data.total > 0 ? ('Showing ' + Math.min(auditOffset + 1, data.total) + '–' + Math.min(auditOffset + data.logs.length, data.total) + ' of ' + data.total) : '';
@@ -1150,7 +1150,7 @@ async function fetchLoginQR(orgId, mod, role) {
   var el = $('qr-' + mod + '-' + role);
   if (!el) return;
   try {
-    var res = await App.apiFetch('/superadmin/organizations/' + orgId + '/login-qr?mod=' + mod + '&role=' + role);
+    var res = await App.saFetch('/superadmin/organizations/' + orgId + '/login-qr?mod=' + mod + '&role=' + role);
     if (res && res.ok) {
       var svg = await res.text();
       el.innerHTML = svg;
@@ -1207,7 +1207,7 @@ async function openAiConfig(orgId, orgName) {
   App.hideError('aiConfigError');
   App.openModal('aiConfigModal');
 
-  var res = await App.apiFetch('/superadmin/organizations/' + orgId + '/ai-config');
+  var res = await App.saFetch('/superadmin/organizations/' + orgId + '/ai-config');
   if (!res || !res.ok) { App.showError('aiConfigError', 'Failed to load AI config'); return; }
   var cfg = await res.json();
 
@@ -1286,7 +1286,7 @@ async function saveAiConfig() {
   btn.disabled = true; btn.textContent = 'Saving…';
   App.hideError('aiConfigError');
 
-  var res = await App.apiFetch('/superadmin/organizations/' + orgId + '/ai-config', {
+  var res = await App.saFetch('/superadmin/organizations/' + orgId + '/ai-config', {
     method: 'PATCH',
     body: JSON.stringify(body)
   });
