@@ -344,7 +344,8 @@ window.App = (function () {
   }
 
   function initAdmin(activePage) {
-    var isSA = !!getSAToken();
+    // isSA = SA browsing admin pages via "Enter Org" (SA token present, NO admin token)
+    var isSA = !getToken() && !!getSAToken();
     if (!getToken() && !isSA) { location.href = orgPath('admin-login'); return false; }
     var user = isSA ? getSAUser() : getUser();
     if (isSA && !localStorage.getItem('selectedOrgId')) {
