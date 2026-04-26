@@ -15,7 +15,8 @@ const MODULE_PAGES = [
   'admin-predictions',
   'supervisor-login', 'supervisor-scan', 'supervisor-tickets',
   'supervisor-attendance', 'supervisor-electrical',
-  'supervisor-assets'
+  'supervisor-assets',
+  'electrician-login', 'electrician-tickets'
 ];
 
 // Module metadata for dynamic manifests
@@ -111,7 +112,9 @@ async function pageRoutes(fastify) {
       lang: 'en-IN',
       icons: [
         { src: '/android-chrome-192x192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
-        { src: '/android-chrome-512x512.png', sizes: '512x512', type: 'image/png', purpose: 'any' }
+        { src: '/android-chrome-512x512.png', sizes: '512x512', type: 'image/png', purpose: 'any' },
+        { src: '/maskable-icon-192x192.png', sizes: '192x192', type: 'image/png', purpose: 'maskable' },
+        { src: '/maskable-icon-512x512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' }
       ]
     };
     reply.header('Content-Type', 'application/manifest+json');
@@ -129,14 +132,14 @@ async function pageRoutes(fastify) {
     const scope = `/${orgSlug}/${mod}/`;
 
     const swCode = `// ${meta.name} — Module Service Worker (auto-generated)
-const CACHE_NAME = 'kodspot-${mod}-v6';
+const CACHE_NAME = 'kodspot-${mod}-v7';
 const SCOPE = '${scope}';
 const OFFLINE_URL = '/offline.html';
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) =>
-      cache.addAll([OFFLINE_URL, '/css/design-system.css?v=7', '/js/app.js?v=7', '/favicon-32x32.png', '/android-chrome-192x192.png'])
+      cache.addAll([OFFLINE_URL, '/css/design-system.css?v=10', '/js/app.js?v=14', '/favicon-32x32.png', '/android-chrome-192x192.png'])
     )
   );
   self.skipWaiting();

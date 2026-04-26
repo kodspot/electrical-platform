@@ -82,10 +82,12 @@ window.App = (function () {
   }
 
   // ─── Token Management ───
-  // Admin uses 'token'/'user', SuperAdmin uses 'sa_token'/'sa_user', Supervisor uses 'sup_token'/'sup_user'
+  // Admin uses 'token'/'user', SuperAdmin uses 'sa_token'/'sa_user',
+  // Supervisor uses 'sup_token'/'sup_user', Electrician uses 'elec_token'/'elec_user'
   function getToken() { return localStorage.getItem('token'); }
   function getSAToken() { return localStorage.getItem('sa_token'); }
   function getSupToken() { return localStorage.getItem('sup_token'); }
+  function getElecToken() { return localStorage.getItem('elec_token'); }
 
   function getUser() {
     try { return JSON.parse(localStorage.getItem('user') || '{}'); }
@@ -99,6 +101,11 @@ window.App = (function () {
 
   function getSupUser() {
     try { return JSON.parse(localStorage.getItem('sup_user') || '{}'); }
+    catch { return {}; }
+  }
+
+  function getElecUser() {
+    try { return JSON.parse(localStorage.getItem('elec_user') || '{}'); }
     catch { return {}; }
   }
 
@@ -121,6 +128,12 @@ window.App = (function () {
     if (includeJson !== false) h['Content-Type'] = 'application/json';
     const oid = localStorage.getItem('selectedOrgId');
     if (oid) h['X-Org-Id'] = oid;
+    return h;
+  }
+
+  function elecHeaders(includeJson) {
+    const h = { 'Authorization': 'Bearer ' + getElecToken() };
+    if (includeJson !== false) h['Content-Type'] = 'application/json';
     return h;
   }
 
@@ -157,6 +170,14 @@ window.App = (function () {
     return _doFetch(path, fetchOpts, '/superadmin-login', 'sa');
   }
 
+  async function elecFetch(path, opts) {
+    opts = opts || {};
+    const headers = { ...elecHeaders(!(opts.body instanceof FormData)), ...(opts.headers || {}) };
+    if (opts.body instanceof FormData) delete headers['Content-Type'];
+    const fetchOpts = { ...opts, headers };
+    return _doFetch(path, fetchOpts, orgPath('electrician-login'), 'electrician');
+  }
+
   async function _doFetch(path, fetchOpts, loginRedirect, scope) {
     var lastErr;
     for (var i = 0; i < 3; i++) {
@@ -169,6 +190,8 @@ window.App = (function () {
             localStorage.removeItem('selectedOrgId'); localStorage.removeItem('selectedOrgName');
           } else if (scope === 'supervisor') {
             localStorage.removeItem('sup_token'); localStorage.removeItem('sup_user');
+          } else if (scope === 'electrician') {
+            localStorage.removeItem('elec_token'); localStorage.removeItem('elec_user');
           } else {
             localStorage.removeItem('token'); localStorage.removeItem('user');
           }
@@ -215,6 +238,13 @@ window.App = (function () {
     if (!ct.includes('application/json')) return null;
     return res.json();
   }
+  async function elecFetchJson(path, opts) {
+    var res = await elecFetch(path, opts);
+    if (!res) return null;
+    var ct = (res.headers.get('content-type') || '');
+    if (!ct.includes('application/json')) return null;
+    return res.json();
+  }
 
   // ─── Logout ───
   function _clearAdminStorage() {
@@ -227,6 +257,10 @@ window.App = (function () {
 
   function _clearSupStorage() {
     ['sup_token','sup_user'].forEach(function(k) { localStorage.removeItem(k); });
+  }
+
+  function _clearElecStorage() {
+    ['elec_token','elec_user'].forEach(function(k) { localStorage.removeItem(k); });
   }
 
   function logout() {
@@ -246,6 +280,13 @@ window.App = (function () {
     var mod = getModule();
     _clearSupStorage();
     location.href = slug ? '/' + slug + '/' + mod + '/supervisor-login' : '/supervisor-login';
+  }
+
+  function logoutElec() {
+    var slug = getOrgSlug();
+    var mod = getModule();
+    _clearElecStorage();
+    location.href = slug ? '/' + slug + '/' + mod + '/electrician-login' : '/electrician-login';
   }
 
   // ─── Toast Notifications ───
@@ -436,6 +477,19 @@ window.App = (function () {
     return true;
   }
 
+  function initElectrician() {
+    if (!getElecToken()) { location.href = orgPath('electrician-login'); return false; }
+    var user = getElecUser();
+
+    var mod = getModule();
+    localStorage.setItem('activeModule', mod);
+    initModulePWA();
+    _applyOrgBrand();
+
+    _buildUserMenu(user, 'electrician');
+    return true;
+  }
+
   function _buildUserMenu(user, role) {
     var topRight = document.querySelector('.topbar-right');
     if (!topRight) return;
@@ -447,7 +501,13 @@ window.App = (function () {
     var parts = name.trim().split(/\s+/);
     var initials = parts.length > 1 ? (parts[0][0] + parts[parts.length - 1][0]).toUpperCase() : parts[0].substring(0, 2).toUpperCase();
 
-    var roleLabel = user.role === 'SUPER_ADMIN' ? 'Super Admin' : role === 'supervisor' ? 'Supervisor' : 'Admin';
+    var roleLabel = user.role === 'SUPER_ADMIN'
+      ? 'Super Admin'
+      : role === 'supervisor'
+        ? 'Supervisor'
+        : role === 'electrician'
+          ? 'Electrician'
+          : 'Admin';
 
     // Build user menu wrap
     var wrap = document.createElement('div');
@@ -513,6 +573,7 @@ window.App = (function () {
     var logoutEl = wrap.querySelector('#userMenuLogout');
     logoutEl.addEventListener('click', function() {
       if (role === 'supervisor') { logoutSup(); }
+      else if (role === 'electrician') { logoutElec(); }
       else if (role === 'superadmin') { logoutSA(); }
       else { logout(); }
     });
@@ -521,13 +582,24 @@ window.App = (function () {
   // ─── Profile Modal ───
   function _openProfileModal(role) {
     // Determine fetcher and token
-    var fetcher = role === 'supervisor' ? supFetch : apiFetch;
+    var fetcher = role === 'supervisor' ? supFetch : role === 'electrician' ? elecFetch : apiFetch;
+    var profilePath = role === 'electrician' ? '/auth/worker-me' : '/auth/me';
     _showProfileLoading();
-    fetcher('/auth/me').then(function(res) {
+    fetcher(profilePath).then(function(res) {
       if (!res || !res.ok) { _showProfileError(); return; }
       return res.json();
     }).then(function(data) {
       if (!data) return;
+      if (role === 'electrician' && data.worker) {
+        data = {
+          name: data.worker.name,
+          email: data.worker.email,
+          phone: data.worker.phone,
+          role: 'ELECTRICIAN',
+          createdAt: null,
+          org: data.org || null
+        };
+      }
       _renderProfileModal(data, role);
     }).catch(function() {
       _showProfileError();
@@ -701,7 +773,7 @@ window.App = (function () {
     var entry = entries[idx];
     // Re-attach current auth token
     var headers = entry.headers || {};
-    var token = getToken() || getSAToken() || getSupToken();
+    var token = getToken() || getSAToken() || getSupToken() || getElecToken();
     if (token) headers['Authorization'] = 'Bearer ' + token;
     fetch(entry.url, { method: entry.method, headers: headers, body: entry.body || undefined })
       .then(function (res) {
@@ -803,7 +875,7 @@ window.App = (function () {
   // ─── Image URL with auth token ───
   function imgUrl(src) {
     if (!src) return '';
-    var t = getToken() || getSAToken() || getSupToken();
+    var t = getToken() || getSAToken() || getSupToken() || getElecToken();
     if (!t || !src.startsWith('/images/')) return src;
     // Image proxy lives at /api/images/* but stored URLs omit /api prefix
     return '/api' + src + (src.includes('?') ? '&' : '?') + 'token=' + t;
@@ -907,7 +979,7 @@ window.App = (function () {
 
   function _connectSSE() {
     // Determine auth token and SSE endpoint
-    var token = getToken() || getSAToken() || getSupToken();
+    var token = getToken() || getSAToken() || getSupToken() || getElecToken();
     if (!token || typeof EventSource === 'undefined') {
       // Browser doesn't support SSE or no token — use polling fallback
       _startPolling();
@@ -1224,15 +1296,16 @@ window.App = (function () {
     getOrgSlug: getOrgSlug, orgPath: orgPath,
     getModule: getModule, modulePath: modulePath,
     getEnabledModules: getEnabledModules, isModuleEnabled: isModuleEnabled,
-    getToken: getToken, getSAToken: getSAToken, getSupToken: getSupToken,
-    getUser: getUser, getSAUser: getSAUser, getSupUser: getSupUser,
-    adminHeaders: adminHeaders, saHeaders: saHeaders, supHeaders: supHeaders,
+    getToken: getToken, getSAToken: getSAToken, getSupToken: getSupToken, getElecToken: getElecToken,
+    getUser: getUser, getSAUser: getSAUser, getSupUser: getSupUser, getElecUser: getElecUser,
+    adminHeaders: adminHeaders, saHeaders: saHeaders, supHeaders: supHeaders, elecHeaders: elecHeaders,
     apiFetch: apiFetch, apiFetchJson: apiFetchJson,
     saFetch: saFetch, saFetchJson: saFetchJson,
     supFetch: supFetch, supFetchJson: supFetchJson,
-    logout: logout, logoutSA: logoutSA, logoutSup: logoutSup,
+    elecFetch: elecFetch, elecFetchJson: elecFetchJson,
+    logout: logout, logoutSA: logoutSA, logoutSup: logoutSup, logoutElec: logoutElec,
     toast: toast, confirmDialog: confirmDialog,
-    initAdmin: initAdmin, initSupervisor: initSupervisor,
+    initAdmin: initAdmin, initSupervisor: initSupervisor, initElectrician: initElectrician,
     initModulePWA: initModulePWA,
     buildUserMenu: _buildUserMenu,
     initNotifications: initNotifications, stopNotifications: stopNotifications,

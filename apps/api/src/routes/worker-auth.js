@@ -6,6 +6,10 @@ const { z } = require('zod');
 const { prisma } = require('../lib/prisma');
 const { BCRYPT_COST } = require('../lib/security');
 const { loginRateLimit } = require('../middleware/rateLimits');
+const { uploadToR2 } = require('../lib/r2');
+const { validateImageBuffer } = require('../errors');
+const { getLocationDescendants } = require('../services/assignment-resolver');
+const { notifyAdmins, createNotification } = require('./notifications');
 
 // ── Worker JWT Authentication Middleware ──
 
@@ -46,6 +50,34 @@ async function authenticateWorkerJWT(request, reply) {
 }
 
 async function workerAuthRoutes(fastify) {
+
+  async function getWorkerCoverageLocationIds(workerId, orgId) {
+    const assignments = await prisma.workerAssignment.findMany({
+      where: { workerId, orgId },
+      select: { locationId: true, coverChildren: true }
+    });
+    const ids = new Set();
+    for (const a of assignments) {
+      ids.add(a.locationId);
+      if (a.coverChildren) {
+        const childIds = await getLocationDescendants(a.locationId, orgId);
+        for (const cid of childIds) ids.add(cid);
+      }
+    }
+    return [...ids];
+  }
+
+  async function processWorkerResolveImage(request, orgId) {
+    const imageFile = request.body.image;
+    if (!imageFile || !imageFile.mimetype) return null;
+    const file = Array.isArray(imageFile) ? imageFile[0] : imageFile;
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/webp'];
+    if (!allowedTypes.includes(file.mimetype)) throw new Error('Invalid image type. Use JPEG, PNG or WebP.');
+    const buffer = await file.toBuffer();
+    if (buffer.length > 5 * 1024 * 1024) throw new Error('Image too large. Max 5MB.');
+    if (!validateImageBuffer(buffer, file.mimetype)) throw new Error('Invalid image file');
+    return uploadToR2(buffer, file.mimetype, orgId);
+  }
 
   // ── Worker Login (employeeId + PIN) ──
   fastify.post('/auth/worker-login', {
@@ -219,6 +251,161 @@ async function workerAuthRoutes(fastify) {
     if (!notif) return reply.code(404).send({ error: 'Not found' });
     await prisma.notification.delete({ where: { id: notif.id } });
     return { success: true };
+  });
+
+  // ── Electrician (Worker) Tickets ──
+
+  fastify.get('/worker/tickets', {
+    preHandler: [authenticateWorkerJWT]
+  }, async (request) => {
+    const orgId = request.worker.orgId;
+    const workerId = request.worker.id;
+    const limit = Math.min(parseInt(request.query.limit, 10) || 50, 100);
+    const page = Math.max(parseInt(request.query.page, 10) || 1, 1);
+    const skip = (page - 1) * limit;
+
+    const locationIds = await getWorkerCoverageLocationIds(workerId, orgId);
+    if (!locationIds.length) {
+      return { tickets: [], total: 0, page, pages: 0, stats: { OPEN: 0, IN_PROGRESS: 0, RESOLVED: 0, CLOSED: 0 } };
+    }
+
+    const statuses = request.query.status
+      ? String(request.query.status).split(',').map(s => s.trim()).filter(Boolean)
+      : ['OPEN', 'IN_PROGRESS', 'RESOLVED'];
+
+    const where = {
+      orgId,
+      locationId: { in: locationIds },
+      status: statuses.length > 1 ? { in: statuses } : statuses[0]
+    };
+
+    const [tickets, total, grouped] = await Promise.all([
+      prisma.ticket.findMany({
+        where,
+        include: {
+          location: { select: { id: true, name: true, type: true } },
+          assignedTo: { select: { id: true, name: true } },
+          resolvedWorkers: { select: { id: true, name: true } }
+        },
+        orderBy: [{ priority: 'desc' }, { createdAt: 'desc' }],
+        take: limit,
+        skip
+      }),
+      prisma.ticket.count({ where }),
+      prisma.ticket.groupBy({
+        by: ['status'],
+        where: { orgId, locationId: { in: locationIds } },
+        _count: true
+      })
+    ]);
+
+    const stats = { OPEN: 0, IN_PROGRESS: 0, RESOLVED: 0, CLOSED: 0 };
+    for (const g of grouped) stats[g.status] = g._count;
+
+    return { tickets, total, page, pages: Math.ceil(total / limit), stats };
+  });
+
+  fastify.get('/worker/tickets/:id', {
+    preHandler: [authenticateWorkerJWT]
+  }, async (request, reply) => {
+    const orgId = request.worker.orgId;
+    const workerId = request.worker.id;
+    const locationIds = await getWorkerCoverageLocationIds(workerId, orgId);
+    if (!locationIds.length) return reply.code(404).send({ error: 'Ticket not found' });
+
+    const ticket = await prisma.ticket.findFirst({
+      where: { id: request.params.id, orgId, locationId: { in: locationIds } },
+      include: {
+        location: { select: { id: true, name: true, type: true } },
+        assignedTo: { select: { id: true, name: true } },
+        resolvedWorkers: { select: { id: true, name: true } }
+      }
+    });
+    if (!ticket) return reply.code(404).send({ error: 'Ticket not found' });
+    return ticket;
+  });
+
+  fastify.post('/worker/tickets/:id/resolve', {
+    preHandler: [authenticateWorkerJWT]
+  }, async (request, reply) => {
+    const orgId = request.worker.orgId;
+    const workerId = request.worker.id;
+    const locationIds = await getWorkerCoverageLocationIds(workerId, orgId);
+    if (!locationIds.length) return reply.code(403).send({ error: 'No assigned locations' });
+
+    const ticket = await prisma.ticket.findFirst({
+      where: { id: request.params.id, orgId, locationId: { in: locationIds } },
+      include: { resolvedWorkers: { select: { id: true } } }
+    });
+    if (!ticket) return reply.code(404).send({ error: 'Ticket not found' });
+    if (ticket.status === 'CLOSED') return reply.code(400).send({ error: 'Ticket is already closed' });
+
+    const fieldValue = (f) => {
+      if (f == null) return undefined;
+      if (typeof f === 'object' && 'value' in f) return f.value;
+      return f;
+    };
+
+    const note = fieldValue(request.body?.note)?.trim() || null;
+    let resolvedImageUrl;
+    try {
+      resolvedImageUrl = await processWorkerResolveImage(request, orgId);
+    } catch (e) {
+      return reply.code(400).send({ error: e.message });
+    }
+
+    if (!resolvedImageUrl) {
+      return reply.code(400).send({ error: 'A proof photo is required to resolve tickets' });
+    }
+
+    const alreadyConnected = ticket.resolvedWorkers.some(w => w.id === workerId);
+    const updated = await prisma.ticket.update({
+      where: { id: ticket.id },
+      data: {
+        status: 'RESOLVED',
+        resolvedAt: new Date(),
+        resolvedImageUrl,
+        resolvedNote: note,
+        resolvedWorkers: alreadyConnected ? undefined : { connect: [{ id: workerId }] }
+      },
+      include: {
+        location: { select: { id: true, name: true, type: true } },
+        resolvedWorkers: { select: { id: true, name: true } }
+      }
+    });
+
+    await prisma.auditLog.create({
+      data: {
+        orgId,
+        actorType: 'worker',
+        actorId: workerId,
+        action: 'ticket_resolved_by_worker',
+        entityType: 'Ticket',
+        entityId: ticket.id,
+        oldValue: { status: ticket.status },
+        newValue: { status: 'RESOLVED', resolvedNote: note }
+      }
+    });
+
+    notifyAdmins(orgId, {
+      type: 'ticket_resolved',
+      title: 'Ticket resolved by electrician',
+      body: updated.title + (updated.location ? ' — ' + updated.location.name : ''),
+      entityId: updated.id
+    }).catch(() => {});
+
+    if (ticket.assignedToId) {
+      createNotification({
+        orgId,
+        userId: ticket.assignedToId,
+        type: 'ticket_resolved',
+        title: 'Ticket resolved by electrician',
+        body: updated.title,
+        entityId: updated.id
+      }).catch(() => {});
+    }
+
+    return updated;
   });
 }
 

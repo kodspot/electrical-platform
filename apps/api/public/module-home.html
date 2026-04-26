@@ -13,18 +13,18 @@
 <link rel="stylesheet" href="/css/design-system.css?v=10">
 <style>
 .mod-home{max-width:420px;margin:0 auto;padding:2rem 1rem;text-align:center}
-.mod-title{font-size:1.3rem;font-weight:700;color:var(--text);margin-bottom:.15rem}
-.mod-subtitle{font-size:.82rem;color:var(--text-muted);margin-bottom:.35rem}
-.mod-org{font-size:.72rem;color:var(--text-light);margin-bottom:1.5rem}
+.mod-title{font-size:1.3rem;font-weight:700;color:#fff;margin-bottom:.15rem;text-shadow:0 4px 18px rgba(0,0,0,.25)}
+.mod-subtitle{font-size:.82rem;color:rgba(255,255,255,.8);margin-bottom:.35rem}
+.mod-org{font-size:.72rem;color:rgba(255,255,255,.72);margin-bottom:1.5rem}
 .role-grid{display:flex;flex-direction:column;gap:.75rem}
-.role-card{text-decoration:none;color:inherit;border:1px solid var(--border);border-radius:var(--radius-lg);padding:1.15rem 1.25rem;text-align:left;transition:all .15s;cursor:pointer;background:var(--surface);display:flex;align-items:center;gap:1rem}
-.role-card:hover{border-color:var(--primary);box-shadow:0 2px 12px rgba(0,0,0,.08)}
+.role-card{text-decoration:none;color:inherit;border:1px solid rgba(255,255,255,.24);border-radius:var(--radius-lg);padding:1.15rem 1.25rem;text-align:left;transition:all .15s;cursor:pointer;background:rgba(255,255,255,.92);display:flex;align-items:center;gap:1rem;backdrop-filter:blur(8px)}
+.role-card:hover{border-color:#fff;box-shadow:0 10px 28px rgba(0,0,0,.16);transform:translateY(-2px)}
 .role-icon{font-size:1.5rem;flex-shrink:0}
 .role-info{flex:1}
 .role-label{font-size:1rem;font-weight:600;color:var(--text)}
 .role-desc{font-size:.75rem;color:var(--text-muted);margin-top:.1rem}
 .mod-back{margin-top:1.25rem;font-size:.78rem}
-.mod-install-hint{margin-top:1.5rem;padding:.75rem;background:var(--surface);border:1px dashed var(--border);border-radius:var(--radius);font-size:.72rem;color:var(--text-muted)}
+.mod-install-hint{margin-top:1.5rem;padding:.75rem;background:rgba(255,255,255,.9);border:1px dashed rgba(255,255,255,.35);border-radius:var(--radius);font-size:.72rem;color:#334155}
 .mod-loading{padding:3rem 1rem;text-align:center;color:var(--text-muted)}
 </style>
 </head>
@@ -44,19 +44,24 @@
 (function() {
   var MODULE_META = {
     ele:        { label: 'Electrical', icon: '⚡', color: '#d97706', roles: [
-      { key: 'admin', label: 'Admin', icon: '🔑', desc: 'Manage electrical maintenance & staff', page: 'admin-login' },
-      { key: 'engineer', label: 'Engineer', icon: '🔧', desc: 'Handle electrical tasks & inspections', page: 'supervisor-login' }
+      { key: 'admin', label: 'Admin', icon: '🔑', desc: 'Manage full setup, users, analytics and operations', page: 'admin-login' },
+      { key: 'supervisor', label: 'Supervisor', icon: '🧭', desc: 'Oversee assigned building/floor operations and escalations', page: 'supervisor-login' },
+      { key: 'electrician', label: 'Electrician', icon: '🛠️', desc: 'View assigned tickets, fix issues and upload proof photos', page: 'electrician-login' }
     ]},
     civil:      { label: 'Civil', icon: '🏗️', color: '#6366f1', roles: [
-      { key: 'admin', label: 'Admin', icon: '🔑', desc: 'Manage civil maintenance operations', page: 'admin-login' },
-      { key: 'engineer', label: 'Engineer', icon: '🏗️', desc: 'Handle civil tasks & inspections', page: 'supervisor-login' }
+      { key: 'admin', label: 'Admin', icon: '🔑', desc: 'Manage full setup, users, analytics and operations', page: 'admin-login' },
+      { key: 'supervisor', label: 'Supervisor', icon: '🧭', desc: 'Oversee assigned building/floor operations and escalations', page: 'supervisor-login' },
+      { key: 'electrician', label: 'Electrician', icon: '🛠️', desc: 'View assigned tickets, fix issues and upload proof photos', page: 'electrician-login' }
     ]},
     asset:      { label: 'Assets', icon: '📦', color: '#0891b2', roles: [
-      { key: 'admin', label: 'Admin', icon: '🔑', desc: 'Track & manage facility assets', page: 'admin-login' },
-      { key: 'manager', label: 'Manager', icon: '📋', desc: 'Handle asset tasks & audits', page: 'supervisor-login' }
+      { key: 'admin', label: 'Admin', icon: '🔑', desc: 'Manage full setup, users, analytics and operations', page: 'admin-login' },
+      { key: 'supervisor', label: 'Supervisor', icon: '🧭', desc: 'Oversee assigned building/floor operations and escalations', page: 'supervisor-login' },
+      { key: 'electrician', label: 'Electrician', icon: '🛠️', desc: 'View assigned tickets, fix issues and upload proof photos', page: 'electrician-login' }
     ]},
     complaints: { label: 'Complaints', icon: '📝', color: '#e11d48', roles: [
-      { key: 'admin', label: 'Admin', icon: '🔑', desc: 'Manage & resolve complaints', page: 'admin-login' }
+      { key: 'admin', label: 'Admin', icon: '🔑', desc: 'Manage full setup, users, analytics and operations', page: 'admin-login' },
+      { key: 'supervisor', label: 'Supervisor', icon: '🧭', desc: 'Oversee assigned building/floor operations and escalations', page: 'supervisor-login' },
+      { key: 'electrician', label: 'Electrician', icon: '🛠️', desc: 'View assigned tickets, fix issues and upload proof photos', page: 'electrician-login' }
     ]}
   };
 
@@ -74,8 +79,10 @@
     if (savedSlug === slug && savedMod === mod) {
       var tk  = localStorage.getItem('token');
       var stk = localStorage.getItem('sup_token');
+      var etk = localStorage.getItem('elec_token');
       if (tk) { location.href = '/' + slug + '/' + mod + '/admin-dashboard'; return; }
       if (stk) { location.href = '/' + slug + '/' + mod + '/supervisor-scan'; return; }
+      if (etk) { location.href = '/' + slug + '/' + mod + '/electrician-tickets'; return; }
     }
   } catch(e) {}
 

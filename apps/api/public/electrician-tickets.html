@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
+<link rel="manifest" href="/site.webmanifest">
+<meta name="theme-color" content="#1E40AF">
+<title>Electrician Tickets — Kodspot</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/css/design-system.css?v=10">
+<style>
+.el-shell{max-width:760px;margin:0 auto;padding:1rem .8rem 2rem}
+.el-toolbar{display:flex;justify-content:space-between;align-items:center;margin-bottom:.8rem}
+.el-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:.5rem;margin-bottom:.9rem}
+.el-stat{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:.55rem .45rem;text-align:center}
+.el-stat b{display:block;font-size:1.2rem;line-height:1.1}
+.el-stat span{font-size:.65rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.04em}
+.el-list{display:flex;flex-direction:column;gap:.55rem}
+.el-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:.8rem .9rem}
+.el-top{display:flex;justify-content:space-between;gap:.7rem;align-items:flex-start}
+.el-title{font-size:.9rem;font-weight:700;line-height:1.35}
+.el-meta{display:flex;flex-wrap:wrap;gap:.35rem .8rem;color:var(--text-muted);font-size:.74rem;margin-top:.35rem}
+.el-desc{margin-top:.45rem;font-size:.8rem;color:var(--text)}
+.el-actions{margin-top:.65rem;display:flex;gap:.4rem;flex-wrap:wrap}
+.el-empty{text-align:center;color:var(--text-muted);padding:2rem 1rem}
+.el-pri{font-size:.62rem;font-weight:700;padding:.14rem .4rem;border-radius:6px;text-transform:uppercase;letter-spacing:.03em}
+.el-pri.URGENT{background:rgba(239,68,68,.15);color:#ef4444}
+.el-pri.HIGH{background:rgba(249,115,22,.16);color:#fb923c}
+.el-pri.NORMAL{background:rgba(59,130,246,.16);color:#60a5fa}
+.el-pri.LOW{background:rgba(148,163,184,.16);color:#94a3b8}
+.el-status{font-size:.62rem;font-weight:700;padding:.14rem .4rem;border-radius:6px;letter-spacing:.03em}
+.el-status.OPEN{background:rgba(220,38,38,.13);color:#ef4444}
+.el-status.IN_PROGRESS{background:rgba(245,158,11,.14);color:#f59e0b}
+.el-status.RESOLVED,.el-status.CLOSED{background:rgba(16,185,129,.15);color:#34d399}
+.el-img{margin-top:.55rem;width:100%;max-height:180px;object-fit:contain;border-radius:8px;border:1px solid var(--border)}
+@media(max-width:640px){.el-stats{grid-template-columns:repeat(2,1fr)}}
+</style>
+</head>
+<body>
+<nav class="topbar">
+  <div class="topbar-left">
+    <span class="topbar-brand">Kodspot</span>
+  </div>
+  <div class="topbar-right">
+    <span class="topbar-user" id="userName"></span>
+    <button class="btn btn-sm btn-ghost" onclick="App.logoutElec()">Logout</button>
+  </div>
+</nav>
+
+<main class="el-shell">
+  <div class="el-toolbar">
+    <h2 style="font-size:1.05rem;font-weight:700;margin:0">Electrician Work Queue</h2>
+    <button class="btn btn-sm btn-outline" onclick="loadTickets()">Refresh</button>
+  </div>
+
+  <div class="el-stats">
+    <div class="el-stat"><b id="sOpen">0</b><span>Open</span></div>
+    <div class="el-stat"><b id="sActive">0</b><span>In Progress</span></div>
+    <div class="el-stat"><b id="sDone">0</b><span>Resolved</span></div>
+    <div class="el-stat"><b id="sAll">0</b><span>Total</span></div>
+  </div>
+
+  <div id="ticketList" class="el-list"></div>
+</main>
+
+<div class="modal-overlay" id="resolveModal">
+  <div class="modal" style="max-width:520px">
+    <h2 class="modal-title">Resolve Ticket</h2>
+    <div id="resolveError" class="error-msg"></div>
+    <form id="resolveForm" enctype="multipart/form-data">
+      <input type="hidden" id="rTicketId">
+      <div class="form-group">
+        <label class="form-label">Resolution Note</label>
+        <textarea class="form-textarea" id="rNote" rows="3" maxlength="1000" placeholder="What was fixed?"></textarea>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Proof Photo *</label>
+        <input class="form-input" type="file" id="rPhoto" accept="image/jpeg,image/png,image/webp" required>
+      </div>
+      <div class="modal-actions">
+        <button type="button" class="btn btn-outline" onclick="App.closeModal('resolveModal')">Cancel</button>
+        <button type="submit" class="btn btn-success" id="resolveBtn">Mark Resolved</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script src="/js/offline-sync.js?v=1"></script>
+<script src="/js/app.js?v=14"></script>
+<script>
+if (!App.initElectrician()) throw '';
+var $ = App.$, esc = App.esc;
+var tickets = [];
+
+async function loadTickets() {
+  var list = $('ticketList');
+  App.showSkeletonCards(list, 3);
+  var res = await App.elecFetch('/worker/tickets?status=OPEN,IN_PROGRESS,RESOLVED&limit=100');
+  if (!res || !res.ok) {
+    list.innerHTML = '<div class="el-empty">Failed to load tickets</div>';
+    return;
+  }
+  var data = await res.json();
+  tickets = data.tickets || [];
+  renderStats(data.stats || {});
+  renderList();
+}
+
+function renderStats(stats) {
+  var open = stats.OPEN || 0;
+  var active = stats.IN_PROGRESS || 0;
+  var done = stats.RESOLVED || 0;
+  $('sOpen').textContent = open;
+  $('sActive').textContent = active;
+  $('sDone').textContent = done;
+  $('sAll').textContent = open + active + done + (stats.CLOSED || 0);
+}
+
+function renderList() {
+  var list = $('ticketList');
+  if (!tickets.length) {
+    list.innerHTML = '<div class="el-empty">No tickets in your assigned locations.</div>';
+    return;
+  }
+
+  tickets.sort(function(a, b) {
+    var p = { URGENT: 4, HIGH: 3, NORMAL: 2, LOW: 1 };
+    var pa = p[a.priority] || 1, pb = p[b.priority] || 1;
+    if (pa !== pb) return pb - pa;
+    return new Date(b.createdAt) - new Date(a.createdAt);
+  });
+
+  list.innerHTML = tickets.map(function(t) {
+    var canResolve = t.status === 'OPEN' || t.status === 'IN_PROGRESS';
+    return '<article class="el-card">' +
+      '<div class="el-top">' +
+        '<div><div class="el-title">' + esc(t.title) + '</div></div>' +
+        '<div style="display:flex;gap:.3rem;flex-wrap:wrap;justify-content:flex-end">' +
+          '<span class="el-pri ' + esc(t.priority) + '">' + esc(t.priority) + '</span>' +
+          '<span class="el-status ' + esc(t.status) + '">' + esc(t.status.replace('_', ' ')) + '</span>' +
+        '</div>' +
+      '</div>' +
+      '<div class="el-meta">' +
+        '<span>📍 ' + esc(t.location ? t.location.name : '—') + '</span>' +
+        '<span>🕒 ' + esc(App.fmtDate(t.createdAt)) + '</span>' +
+      '</div>' +
+      (t.description ? '<div class="el-desc">' + esc(t.description) + '</div>' : '') +
+      (t.imageUrl ? '<img class="el-img" src="' + esc(App.imgUrl(t.imageUrl)) + '" alt="Ticket photo" loading="lazy">' : '') +
+      (t.resolvedImageUrl ? '<img class="el-img" src="' + esc(App.imgUrl(t.resolvedImageUrl)) + '" alt="Resolved proof" loading="lazy">' : '') +
+      '<div class="el-actions">' +
+        (canResolve ? '<button class="btn btn-sm btn-success" onclick="openResolve(\'' + t.id + '\')">Resolve With Photo</button>' : '<span style="font-size:.75rem;color:var(--text-muted)">Already resolved</span>') +
+      '</div>' +
+    '</article>';
+  }).join('');
+}
+
+function openResolve(id) {
+  $('resolveForm').reset();
+  $('rTicketId').value = id;
+  App.hideError('resolveError');
+  App.openModal('resolveModal');
+}
+
+$('resolveForm').addEventListener('submit', async function(e) {
+  e.preventDefault();
+  var id = $('rTicketId').value;
+  var fd = new FormData();
+  var file = $('rPhoto').files[0];
+  if (!file) { App.showError('resolveError', 'Please attach a proof photo.'); return; }
+  fd.append('image', file);
+  if ($('rNote').value.trim()) fd.append('note', $('rNote').value.trim());
+
+  var btn = $('resolveBtn');
+  btn.disabled = true; btn.textContent = 'Saving...';
+  var res = await App.elecFetch('/worker/tickets/' + encodeURIComponent(id) + '/resolve', { method: 'POST', body: fd });
+  btn.disabled = false; btn.textContent = 'Mark Resolved';
+  if (!res) return;
+  if (!res.ok) {
+    var d = await res.json().catch(function(){ return {}; });
+    App.showError('resolveError', d.error || 'Failed to resolve ticket');
+    return;
+  }
+  App.closeModal('resolveModal');
+  App.toast('Ticket resolved successfully', 'success');
+  loadTickets();
+});
+
+loadTickets();
+</script>
+</body>
+</html>
