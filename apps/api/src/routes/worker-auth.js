@@ -266,7 +266,7 @@ async function workerAuthRoutes(fastify) {
 
     const locationIds = await getWorkerCoverageLocationIds(workerId, orgId);
     if (!locationIds.length) {
-      return { tickets: [], total: 0, page, pages: 0, stats: { OPEN: 0, IN_PROGRESS: 0, RESOLVED: 0, CLOSED: 0 } };
+      return { tickets: [], total: 0, page, pages: 0, stats: { OPEN: 0, IN_PROGRESS: 0, RESOLVED_PENDING_VERIFY: 0, RESOLVED: 0, CLOSED: 0 } };
     }
 
     const statuses = request.query.status

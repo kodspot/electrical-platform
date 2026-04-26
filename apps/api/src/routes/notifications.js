@@ -7,7 +7,7 @@ const { addConnection, removeConnection, pushNotification } = require('../servic
 /**
  * Create a notification for a user (called internally by other routes).
  */
-async function createNotification({ orgId, userId, workerId, type, title, body, entityId }) {
+async function createNotification({ orgId, userId, workerId, type, title, body, entityId, isUrgent }) {
   const notif = await prisma.notification.create({
     data: {
       orgId,
@@ -16,7 +16,8 @@ async function createNotification({ orgId, userId, workerId, type, title, body, 
       type,
       title,
       body: body || null,
-      entityId: entityId || null
+      entityId: entityId || null,
+      isUrgent: !!isUrgent
     }
   });
   // Push via SSE in real-time
@@ -27,20 +28,20 @@ async function createNotification({ orgId, userId, workerId, type, title, body, 
 /**
  * Notify all active admins of an org.
  */
-async function notifyAdmins(orgId, { type, title, body, entityId }) {
+async function notifyAdmins(orgId, { type, title, body, entityId, isUrgent }) {
   const admins = await prisma.user.findMany({
     where: { orgId, role: 'ADMIN', isActive: true },
     select: { id: true }
   });
   if (!admins.length) return;
   const rows = admins.map(a => ({
-    orgId, userId: a.id, type, title, body: body || null, entityId: entityId || null
+    orgId, userId: a.id, type, title, body: body || null, entityId: entityId || null, isUrgent: !!isUrgent
   }));
   await prisma.notification.createMany({ data: rows });
   // Push SSE to each admin
   for (const a of admins) {
     try {
-      pushNotification(orgId, { userId: a.id, type, title, body, entityId, createdAt: new Date() });
+      pushNotification(orgId, { userId: a.id, type, title, body, entityId, isUrgent: !!isUrgent, createdAt: new Date() });
     } catch { /* silent */ }
   }
 }
@@ -48,20 +49,20 @@ async function notifyAdmins(orgId, { type, title, body, entityId }) {
 /**
  * Notify all active supervisors of an org.
  */
-async function notifySupervisors(orgId, { type, title, body, entityId }) {
+async function notifySupervisors(orgId, { type, title, body, entityId, isUrgent }) {
   const supervisors = await prisma.user.findMany({
     where: { orgId, role: 'SUPERVISOR', isActive: true },
     select: { id: true }
   });
   if (!supervisors.length) return;
   const rows = supervisors.map(s => ({
-    orgId, userId: s.id, type, title, body: body || null, entityId: entityId || null
+    orgId, userId: s.id, type, title, body: body || null, entityId: entityId || null, isUrgent: !!isUrgent
   }));
   await prisma.notification.createMany({ data: rows });
   // Push SSE to each supervisor
   for (const s of supervisors) {
     try {
-      pushNotification(orgId, { userId: s.id, type, title, body, entityId, createdAt: new Date() });
+      pushNotification(orgId, { userId: s.id, type, title, body, entityId, isUrgent: !!isUrgent, createdAt: new Date() });
     } catch { /* silent */ }
   }
 }
@@ -69,16 +70,16 @@ async function notifySupervisors(orgId, { type, title, body, entityId }) {
 /**
  * Notify specific workers.
  */
-async function notifyWorkers(orgId, workerIds, { type, title, body, entityId }) {
+async function notifyWorkers(orgId, workerIds, { type, title, body, entityId, isUrgent }) {
   if (!workerIds || !workerIds.length) return;
   const rows = workerIds.map(wid => ({
-    orgId, workerId: wid, type, title, body: body || null, entityId: entityId || null
+    orgId, workerId: wid, type, title, body: body || null, entityId: entityId || null, isUrgent: !!isUrgent
   }));
   await prisma.notification.createMany({ data: rows });
   // Push SSE to each worker
   for (const wid of workerIds) {
     try {
-      pushNotification(orgId, { workerId: wid, type, title, body, entityId, createdAt: new Date() });
+      pushNotification(orgId, { workerId: wid, type, title, body, entityId, isUrgent: !!isUrgent, createdAt: new Date() });
     } catch { /* silent */ }
   }
 }
