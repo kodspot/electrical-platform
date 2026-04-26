@@ -1,11 +1,13 @@
 'use strict';
 
+const crypto = require('crypto');
 const { z } = require('zod');
 const { prisma } = require('../lib/prisma');
 const { uploadToR2 } = require('../lib/r2');
 const { validateImageBuffer } = require('../errors');
 const { notifyAdmins, notifySupervisors, createNotification } = require('./notifications');
 const { emailAdmins, escHtml } = require('../lib/email');
+const { getAssignedSupervisorIds } = require('../services/assignment-resolver');
 
 const ISSUE_TYPES = ['ELECTRICAL_FAULT', 'WIRING_ISSUE', 'POWER_OUTAGE', 'SHORT_CIRCUIT', 'LIGHT_NOT_WORKING', 'FAN_NOT_WORKING', 'AC_NOT_WORKING', 'SWITCH_SOCKET_ISSUE', 'OTHER'];
 
@@ -199,6 +201,27 @@ async function publicRoutes(fastify, opts) {
 
     const title = (ISSUE_LABELS[data.issueType] || data.issueType) + ' — ' + location.name;
 
+    // Compute complaint provenance (privacy-safe)
+    const rawIp = request.ip || request.headers['x-forwarded-for']?.split(',')[0]?.trim() || '';
+    const sourceIp = rawIp ? crypto.createHash('sha256').update(rawIp).digest('hex').slice(0, 16) : null;
+    const userAgent = (request.headers['user-agent'] || '').slice(0, 200) || null;
+
+    // Risk scoring: duplicate detection within last 30 min from same IP hash + same location
+    let riskScore = 0;
+    if (sourceIp) {
+      const recentCount = await prisma.ticket.count({
+        where: {
+          orgId: location.orgId,
+          locationId: data.locationId,
+          source: 'PUBLIC',
+          sourceIp,
+          createdAt: { gte: new Date(Date.now() - 30 * 60 * 1000) }
+        }
+      });
+      if (recentCount >= 3) riskScore = 80;
+      else if (recentCount >= 1) riskScore = 40;
+    }
+
     const ticket = await prisma.ticket.create({
       data: {
         orgId: location.orgId,
@@ -211,7 +234,11 @@ async function publicRoutes(fastify, opts) {
         module: mod,
         guestName: data.guestName || null,
         guestPhone: data.guestPhone || null,
-        issueType: data.issueType
+        issueType: data.issueType,
+        sourceIp,
+        userAgent,
+        riskScore,
+        slaDeadlineAt: new Date(Date.now() + 24 * 60 * 60 * 1000) // 24h SLA for public complaints
       },
       select: {
         id: true,
@@ -222,6 +249,26 @@ async function publicRoutes(fastify, opts) {
         location: { select: { name: true } }
       }
     });
+
+    // Auto-assign to supervisors responsible for this location
+    try {
+      const supervisorIds = await getAssignedSupervisorIds(data.locationId, location.orgId);
+      if (supervisorIds.length > 0) {
+        await prisma.ticket.update({ where: { id: ticket.id }, data: { assignedToId: supervisorIds[0] } });
+        // Notify each assigned supervisor directly
+        for (const supId of supervisorIds) {
+          createNotification({
+            orgId: location.orgId,
+            userId: supId,
+            type: 'public_complaint',
+            title: 'New public complaint assigned',
+            body: ticket.title,
+            entityId: ticket.id,
+            isUrgent: true
+          }).catch(() => {});
+        }
+      }
+    } catch (_) { /* non-fatal */ }
 
     // Audit log
     await prisma.auditLog.create({

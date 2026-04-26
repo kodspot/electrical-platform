@@ -87,6 +87,7 @@ model User {
 
   ticketsCreated        Ticket[]               @relation("TicketCreatedBy")
   ticketsAssigned       Ticket[]               @relation("TicketAssignedTo")
+  ticketsVerified       Ticket[]               @relation("TicketVerifiedBy")
   notifications         Notification[]
   attendanceMarked      Attendance[]           @relation("AttendanceMarkedBy")
   dutyRosters           DutyRoster[]           @relation("DutyRosterSupervisor")
@@ -199,6 +200,22 @@ model Ticket {
   resolvedWorkers  Worker[]  @relation("TicketResolvedWorkers")
   resolvedAt       DateTime?
 
+  // SLA tracking
+  slaDeadlineAt    DateTime?  // Computed at creation based on priority
+  slaBreachedAt    DateTime?  // Set when SLA breach is detected
+  acceptedAt       DateTime?  // When work was started
+
+  // Complaint provenance (privacy-safe)
+  sourceIp         String?    // SHA-256 hash prefix (first 16 chars) — not reversible
+  userAgent        String?    // Browser UA truncated to 200 chars
+  riskScore        Int        @default(0) // 0-100 computed risk (duplicate/spam detection)
+
+  // Supervisor verification after worker resolution
+  verifiedAt       DateTime?
+  verifiedById     String?
+  verifiedBy       User?      @relation("TicketVerifiedBy", fields: [verifiedById], references: [id])
+  verifyNote       String?
+
   // Public review fields
   reviewToken     String?   @unique
   reviewExpiresAt DateTime?
@@ -252,6 +269,7 @@ model Notification {
   body     String?
   entityId String? // ticket id or other entity
   isRead   Boolean @default(false)
+  isUrgent Boolean @default(false) // Persistent alert — requires acknowledgement
 
   createdAt DateTime @default(now())
 
@@ -347,6 +365,7 @@ enum TicketPriority {
 enum TicketStatus {
   OPEN
   IN_PROGRESS
+  RESOLVED_PENDING_VERIFY
   RESOLVED
   CLOSED
 }

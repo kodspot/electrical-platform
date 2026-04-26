@@ -34,7 +34,11 @@
 .el-status{font-size:.62rem;font-weight:700;padding:.14rem .4rem;border-radius:6px;letter-spacing:.03em}
 .el-status.OPEN{background:rgba(220,38,38,.13);color:#ef4444}
 .el-status.IN_PROGRESS{background:rgba(245,158,11,.14);color:#f59e0b}
+.el-status.RESOLVED_PENDING_VERIFY{background:rgba(168,85,247,.14);color:#c084fc}
 .el-status.RESOLVED,.el-status.CLOSED{background:rgba(16,185,129,.15);color:#34d399}
+.el-timer{font-size:.68rem;font-weight:700;padding:.12rem .4rem;border-radius:6px;background:rgba(239,68,68,.1);color:#ef4444;font-variant-numeric:tabular-nums}
+.el-timer.warn{background:rgba(249,115,22,.1);color:#fb923c}
+.el-timer.ok{background:rgba(59,130,246,.1);color:#60a5fa}
 .el-img{margin-top:.55rem;width:100%;max-height:180px;object-fit:contain;border-radius:8px;border:1px solid var(--border)}
 @media(max-width:640px){.el-stats{grid-template-columns:repeat(2,1fr)}}
 </style>
@@ -59,8 +63,8 @@
   <div class="el-stats">
     <div class="el-stat"><b id="sOpen">0</b><span>Open</span></div>
     <div class="el-stat"><b id="sActive">0</b><span>In Progress</span></div>
+    <div class="el-stat"><b id="sVerify" style="color:#c084fc">0</b><span>To Verify</span></div>
     <div class="el-stat"><b id="sDone">0</b><span>Resolved</span></div>
-    <div class="el-stat"><b id="sAll">0</b><span>Total</span></div>
   </div>
 
   <div id="ticketList" class="el-list"></div>
@@ -98,7 +102,7 @@ var tickets = [];
 async function loadTickets() {
   var list = $('ticketList');
   App.showSkeletonCards(list, 3);
-  var res = await App.elecFetch('/worker/tickets?status=OPEN,IN_PROGRESS,RESOLVED&limit=100');
+  var res = await App.elecFetch('/worker/tickets?status=OPEN,IN_PROGRESS,RESOLVED_PENDING_VERIFY,RESOLVED&limit=100');
   if (!res || !res.ok) {
     list.innerHTML = '<div class="el-empty">Failed to load tickets</div>';
     return;
@@ -112,11 +116,29 @@ async function loadTickets() {
 function renderStats(stats) {
   var open = stats.OPEN || 0;
   var active = stats.IN_PROGRESS || 0;
+  var verify = stats.RESOLVED_PENDING_VERIFY || 0;
   var done = stats.RESOLVED || 0;
   $('sOpen').textContent = open;
   $('sActive').textContent = active;
+  $('sVerify').textContent = verify;
   $('sDone').textContent = done;
-  $('sAll').textContent = open + active + done + (stats.CLOSED || 0);
+}
+
+function elapsedLabel(dateStr) {
+  var ms = Date.now() - new Date(dateStr).getTime();
+  var mins = Math.floor(ms / 60000);
+  if (mins < 1) return 'Just now';
+  if (mins < 60) return mins + 'm';
+  var hrs = Math.floor(mins / 60);
+  if (hrs < 24) return hrs + 'h ' + (mins % 60) + 'm';
+  return Math.floor(hrs / 24) + 'd';
+}
+
+function timerClass(dateStr) {
+  var hrs = (Date.now() - new Date(dateStr).getTime()) / 3600000;
+  if (hrs >= 4) return 'el-timer';
+  if (hrs >= 1) return 'el-timer warn';
+  return 'el-timer ok';
 }
 
 function renderList() {
@@ -135,12 +157,16 @@ function renderList() {
 
   list.innerHTML = tickets.map(function(t) {
     var canResolve = t.status === 'OPEN' || t.status === 'IN_PROGRESS';
+    var isActive = t.status === 'OPEN' || t.status === 'IN_PROGRESS';
+    var isPendingVerify = t.status === 'RESOLVED_PENDING_VERIFY';
+    var timerHtml = isActive ? '<span class="' + timerClass(t.createdAt) + '">' + elapsedLabel(t.createdAt) + '</span>' : '';
     return '<article class="el-card">' +
       '<div class="el-top">' +
         '<div><div class="el-title">' + esc(t.title) + '</div></div>' +
-        '<div style="display:flex;gap:.3rem;flex-wrap:wrap;justify-content:flex-end">' +
+        '<div style="display:flex;gap:.3rem;flex-wrap:wrap;justify-content:flex-end;align-items:center">' +
+          timerHtml +
           '<span class="el-pri ' + esc(t.priority) + '">' + esc(t.priority) + '</span>' +
-          '<span class="el-status ' + esc(t.status) + '">' + esc(t.status.replace('_', ' ')) + '</span>' +
+          '<span class="el-status ' + esc(t.status) + '">' + esc(t.status.replace(/_/g, ' ')) + '</span>' +
         '</div>' +
       '</div>' +
       '<div class="el-meta">' +
@@ -151,7 +177,9 @@ function renderList() {
       (t.imageUrl ? '<img class="el-img" src="' + esc(App.imgUrl(t.imageUrl)) + '" alt="Ticket photo" loading="lazy">' : '') +
       (t.resolvedImageUrl ? '<img class="el-img" src="' + esc(App.imgUrl(t.resolvedImageUrl)) + '" alt="Resolved proof" loading="lazy">' : '') +
       '<div class="el-actions">' +
-        (canResolve ? '<button class="btn btn-sm btn-success" onclick="openResolve(\'' + t.id + '\')">Resolve With Photo</button>' : '<span style="font-size:.75rem;color:var(--text-muted)">Already resolved</span>') +
+        (canResolve ? '<button class="btn btn-sm btn-success" onclick="openResolve(\'' + t.id + '\')">📷 Resolve With Photo</button>' : '') +
+        (isPendingVerify ? '<span style="font-size:.75rem;color:#c084fc;font-weight:600">⚡ Awaiting supervisor verification</span>' : '') +
+        (!canResolve && !isPendingVerify ? '<span style="font-size:.75rem;color:var(--text-muted)">✓ Done</span>' : '') +
       '</div>' +
     '</article>';
   }).join('');

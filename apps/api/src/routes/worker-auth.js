@@ -271,7 +271,7 @@ async function workerAuthRoutes(fastify) {
 
     const statuses = request.query.status
       ? String(request.query.status).split(',').map(s => s.trim()).filter(Boolean)
-      : ['OPEN', 'IN_PROGRESS', 'RESOLVED'];
+      : ['OPEN', 'IN_PROGRESS', 'RESOLVED_PENDING_VERIFY'];
 
     const where = {
       orgId,
@@ -299,8 +299,8 @@ async function workerAuthRoutes(fastify) {
       })
     ]);
 
-    const stats = { OPEN: 0, IN_PROGRESS: 0, RESOLVED: 0, CLOSED: 0 };
-    for (const g of grouped) stats[g.status] = g._count;
+    const stats = { OPEN: 0, IN_PROGRESS: 0, RESOLVED_PENDING_VERIFY: 0, RESOLVED: 0, CLOSED: 0 };
+    for (const g of grouped) stats[g.status] = (stats[g.status] || 0) + g._count;
 
     return { tickets, total, page, pages: Math.ceil(total / limit), stats };
   });
@@ -362,7 +362,7 @@ async function workerAuthRoutes(fastify) {
     const updated = await prisma.ticket.update({
       where: { id: ticket.id },
       data: {
-        status: 'RESOLVED',
+        status: 'RESOLVED_PENDING_VERIFY',
         resolvedAt: new Date(),
         resolvedImageUrl,
         resolvedNote: note,
@@ -383,25 +383,27 @@ async function workerAuthRoutes(fastify) {
         entityType: 'Ticket',
         entityId: ticket.id,
         oldValue: { status: ticket.status },
-        newValue: { status: 'RESOLVED', resolvedNote: note }
+        newValue: { status: 'RESOLVED_PENDING_VERIFY', resolvedNote: note }
       }
     });
 
     notifyAdmins(orgId, {
       type: 'ticket_resolved',
-      title: 'Ticket resolved by electrician',
+      title: 'Ticket needs verification',
       body: updated.title + (updated.location ? ' — ' + updated.location.name : ''),
       entityId: updated.id
     }).catch(() => {});
 
+    // Notify assigned supervisor urgently to verify
     if (ticket.assignedToId) {
       createNotification({
         orgId,
         userId: ticket.assignedToId,
-        type: 'ticket_resolved',
-        title: 'Ticket resolved by electrician',
-        body: updated.title,
-        entityId: updated.id
+        type: 'ticket_pending_verify',
+        title: '⚡ Verify Required: ' + updated.title,
+        body: 'Electrician marked work done. Please verify and close.',
+        entityId: updated.id,
+        isUrgent: true
       }).catch(() => {});
     }
 

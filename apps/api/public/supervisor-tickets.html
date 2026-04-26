@@ -22,7 +22,8 @@
 .sv-stat.urgent .sv-stat-val{color:#ef4444}
 .sv-stat.open .sv-stat-val{color:#f59e0b}
 .sv-stat.progress .sv-stat-val{color:var(--primary)}
-.sv-stat.done .sv-stat-val{color:var(--success)}
+.el-status.RESOLVED_PENDING_VERIFY{background:rgba(168,85,247,.14);color:#c084fc}
+.sv-stat.verify .sv-stat-val{color:#a855f7}
 
 /* Tabs */
 .sv-tabs{display:flex;gap:.25rem;margin-bottom:.85rem;background:var(--surface);border-radius:var(--radius);padding:.2rem;border:1px solid var(--border)}
@@ -149,6 +150,7 @@
       <div class="sv-stat open"><div class="sv-stat-val" id="statUnassigned">–</div><div class="sv-stat-lbl">Pool</div></div>
       <div class="sv-stat open"><div class="sv-stat-val" id="statOpen">–</div><div class="sv-stat-lbl">Open</div></div>
       <div class="sv-stat progress"><div class="sv-stat-val" id="statInProgress">–</div><div class="sv-stat-lbl">Active</div></div>
+      <div class="sv-stat verify"><div class="sv-stat-val" id="statVerify">–</div><div class="sv-stat-lbl">To Verify</div></div>
       <div class="sv-stat done"><div class="sv-stat-val" id="statDone">–</div><div class="sv-stat-lbl">Done</div></div>
     </div>
 
@@ -157,6 +159,7 @@
       <button class="sv-tab active" data-status="UNASSIGNED" onclick="switchTab('UNASSIGNED')">Pool <span class="tab-count" id="countUnassigned">0</span><span class="tab-dot" id="dotPool"></span></button>
       <button class="sv-tab" data-status="OPEN" onclick="switchTab('OPEN')">Open <span class="tab-count" id="countOpen">0</span><span class="tab-dot" id="dotOpen"></span></button>
       <button class="sv-tab" data-status="IN_PROGRESS" onclick="switchTab('IN_PROGRESS')">Active <span class="tab-count" id="countProgress">0</span></button>
+      <button class="sv-tab" data-status="RESOLVED_PENDING_VERIFY" onclick="switchTab('RESOLVED_PENDING_VERIFY')">Verify <span class="tab-count" id="countVerify">0</span><span class="tab-dot" id="dotVerify"></span></button>
       <button class="sv-tab" data-status="done" onclick="switchTab('done')">Done <span class="tab-count" id="countDone">0</span></button>
     </div>
 
@@ -196,7 +199,7 @@ async function loadTickets() {
 }
 
 function updateCounts(unassignedCount) {
-  var open = 0, progress = 0, done = 0, urgent = 0, unassigned = 0;
+  var open = 0, progress = 0, done = 0, urgent = 0, unassigned = 0, verify = 0;
   for (var i = 0; i < allTickets.length; i++) {
     var t = allTickets[i];
     if (!t.assignedToId && t.status === 'OPEN') {
@@ -207,6 +210,8 @@ function updateCounts(unassignedCount) {
       if (t.priority === 'URGENT' || t.priority === 'HIGH') urgent++;
     } else if (t.status === 'IN_PROGRESS') {
       progress++;
+    } else if (t.status === 'RESOLVED_PENDING_VERIFY') {
+      verify++;
     } else {
       done++;
     }
@@ -214,16 +219,20 @@ function updateCounts(unassignedCount) {
   $('countUnassigned').textContent = unassigned;
   $('countOpen').textContent = open;
   $('countProgress').textContent = progress;
+  $('countVerify').textContent = verify;
   $('countDone').textContent = done;
   $('statUrgent').textContent = urgent;
   $('statUnassigned').textContent = unassigned;
   $('statOpen').textContent = open;
   $('statInProgress').textContent = progress;
+  $('statVerify').textContent = verify;
   $('statDone').textContent = done;
   var dotPool = $('dotPool');
   if (dotPool) dotPool.style.display = unassigned > 0 ? 'block' : 'none';
   var dotEl = $('dotOpen');
   if (dotEl) dotEl.style.display = (open > 0 && urgent > 0) ? 'block' : 'none';
+  var dotVerify = $('dotVerify');
+  if (dotVerify) dotVerify.style.display = verify > 0 ? 'block' : 'none';
 }
 
 function switchTab(tab) {
@@ -239,6 +248,7 @@ function renderList() {
   var filtered = allTickets.filter(function(t) {
     if (activeTab === 'UNASSIGNED') return !t.assignedToId && t.status === 'OPEN';
     if (activeTab === 'OPEN') return t.assignedToId && t.status === 'OPEN';
+    if (activeTab === 'RESOLVED_PENDING_VERIFY') return t.status === 'RESOLVED_PENDING_VERIFY';
     if (activeTab === 'done') return t.status === 'RESOLVED' || t.status === 'CLOSED';
     return t.status === activeTab;
   });
@@ -251,14 +261,15 @@ function renderList() {
   });
 
   if (!filtered.length) {
-    var msgs = { UNASSIGNED: 'No unassigned tickets available', OPEN: 'No open tickets assigned to you', IN_PROGRESS: 'No tickets in progress', done: 'No resolved tickets yet' };
+    var msgs = { UNASSIGNED: 'No unassigned tickets available', OPEN: 'No open tickets assigned to you', IN_PROGRESS: 'No tickets in progress', RESOLVED_PENDING_VERIFY: 'No tickets waiting for verification', done: 'No resolved tickets yet' };
     var icons = {
       UNASSIGNED: '<svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="opacity:.5"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4-4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>',
       OPEN: '<svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="opacity:.5"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/></svg>',
       IN_PROGRESS: '<svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="opacity:.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>',
+      RESOLVED_PENDING_VERIFY: '<svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#a855f7" stroke-width="1.5" style="opacity:.5"><path d="M9 12l2 2 4-4"/><circle cx="12" cy="12" r="10"/></svg>',
       done: '<svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="var(--success)" stroke-width="1.5" style="opacity:.5"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>'
     };
-    $('ticketList').innerHTML = '<div class="sv-empty">' + (icons[activeTab] || icons.OPEN) + '<p style="margin-top:.5rem">' + esc(msgs[activeTab]) + '</p></div>';
+    $('ticketList').innerHTML = '<div class="sv-empty">' + (icons[activeTab] || icons.OPEN) + '<p style="margin-top:.5rem">' + esc(msgs[activeTab] || 'No tickets') + '</p></div>';
     return;
   }
 
@@ -382,8 +393,26 @@ async function showDetail(id) {
     html += '<div class="form-group" style="margin-bottom:.5rem"><textarea class="form-textarea" id="resolveNote" placeholder="Resolution notes (optional)…" rows="2" maxlength="500" style="font-size:.82rem"></textarea></div>';
     html += '<button class="btn btn-success btn-block" id="resolveBtn" onclick="resolveTicket(\'' + t.id + '\')" disabled>Upload proof photo first</button>';
     html += '</div></div>';
+  } else if (t.status === 'RESOLVED_PENDING_VERIFY') {
+    // Show verify and reopen buttons
+    html += '<div style="width:100%;display:flex;flex-direction:column;gap:.5rem">';
+    html += '<div style="background:rgba(168,85,247,.08);border:1px solid rgba(168,85,247,.25);border-radius:var(--radius);padding:.75rem;font-size:.82rem;color:#c084fc"><b>⚡ Awaiting your verification</b><br>Electrician marked work done. Please inspect and verify or reject.</div>';
+    if (t.resolvedImageUrl || t.resolvedNote) {
+      html += '<div style="padding:0"><div class="tk-resolution">';
+      html += '<h4>Electrician\'s Report</h4>';
+      if (t.resolvedNote) html += '<p>' + esc(t.resolvedNote) + '</p>';
+      if (t.resolvedWorkers && t.resolvedWorkers.length) html += '<p style="font-size:.75rem"><b>By:</b> ' + t.resolvedWorkers.map(function(w) { return esc(w.name); }).join(', ') + '</p>';
+      if (t.resolvedImageUrl) html += '<img src="' + esc(App.imgUrl(t.resolvedImageUrl)) + '" onclick="openLightbox(this.src)" loading="lazy" alt="Proof photo">';
+      html += '</div></div>';
+    }
+    html += '<div class="form-group" style="margin:0"><textarea class="form-textarea" id="verifyNote" placeholder="Verification note (optional)…" rows="2" maxlength="500" style="font-size:.82rem"></textarea></div>';
+    html += '<div style="display:flex;gap:.5rem">';
+    html += '<button class="btn btn-success" style="flex:1" onclick="verifyTicket(\'' + t.id + '\')"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" style="vertical-align:-2px"><polyline points="20 6 9 17 4 12"/></svg> Verify &amp; Close</button>';
+    html += '<button class="btn btn-danger" style="flex:1" onclick="reopenTicket(\'' + t.id + '\')"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 102.13-9.36L1 10"/></svg> Reject &amp; Reopen</button>';
+    html += '</div>';
+    html += '</div>';
   } else {
-    html += '<span class="badge ' + statCls + '" style="font-size:.85rem;padding:.4rem .8rem">' + t.status.replace('_', ' ') + '</span>';
+    html += '<span class="badge ' + statCls + '" style="font-size:.85rem;padding:.4rem .8rem">' + t.status.replace(/_/g, ' ') + '</span>';
   }
   html += '</div>';
 
@@ -506,6 +535,52 @@ async function resolveTicket(id) {
     alert(copyMsg);
   }
 
+  showDetail(id);
+}
+
+async function verifyTicket(id) {
+  var note = ($('verifyNote') || {}).value || '';
+  var btns = $('ticketActions').querySelectorAll('button');
+  btns.forEach(function(b) { b.disabled = true; });
+  var res = await App.supFetch('/tickets/' + id + '/verify', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ note: note.trim() || undefined })
+  });
+  if (!res) { btns.forEach(function(b) { b.disabled = false; }); return; }
+  if (!res.ok) {
+    var d = await res.json();
+    App.toast(d.error || 'Failed to verify', 'error');
+    btns.forEach(function(b) { b.disabled = false; });
+    return;
+  }
+  var result = await res.json();
+  App.toast('Ticket verified and closed!', 'success');
+  if (result.reviewUrl) {
+    var reviewLink = window.location.origin + result.reviewUrl;
+    try { await navigator.clipboard.writeText(reviewLink); App.toast('Guest review link copied!', 'info'); } catch(e) {}
+  }
+  showDetail(id);
+}
+
+async function reopenTicket(id) {
+  var note = ($('verifyNote') || {}).value || '';
+  if (!confirm('Reject this resolution and reopen the ticket?')) return;
+  var btns = $('ticketActions').querySelectorAll('button');
+  btns.forEach(function(b) { b.disabled = true; });
+  var res = await App.supFetch('/tickets/' + id + '/reopen', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ note: note.trim() || undefined })
+  });
+  if (!res) { btns.forEach(function(b) { b.disabled = false; }); return; }
+  if (!res.ok) {
+    var d = await res.json();
+    App.toast(d.error || 'Failed to reopen', 'error');
+    btns.forEach(function(b) { b.disabled = false; });
+    return;
+  }
+  App.toast('Ticket reopened — electrician must redo the work.', 'warning');
   showDetail(id);
 }
 

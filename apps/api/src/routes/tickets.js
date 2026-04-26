@@ -9,12 +9,22 @@ const { authenticateJWT, requireRole } = require('../middleware/auth');
 const { createNotification, notifyAdmins } = require('./notifications');
 const { evaluateEvent } = require('../services/automation');
 const { sendEmail, emailAdmins, escHtml } = require('../lib/email');
+const { getAssignedSupervisorIds } = require('../services/assignment-resolver');
+
+// SLA deadlines by priority (milliseconds)
+const SLA_MS = { URGENT: 2 * 60 * 60 * 1000, HIGH: 4 * 60 * 60 * 1000, NORMAL: 24 * 60 * 60 * 1000, LOW: 72 * 60 * 60 * 1000 };
+
+function getSlaDeadline(priority) {
+  const ms = SLA_MS[priority] || SLA_MS.NORMAL;
+  return new Date(Date.now() + ms);
+}
 
 const TICKET_INCLUDE = {
   location: { select: { id: true, name: true, type: true } },
   createdBy: { select: { id: true, name: true, role: true } },
   assignedTo: { select: { id: true, name: true } },
-  resolvedWorkers: { select: { id: true, name: true } }
+  resolvedWorkers: { select: { id: true, name: true } },
+  verifiedBy: { select: { id: true, name: true } }
 };
 
 // Strip reviewToken from ticket responses — only expose computed reviewUrl
@@ -128,10 +138,29 @@ async function ticketRoutes(fastify, opts) {
         description: data.description || null,
         imageUrl,
         priority: data.priority || 'NORMAL',
-        module: data.module || 'ele'
+        module: data.module || 'ele',
+        slaDeadlineAt: getSlaDeadline(data.priority || 'NORMAL')
       },
       include: TICKET_INCLUDE
     });
+
+    // Auto-assign to first matching supervisor based on location hierarchy
+    try {
+      const supervisorIds = await getAssignedSupervisorIds(data.locationId, orgId);
+      if (supervisorIds.length > 0) {
+        const firstSup = supervisorIds[0];
+        await prisma.ticket.update({ where: { id: ticket.id }, data: { assignedToId: firstSup } });
+        ticket.assignedToId = firstSup;
+        createNotification({
+          orgId,
+          userId: firstSup,
+          type: 'ticket_assigned',
+          title: 'New ticket assigned to you',
+          body: ticket.title + (location ? ' — ' + location.name : ''),
+          entityId: ticket.id
+        }).catch(() => {});
+      }
+    } catch (_) { /* non-fatal */ }
 
     // Fire-and-forget: alert evaluation for high-priority tickets
     const ticketPri = data.priority || 'NORMAL';
@@ -165,10 +194,11 @@ async function ticketRoutes(fastify, opts) {
         where.assignedToId = null;
         where.status = 'OPEN';
       } else {
-        // Show assigned-to-me tickets + unassigned open tickets
+        // Show assigned-to-me tickets + unassigned open + pending-verify tickets
         where.OR = [
           { assignedToId: request.user.id },
-          { assignedToId: null, status: 'OPEN' }
+          { assignedToId: null, status: 'OPEN' },
+          { status: 'RESOLVED_PENDING_VERIFY', assignedToId: request.user.id }
         ];
       }
     }
@@ -217,7 +247,8 @@ async function ticketRoutes(fastify, opts) {
     if (request.user.role === 'SUPERVISOR') {
       statsWhere.OR = [
         { assignedToId: request.user.id },
-        { assignedToId: null, status: 'OPEN' }
+        { assignedToId: null, status: 'OPEN' },
+        { status: 'RESOLVED_PENDING_VERIFY', assignedToId: request.user.id }
       ];
     }
     const statCounts = await prisma.ticket.groupBy({
@@ -225,8 +256,8 @@ async function ticketRoutes(fastify, opts) {
       where: statsWhere,
       _count: true
     });
-    const stats = { OPEN: 0, IN_PROGRESS: 0, RESOLVED: 0, CLOSED: 0 };
-    for (const s of statCounts) stats[s.status] = s._count;
+    const stats = { OPEN: 0, IN_PROGRESS: 0, RESOLVED_PENDING_VERIFY: 0, RESOLVED: 0, CLOSED: 0 };
+    for (const s of statCounts) stats[s.status] = (stats[s.status] || 0) + s._count;
 
     // For supervisors, also count unassigned open tickets separately
     let unassignedCount = 0;
@@ -243,10 +274,11 @@ async function ticketRoutes(fastify, opts) {
     const { id } = request.params;
     const where = { id, orgId: request.user.orgId };
     if (request.user.role === 'SUPERVISOR') {
-      // Supervisors can view their assigned tickets + unassigned open tickets
+      // Supervisors can view their assigned tickets + unassigned open tickets + pending-verify tickets
       where.OR = [
         { assignedToId: request.user.id },
-        { assignedToId: null, status: 'OPEN' }
+        { assignedToId: null, status: 'OPEN' },
+        { status: 'RESOLVED_PENDING_VERIFY', assignedToId: request.user.id }
       ];
     }
     const ticket = await prisma.ticket.findFirst({ where, include: TICKET_INCLUDE });
@@ -260,7 +292,7 @@ async function ticketRoutes(fastify, opts) {
   }, async (request, reply) => {
     const { id } = request.params;
     const schema = z.object({
-      status: z.enum(['OPEN', 'IN_PROGRESS', 'RESOLVED', 'CLOSED']).optional(),
+      status: z.enum(['OPEN', 'IN_PROGRESS', 'RESOLVED_PENDING_VERIFY', 'RESOLVED', 'CLOSED']).optional(),
       assignedToId: z.string().uuid().optional().nullable(),
       priority: z.enum(['LOW', 'NORMAL', 'HIGH', 'URGENT']).optional()
     });
@@ -530,6 +562,138 @@ async function ticketRoutes(fastify, opts) {
     }
     delete response.reviewToken;
     return response;
+  });
+
+  // ── Supervisor: Verify a ticket (after worker marks RESOLVED_PENDING_VERIFY) ──
+  fastify.post('/tickets/:id/verify', {
+    preHandler: [requireRole('SUPERVISOR', 'ADMIN')]
+  }, async (request, reply) => {
+    const { id } = request.params;
+    const orgId = request.user.orgId;
+
+    const schema = z.object({
+      note: z.string().max(500).optional()
+    });
+    const data = schema.parse(request.body || {});
+
+    const ticket = await prisma.ticket.findFirst({ where: { id, orgId } });
+    if (!ticket) return reply.code(404).send({ error: 'Ticket not found' });
+    if (ticket.status !== 'RESOLVED_PENDING_VERIFY') {
+      return reply.code(400).send({ error: 'Only RESOLVED_PENDING_VERIFY tickets can be verified' });
+    }
+    // Supervisors can only verify tickets assigned to them
+    if (request.user.role === 'SUPERVISOR' && ticket.assignedToId !== request.user.id) {
+      return reply.code(403).send({ error: 'You can only verify tickets assigned to you' });
+    }
+
+    const updateData = {
+      status: 'RESOLVED',
+      verifiedAt: new Date(),
+      verifiedById: request.user.id,
+      verifyNote: data.note?.trim() || null
+    };
+
+    // Generate review token for PUBLIC tickets
+    if (ticket.source === 'PUBLIC' && !ticket.reviewToken) {
+      updateData.reviewToken = crypto.randomBytes(32).toString('hex');
+      updateData.reviewExpiresAt = new Date(Date.now() + 30 * 60 * 1000);
+      updateData.reviewStatus = 'PENDING';
+    }
+
+    const updated = await prisma.ticket.update({
+      where: { id },
+      data: updateData,
+      include: TICKET_INCLUDE
+    });
+
+    await prisma.auditLog.create({
+      data: {
+        orgId,
+        actorType: request.user.role === 'ADMIN' ? 'admin' : 'supervisor',
+        actorId: request.user.id,
+        action: 'ticket_verified',
+        entityType: 'Ticket',
+        entityId: id,
+        oldValue: { status: 'RESOLVED_PENDING_VERIFY' },
+        newValue: { status: 'RESOLVED', verifyNote: data.note || null }
+      }
+    });
+
+    notifyAdmins(orgId, {
+      type: 'ticket_resolved',
+      title: 'Ticket verified & resolved',
+      body: updated.title + (updated.location ? ' — ' + updated.location.name : ''),
+      entityId: id
+    }).catch(() => {});
+
+    // Notify workers who resolved it
+    if (ticket.resolvedWorkers) {
+      // resolvedWorkers loaded via TICKET_INCLUDE
+    }
+
+    const response = { ...updated };
+    if (updated.reviewToken) {
+      response.reviewUrl = `/review/${updated.reviewToken}`;
+    }
+    delete response.reviewToken;
+    return sanitizeTicket(response);
+  });
+
+  // ── Supervisor/Admin: Reopen ticket (reject worker resolution) ──
+  fastify.post('/tickets/:id/reopen', {
+    preHandler: [requireRole('SUPERVISOR', 'ADMIN')]
+  }, async (request, reply) => {
+    const { id } = request.params;
+    const orgId = request.user.orgId;
+
+    const schema = z.object({
+      note: z.string().max(500).optional()
+    });
+    const data = schema.parse(request.body || {});
+
+    const ticket = await prisma.ticket.findFirst({ where: { id, orgId } });
+    if (!ticket) return reply.code(404).send({ error: 'Ticket not found' });
+    if (ticket.status !== 'RESOLVED_PENDING_VERIFY') {
+      return reply.code(400).send({ error: 'Only RESOLVED_PENDING_VERIFY tickets can be reopened this way' });
+    }
+    if (request.user.role === 'SUPERVISOR' && ticket.assignedToId !== request.user.id) {
+      return reply.code(403).send({ error: 'You can only reopen tickets assigned to you' });
+    }
+
+    const updated = await prisma.ticket.update({
+      where: { id },
+      data: {
+        status: 'IN_PROGRESS',
+        resolvedAt: null,
+        resolvedImageUrl: null,
+        resolvedNote: data.note?.trim() || null,
+        resolvedWorkers: { set: [] }
+      },
+      include: TICKET_INCLUDE
+    });
+
+    await prisma.auditLog.create({
+      data: {
+        orgId,
+        actorType: request.user.role === 'ADMIN' ? 'admin' : 'supervisor',
+        actorId: request.user.id,
+        action: 'ticket_reopened',
+        entityType: 'Ticket',
+        entityId: id,
+        oldValue: { status: 'RESOLVED_PENDING_VERIFY' },
+        newValue: { status: 'IN_PROGRESS', reopenNote: data.note || null }
+      }
+    });
+
+    // Notify workers assigned to this location that ticket was rejected
+    notifyAdmins(orgId, {
+      type: 'ticket_reopened',
+      title: 'Ticket resolution rejected',
+      body: updated.title + (updated.location ? ' — ' + updated.location.name : ''),
+      entityId: id
+    }).catch(() => {});
+
+    return sanitizeTicket(updated);
   });
 }
 
