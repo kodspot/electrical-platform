@@ -1,4 +1,5 @@
 FROM node:20-alpine
+
 WORKDIR /app
 
 # Install system dependencies
@@ -11,25 +12,26 @@ RUN addgroup -g 1001 -S nodejs && \
 # Copy package files
 COPY package*.json ./
 
-# 1. Install ALL dependencies (including devDependencies so we have Prisma CLI)
+# Install ALL dependencies (including devDependencies for Prisma CLI)
 RUN npm ci
 
-# 2. Copy application code
-
+# Copy Prisma schema first
 COPY prisma ./prisma
 
-
+# Copy application code
 COPY . .
 
-# 3. Generate Prisma client
+# Generate Prisma client
 RUN npx prisma generate
 
-# 4. NOW remove devDependencies to keep the image small
+# Remove devDependencies to reduce image size
 RUN npm prune --production && \
     npm cache clean --force
 
 # Change ownership
 RUN chown -R nodejs:nodejs /app
+
+# Use non-root user
 USER nodejs
 
 EXPOSE 3000
@@ -38,5 +40,5 @@ EXPOSE 3000
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
     CMD wget --quiet --tries=1 --spider http://localhost:3000/health || exit 1
 
-# Start with migration deploy (SAFE for production)
-CMD ["sh", "-c", "npx prisma migrate deploy && node index.js"]
+# Wait for PostgreSQL before running Prisma migrations
+CMD ["sh", "-c", "echo 'Waiting for PostgreSQL...' && sleep 15 && npx prisma migrate deploy && node index.js"]
