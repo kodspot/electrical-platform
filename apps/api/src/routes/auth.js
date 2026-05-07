@@ -19,18 +19,15 @@ function safeCompareKeys(input, secret) {
 
 async function authRoutes(fastify, opts) {
 
-  // Bootstrap: Create first SUPER_ADMIN (one-time, protected by ADMIN_KEY)
+  // Bootstrap: Create first SUPER_ADMIN (one-time, admin key only — no email/password needed)
   fastify.post('/auth/bootstrap', {
     config: { rateLimit: strictRateLimit }
   }, async (request, reply) => {
     const schema = z.object({
-      adminKey: z.string().min(1),
-      name: z.string().min(1).max(100).trim(),
-      email: z.string().email().max(200),
-      password: passwordSchema
+      adminKey: z.string().min(1)
     });
 
-    const { adminKey, name, email, password } = schema.parse(request.body);
+    const { adminKey } = schema.parse(request.body);
 
     if (!process.env.ADMIN_KEY || !safeCompareKeys(adminKey, process.env.ADMIN_KEY)) {
       await new Promise(r => setTimeout(r, 500 + Math.random() * 500));
@@ -43,12 +40,14 @@ async function authRoutes(fastify, opts) {
       return reply.code(409).send({ error: 'SuperAdmin already exists. Use /auth/login instead.' });
     }
 
-    const passwordHash = await bcrypt.hash(password, BCRYPT_COST);
+    // Internal values — login is always done via admin key, not email/password
+    const internalEmail = 'superadmin@internal.kodspot';
+    const passwordHash = await bcrypt.hash(adminKey, BCRYPT_COST);
 
     const user = await prisma.user.create({
       data: {
-        name,
-        email: email.toLowerCase().trim(),
+        name: 'Super Admin',
+        email: internalEmail,
         passwordHash,
         role: 'SUPER_ADMIN',
         orgId: null
