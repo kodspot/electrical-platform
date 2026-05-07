@@ -3,7 +3,7 @@ FROM node:20-alpine
 WORKDIR /app
 
 # Install system dependencies
-RUN apk add --no-cache openssl libc6-compat wget
+RUN apk add --no-cache openssl libc6-compat wget postgresql-client
 
 # Create non-root user
 RUN addgroup -g 1001 -S nodejs && \
@@ -41,4 +41,4 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
     CMD wget --quiet --tries=1 --spider http://localhost:3000/health || exit 1
 
 # Wait for PostgreSQL before running Prisma migrations
-CMD ["sh", "-c", "echo 'Waiting for PostgreSQL...' && sleep 15 && npx prisma migrate deploy && node index.js"]
+CMD ["sh", "-c", "echo 'Waiting for PostgreSQL...' && until pg_isready -h db -p 5432; do echo 'DB not ready, retrying in 3s...'; sleep 3; done && echo 'DB is ready. Running migrations...' && npx prisma migrate deploy && exec node index.js"]

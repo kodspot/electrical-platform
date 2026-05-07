@@ -105,37 +105,30 @@ jobs:
 
             chmod 600 .env
 
-            # First deploy vs update deploy
-            if docker compose ps --format '{{.Name}}' 2>/dev/null | grep -q "electrical-db"; then
-              echo "=== UPDATE DEPLOYMENT ==="
+            # Always clean up before deploy — prevents port conflicts from stale containers
+            echo "=== STOPPING OLD CONTAINERS ==="
+            docker compose down --remove-orphans
 
-              docker compose build api
+            echo "=== BUILDING NEW IMAGE ==="
+            docker compose build
 
-              docker compose up -d --no-deps --remove-orphans api
+            echo "=== STARTING ALL SERVICES ==="
+            docker compose up -d
 
-            else
-              echo "=== FIRST TIME DEPLOYMENT ==="
-
-              docker compose build
-
-              docker compose up -d
-            fi
-
-            echo "=== WAITING FOR SERVICES ==="
-            sleep 40
-
-            echo "=== CONTAINER STATUS ==="
-            docker compose ps
-
-            echo "=== API HEALTH CHECK ==="
-
-            docker compose exec -T api wget -qO- http://127.0.0.1:3000/health || {
-              echo "❌ API HEALTH CHECK FAILED"
-
-              docker compose logs --tail 100 api
-
-              exit 1
-            }
+            echo "=== WAITING FOR API TO BECOME HEALTHY ==="
+            for i in $(seq 1 24); do
+              if docker compose exec -T api wget -qO- http://127.0.0.1:3000/health > /dev/null 2>&1; then
+                echo "✅ API is healthy (after ~${i}0s)"
+                break
+              fi
+              echo "  Attempt $i/24 — not ready yet..."
+              sleep 10
+              if [ "$i" -eq 24 ]; then
+                echo "❌ API HEALTH CHECK TIMED OUT after 240s"
+                docker compose logs --tail 150 api
+                exit 1
+              fi
+            done
 
             echo "✅ API HEALTHY"
 
