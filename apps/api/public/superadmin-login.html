@@ -30,6 +30,11 @@
     <button type="submit" class="btn btn-sa btn-block" id="saBtn">Sign In</button>
   </form>
 
+  <div id="setupHint" style="display:none;margin-top:var(--sp-lg);font-size:.82rem;color:#3730A3;background:#EEF2FF;border:1px solid #C7D2FE;border-radius:8px;padding:.75rem 1rem;text-align:center">
+    No Super Admin account found.<br>
+    <a href="/superadmin-setup" style="color:#4338CA;font-weight:600">Run one-time setup &rarr;</a>
+  </div>
+
   <p style="margin-top:var(--sp-lg);font-size:.8rem;color:var(--text-light);text-align:center">
     <a href="/" style="color:#4338CA">&larr; Back to Home</a>
   </p>
@@ -46,12 +51,20 @@ function hideErr() { $('error').style.display = 'none'; }
 // SA Login
 $('saLoginForm').addEventListener('submit', async function(e) {
   e.preventDefault(); hideErr();
+  $('setupHint').style.display = 'none';
   var btn = $('saBtn'); btn.disabled = true; btn.textContent = 'Signing in...';
   try {
     var res = await fetch('/api/auth/login', { method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ adminKey: $('adminKey').value }) });
     var data = await res.json();
-    if (!res.ok) { showErr(data.error || 'Login failed'); return; }
+    if (!res.ok) {
+      if (res.status === 404 && data.error && data.error.includes('No SuperAdmin')) {
+        $('setupHint').style.display = 'block';
+      } else {
+        showErr(data.error || 'Login failed');
+      }
+      return;
+    }
     localStorage.setItem('sa_token', data.token);
     localStorage.setItem('sa_user', JSON.stringify(data.user));
     location.href = '/superadmin-dashboard';

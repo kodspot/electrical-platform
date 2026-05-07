@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
+<link rel="manifest" href="/site.webmanifest">
+<meta name="theme-color" content="#1E40AF">
+<title>Super Admin Setup — Kodspot</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/css/design-system.css?v=10">
+<style>
+  .auth-card { border-top: 4px solid #4338CA; }
+  .auth-subtitle { color: #4338CA; }
+  .setup-notice {
+    background: #EEF2FF;
+    border: 1px solid #C7D2FE;
+    border-radius: 8px;
+    padding: .75rem 1rem;
+    font-size: .82rem;
+    color: #3730A3;
+    margin-bottom: var(--sp-lg);
+    line-height: 1.5;
+  }
+  .success-box {
+    display: none;
+    background: #ECFDF5;
+    border: 1px solid #6EE7B7;
+    border-radius: 8px;
+    padding: 1.2rem 1rem;
+    font-size: .88rem;
+    color: #065F46;
+    text-align: center;
+    margin-bottom: var(--sp-lg);
+  }
+</style>
+</head>
+<body class="auth-layout">
+<div class="auth-card">
+  <h1 class="auth-title">Kodspot</h1>
+  <p class="auth-subtitle">One-Time Super Admin Setup</p>
+
+  <div class="setup-notice">
+    This page creates the initial Super Admin account. It only works once — once the account is created, this page will no longer be accessible.
+  </div>
+
+  <div id="error" class="error-msg"></div>
+  <div id="success" class="success-box"></div>
+
+  <form id="setupForm">
+    <div class="form-group">
+      <label class="form-label" for="adminKey">Admin Key</label>
+      <input class="form-input" type="password" id="adminKey" required placeholder="Enter the admin key">
+    </div>
+    <div class="form-group">
+      <label class="form-label" for="saName">Full Name</label>
+      <input class="form-input" type="text" id="saName" required placeholder="e.g. Kishan">
+    </div>
+    <div class="form-group">
+      <label class="form-label" for="saEmail">Email Address</label>
+      <input class="form-input" type="email" id="saEmail" required placeholder="e.g. admin@kodspot.in">
+    </div>
+    <div class="form-group">
+      <label class="form-label" for="saPassword">Password</label>
+      <input class="form-input" type="password" id="saPassword" required placeholder="Min 8 chars, upper + lower + number">
+      <p style="font-size:.75rem;color:var(--text-light);margin-top:.3rem">Must contain uppercase, lowercase, and a number.</p>
+    </div>
+    <button type="submit" class="btn btn-sa btn-block" id="setupBtn">Create Super Admin Account</button>
+  </form>
+
+  <p style="margin-top:var(--sp-lg);font-size:.8rem;color:var(--text-light);text-align:center">
+    <a href="/superadmin-login" style="color:#4338CA">&larr; Back to Login</a>
+  </p>
+</div>
+
+<script src="/js/offline-sync.js?v=1"></script>
+<script src="/js/app.js?v=14"></script>
+<script>
+var $ = App.$;
+
+// If already logged in as SA, go straight to dashboard
+if (localStorage.getItem('sa_token')) {
+  var _u = JSON.parse(localStorage.getItem('sa_user') || '{}');
+  if (_u.role === 'SUPER_ADMIN') location.href = '/superadmin-dashboard';
+}
+
+function showErr(msg) { $('error').textContent = msg; $('error').style.display = 'block'; $('success').style.display = 'none'; }
+function hideErr() { $('error').style.display = 'none'; }
+
+$('setupForm').addEventListener('submit', async function(e) {
+  e.preventDefault(); hideErr();
+
+  var btn = $('setupBtn');
+  btn.disabled = true; btn.textContent = 'Creating account...';
+
+  try {
+    var res = await fetch('/api/auth/bootstrap', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        adminKey: $('adminKey').value,
+        name:     $('saName').value.trim(),
+        email:    $('saEmail').value.trim(),
+        password: $('saPassword').value
+      })
+    });
+
+    var data = await res.json();
+
+    if (!res.ok) {
+      if (res.status === 409) {
+        // Already exists — redirect to login
+        showErr('Super Admin account already exists. Redirecting to login...');
+        setTimeout(function() { location.href = '/superadmin-login'; }, 2000);
+        return;
+      }
+      showErr(data.error || 'Setup failed. Check your admin key and try again.');
+      return;
+    }
+
+    // Success — store token and go to dashboard
+    localStorage.setItem('sa_token', data.token);
+    localStorage.setItem('sa_user', JSON.stringify(data.user));
+
+    $('setupForm').style.display = 'none';
+    var box = $('success');
+    box.innerHTML = '<strong>Super Admin created successfully!</strong><br>Welcome, ' + data.user.name + '.<br><br>Redirecting to dashboard...';
+    box.style.display = 'block';
+
+    setTimeout(function() { location.href = '/superadmin-dashboard'; }, 2000);
+
+  } catch (err) {
+    showErr('Network error. Please check your connection and try again.');
+  } finally {
+    btn.disabled = false; btn.textContent = 'Create Super Admin Account';
+  }
+});
+</script>
+
+<footer style="position:fixed;bottom:0;left:0;right:0;text-align:center;padding:.8rem;font-size:.75rem;color:var(--text-muted)">
+  <a href="/privacy" style="color:var(--text-muted);text-decoration:underline">Privacy Policy</a> · <a href="/terms" style="color:var(--text-muted);text-decoration:underline">Terms of Service</a>
+</footer>
+</body>
+</html>
