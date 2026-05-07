@@ -49,7 +49,6 @@ async function pageRoutes(fastify) {
   // ── Static pages ──
   fastify.get('/', sendPage('index.html'));
   fastify.get('/superadmin-login', sendPage('superadmin-login.html'));
-  fastify.get('/superadmin-setup', sendPage('superadmin-setup.html'));
   fastify.get('/superadmin-dashboard', sendPage('superadmin-dashboard.html'));
   fastify.get('/privacy', sendPage('privacy.html'));
   fastify.get('/terms', sendPage('terms.html'));
