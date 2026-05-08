@@ -785,7 +785,7 @@ async function loadUsers(role) {
       '<td class="name-cell"><b>' + esc(u.name) + '</b></td>' +
       '<td>' + esc(u.email) + '</td>' +
       '<td class="hide-mobile">' + esc(u.phone || '—') + '</td>' +
-      '<td class="hide-mobile">' + esc(u.organization ? u.organization.name : '—') + '</td>' +
+      '<td class="hide-mobile">' + esc(u.org ? u.org.name : '—') + '</td>' +
       '<td><span class="status-badge ' + statusCls + '">' + statusText + '</span></td>' +
       '<td class="actions-cell">' +
         '<button class="btn btn-sm btn-outline" onclick="openEditUser(\'' + u.id + '\',\'' + esc(u.name).replace(/'/g, "\\'") + '\',\'' + esc(u.email).replace(/'/g, "\\'") + '\',\'' + esc(u.phone || '').replace(/'/g, "\\'") + '\',\'' + role + '\',\'' + (u.orgId || '') + '\')">Edit</button>' +
