@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
+<link rel="manifest" href="/site.webmanifest">
+<meta name="theme-color" content="#1E40AF">
+<title>My Work — Electrician</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/css/design-system.css?v=10">
+<style>
+.el-shell{max-width:760px;margin:0 auto;padding:1rem .8rem 2rem}
+.el-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:.5rem;margin-bottom:.9rem}
+.el-stat{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:.55rem .45rem;text-align:center}
+.el-stat b{display:block;font-size:1.2rem;line-height:1.1}
+.el-stat span{font-size:.65rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.04em}
+.el-list{display:flex;flex-direction:column;gap:.55rem}
+.el-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:.8rem .9rem}
+.el-top{display:flex;justify-content:space-between;gap:.7rem;align-items:flex-start}
+.el-title{font-size:.9rem;font-weight:700;line-height:1.35}
+.el-meta{display:flex;flex-wrap:wrap;gap:.35rem .8rem;color:var(--text-muted);font-size:.74rem;margin-top:.35rem}
+.el-empty{text-align:center;color:var(--text-muted);padding:2rem 1rem}
+.el-status{font-size:.62rem;font-weight:700;padding:.14rem .4rem;border-radius:6px;letter-spacing:.03em}
+.el-status.OPEN{background:rgba(220,38,38,.13);color:#ef4444}
+.el-status.IN_PROGRESS{background:rgba(245,158,11,.14);color:#f59e0b}
+.el-status.RESOLVED_PENDING_VERIFY{background:rgba(168,85,247,.14);color:#c084fc}
+.el-status.RESOLVED,.el-status.CLOSED{background:rgba(16,185,129,.15);color:#34d399}
+.el-img{margin-top:.55rem;width:100%;max-height:160px;object-fit:contain;border-radius:8px;border:1px solid var(--border)}
+.retention-note{font-size:.72rem;color:var(--text-muted);background:rgba(59,130,246,.08);border:1px solid rgba(59,130,246,.2);padding:.55rem .75rem;border-radius:var(--radius);margin-bottom:.85rem}
+.filter-tabs{display:flex;gap:.3rem;margin-bottom:.7rem;overflow-x:auto;-webkit-overflow-scrolling:touch}
+.filter-tab{flex:0 0 auto;padding:.35rem .65rem;font-size:.74rem;border-radius:var(--radius);border:1px solid var(--border);background:var(--surface);color:var(--text-muted);cursor:pointer;font-weight:600}
+.filter-tab.active{background:var(--primary);color:#fff;border-color:var(--primary)}
+@media(max-width:640px){.el-stats{grid-template-columns:repeat(2,1fr)}}
+</style>
+</head>
+<body>
+<nav class="topbar">
+  <div class="topbar-left">
+    <span class="topbar-brand">Kodspot</span>
+    <div class="sv-nav" id="sv-nav">
+      <a href="/electrician-scan" class="sv-nav-link"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7V5a2 2 0 012-2h2"/><path d="M17 3h2a2 2 0 012 2v2"/><path d="M21 17v2a2 2 0 01-2 2h-2"/><path d="M7 21H5a2 2 0 01-2-2v-2"/><rect x="7" y="7" width="10" height="10" rx="1"/></svg>Scan</a>
+      <a href="/electrician-tickets" class="sv-nav-link"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 5H9a2 2 0 00-2 2v10a2 2 0 002 2h6a2 2 0 002-2V7a2 2 0 00-2-2z"/><path d="M12 11h.01"/><path d="M12 15h.01"/></svg>Tickets</a>
+      <a href="/electrician-my-work" class="sv-nav-link active"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>My Work</a>
+    </div>
+  </div>
+  <div class="topbar-right">
+    <span class="topbar-user" id="userName"></span>
+    <button class="btn btn-sm btn-ghost" onclick="App.logoutElec()">Logout</button>
+  </div>
+</nav>
+
+<main class="el-shell">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.6rem">
+    <h2 style="font-size:1.05rem;font-weight:700;margin:0">My Work — Last 30 Days</h2>
+    <button class="btn btn-sm btn-outline" onclick="loadWork()">Refresh</button>
+  </div>
+
+  <div class="retention-note">📸 Proof photos are kept for 30 days, then automatically deleted. Ticket records and your work history remain visible.</div>
+
+  <div class="el-stats">
+    <div class="el-stat"><b id="sTotal">0</b><span>Total</span></div>
+    <div class="el-stat"><b id="sVerified" style="color:#34d399">0</b><span>Verified</span></div>
+    <div class="el-stat"><b id="sPending" style="color:#c084fc">0</b><span>Pending Verify</span></div>
+    <div class="el-stat"><b id="sActive" style="color:#f59e0b">0</b><span>Active / Reopened</span></div>
+  </div>
+
+  <div class="filter-tabs" id="filterTabs">
+    <button class="filter-tab active" data-f="all" onclick="setFilter('all')">All</button>
+    <button class="filter-tab" data-f="verified" onclick="setFilter('verified')">Verified</button>
+    <button class="filter-tab" data-f="pending" onclick="setFilter('pending')">Pending Verify</button>
+    <button class="filter-tab" data-f="active" onclick="setFilter('active')">Active / Reopened</button>
+  </div>
+
+  <div id="workList" class="el-list"></div>
+</main>
+
+<script src="/js/offline-sync.js?v=1"></script>
+<script src="/js/app.js?v=14"></script>
+<script>
+if (!App.initElectrician()) throw '';
+App.initNotifications(App.elecFetch, 'electrician');
+var $ = App.$, esc = App.esc;
+var allTickets = [];
+var filter = 'all';
+
+async function loadWork() {
+  var list = $('workList');
+  App.showSkeletonCards(list, 3);
+  var res = await App.elecFetch('/worker/my-work?days=30');
+  if (!res || !res.ok) {
+    list.innerHTML = '<div class="el-empty">Failed to load work history</div>';
+    return;
+  }
+  var data = await res.json();
+  allTickets = data.tickets || [];
+  var c = data.counts || {};
+  $('sTotal').textContent = c.total || 0;
+  $('sVerified').textContent = c.verified || 0;
+  $('sPending').textContent = c.pendingVerify || 0;
+  $('sActive').textContent = (c.inProgress || 0) + (c.reopened || 0);
+  render();
+}
+
+function setFilter(f) {
+  filter = f;
+  var btns = document.querySelectorAll('.filter-tab');
+  for (var i = 0; i < btns.length; i++) btns[i].classList.toggle('active', btns[i].getAttribute('data-f') === f);
+  render();
+}
+
+function passes(t) {
+  if (filter === 'all') return true;
+  if (filter === 'verified') return t.status === 'RESOLVED' || t.status === 'CLOSED';
+  if (filter === 'pending') return t.status === 'RESOLVED_PENDING_VERIFY';
+  if (filter === 'active') return t.status === 'OPEN' || t.status === 'IN_PROGRESS';
+  return true;
+}
+
+function render() {
+  var list = $('workList');
+  var rows = allTickets.filter(passes);
+  if (!rows.length) {
+    list.innerHTML = '<div class="el-empty">No work history in this filter.</div>';
+    return;
+  }
+  list.innerHTML = rows.map(function(t) {
+    var when = t.resolvedAt ? 'Resolved ' + App.fmtDate(t.resolvedAt) :
+               t.acceptedAt ? 'Picked up ' + App.fmtDate(t.acceptedAt) :
+               'Updated ' + App.fmtDate(t.updatedAt);
+    return '<article class="el-card">' +
+      '<div class="el-top">' +
+        '<div><div class="el-title">' + esc(t.title) + '</div></div>' +
+        '<span class="el-status ' + esc(t.status) + '">' + esc(t.status.replace(/_/g, ' ')) + '</span>' +
+      '</div>' +
+      '<div class="el-meta">' +
+        '<span>📍 ' + esc(t.location ? t.location.name : '—') + '</span>' +
+        '<span>🕒 ' + esc(when) + '</span>' +
+        (t.verifiedBy ? '<span>✓ Verified by ' + esc(t.verifiedBy.name) + '</span>' : '') +
+      '</div>' +
+      (t.resolvedNote ? '<div style="margin-top:.4rem;font-size:.78rem;color:var(--text)">' + esc(t.resolvedNote) + '</div>' : '') +
+      (t.resolvedImageUrl ? '<img class="el-img" src="' + esc(App.imgUrl(t.resolvedImageUrl)) + '" alt="Proof" loading="lazy">' : '') +
+    '</article>';
+  }).join('');
+}
+
+loadWork();
+</script>
+<footer style="text-align:center;padding:.8rem;font-size:.72rem;color:var(--text-muted)">
+  <a href="/privacy" style="color:var(--text-muted);text-decoration:underline">Privacy</a> · <a href="/terms" style="color:var(--text-muted);text-decoration:underline">Terms</a>
+</footer>
+</body>
+</html>

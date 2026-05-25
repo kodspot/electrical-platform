@@ -47,6 +47,11 @@
 <nav class="topbar">
   <div class="topbar-left">
     <span class="topbar-brand">Kodspot</span>
+    <div class="sv-nav" id="sv-nav">
+      <a href="/electrician-scan" class="sv-nav-link"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7V5a2 2 0 012-2h2"/><path d="M17 3h2a2 2 0 012 2v2"/><path d="M21 17v2a2 2 0 01-2 2h-2"/><path d="M7 21H5a2 2 0 01-2-2v-2"/><rect x="7" y="7" width="10" height="10" rx="1"/></svg>Scan</a>
+      <a href="/electrician-tickets" class="sv-nav-link active"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 5H9a2 2 0 00-2 2v10a2 2 0 002 2h6a2 2 0 002-2V7a2 2 0 00-2-2z"/><path d="M12 11h.01"/><path d="M12 15h.01"/></svg>Tickets</a>
+      <a href="/electrician-my-work" class="sv-nav-link"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>My Work</a>
+    </div>
   </div>
   <div class="topbar-right">
     <span class="topbar-user" id="userName"></span>
@@ -61,11 +66,19 @@
   </div>
 
   <div class="el-stats">
-    <div class="el-stat"><b id="sOpen">0</b><span>Open</span></div>
-    <div class="el-stat"><b id="sActive">0</b><span>In Progress</span></div>
+    <div class="el-stat"><b id="sPool" style="color:#fb923c">0</b><span>Pool</span></div>
+    <div class="el-stat"><b id="sActive">0</b><span>My Active</span></div>
     <div class="el-stat"><b id="sVerify" style="color:#c084fc">0</b><span>To Verify</span></div>
-    <div class="el-stat"><b id="sDone">0</b><span>Resolved</span></div>
+    <div class="el-stat"><b id="sDone" style="color:#34d399">0</b><span>Resolved</span></div>
   </div>
+
+  <div class="filter-tabs" id="filterTabs" style="display:flex;gap:.3rem;margin-bottom:.7rem;overflow-x:auto;-webkit-overflow-scrolling:touch">
+    <button class="filter-tab" data-tab="pool" onclick="setTab('pool')" style="flex:0 0 auto;padding:.4rem .75rem;font-size:.78rem;border-radius:var(--radius);border:1px solid var(--border);background:var(--surface);color:var(--text-muted);cursor:pointer;font-weight:600">🔥 Pool <span id="tabPoolCount" style="opacity:.7">0</span></button>
+    <button class="filter-tab" data-tab="active" onclick="setTab('active')" style="flex:0 0 auto;padding:.4rem .75rem;font-size:.78rem;border-radius:var(--radius);border:1px solid var(--border);background:var(--surface);color:var(--text-muted);cursor:pointer;font-weight:600">🛠 Active</button>
+    <button class="filter-tab" data-tab="verify" onclick="setTab('verify')" style="flex:0 0 auto;padding:.4rem .75rem;font-size:.78rem;border-radius:var(--radius);border:1px solid var(--border);background:var(--surface);color:var(--text-muted);cursor:pointer;font-weight:600">⏳ To Verify</button>
+    <button class="filter-tab" data-tab="done" onclick="setTab('done')" style="flex:0 0 auto;padding:.4rem .75rem;font-size:.78rem;border-radius:var(--radius);border:1px solid var(--border);background:var(--surface);color:var(--text-muted);cursor:pointer;font-weight:600">✓ Done</button>
+  </div>
+  <style>.filter-tab.active{background:var(--primary)!important;color:#fff!important;border-color:var(--primary)!important}</style>
 
   <div id="ticketList" class="el-list"></div>
 </main>
@@ -96,33 +109,56 @@
 <script src="/js/app.js?v=14"></script>
 <script>
 if (!App.initElectrician()) throw '';
+App.initNotifications(App.elecFetch, 'electrician');
 var $ = App.$, esc = App.esc;
 var tickets = [];
+var poolTickets = [];
+var currentTab = 'pool';
+var locationFilter = new URLSearchParams(location.search).get('locationId') || null;
 
 async function loadTickets() {
   var list = $('ticketList');
   App.showSkeletonCards(list, 3);
-  var res = await App.elecFetch('/worker/tickets?status=OPEN,IN_PROGRESS,RESOLVED_PENDING_VERIFY,RESOLVED&limit=100');
-  if (!res || !res.ok) {
+  // Fetch in parallel: assigned-coverage tickets + pool
+  var qs = locationFilter ? '&locationId=' + encodeURIComponent(locationFilter) : '';
+  var [resTk, resPool] = await Promise.all([
+    App.elecFetch('/worker/tickets?status=OPEN,IN_PROGRESS,RESOLVED_PENDING_VERIFY,RESOLVED&limit=100' + qs),
+    App.elecFetch('/worker/tickets/pool')
+  ]);
+  if (!resTk || !resTk.ok) {
     list.innerHTML = '<div class="el-empty">Failed to load tickets</div>';
     return;
   }
-  var data = await res.json();
-  tickets = data.tickets || [];
+  var data = await resTk.json();
+  tickets = (data.tickets || []).filter(function(t) {
+    return !locationFilter || t.locationId === locationFilter;
+  });
+  if (resPool && resPool.ok) {
+    var p = await resPool.json();
+    poolTickets = (p.tickets || []).filter(function(t) {
+      return !locationFilter || t.locationId === locationFilter;
+    });
+  }
   renderStats(data.stats || {});
   renderList();
 }
 
 function renderStats(stats) {
-  var open = stats.OPEN || 0;
-  var active = stats.IN_PROGRESS || 0;
-  var verify = stats.RESOLVED_PENDING_VERIFY || 0;
-  var done = stats.RESOLVED || 0;
-  $('sOpen').textContent = open;
-  $('sActive').textContent = active;
-  $('sVerify').textContent = verify;
-  $('sDone').textContent = done;
+  $('sPool').textContent = poolTickets.length;
+  $('tabPoolCount').textContent = poolTickets.length;
+  $('sActive').textContent = stats.IN_PROGRESS || 0;
+  $('sVerify').textContent = stats.RESOLVED_PENDING_VERIFY || 0;
+  $('sDone').textContent = stats.RESOLVED || 0;
 }
+
+function setTab(t) {
+  currentTab = t;
+  var btns = document.querySelectorAll('.filter-tab');
+  for (var i = 0; i < btns.length; i++) btns[i].classList.toggle('active', btns[i].getAttribute('data-tab') === t);
+  renderList();
+}
+// initialize active tab
+document.querySelector('.filter-tab[data-tab="pool"]').classList.add('active');
 
 function elapsedLabel(dateStr) {
   var ms = Date.now() - new Date(dateStr).getTime();
@@ -143,22 +179,38 @@ function timerClass(dateStr) {
 
 function renderList() {
   var list = $('ticketList');
-  if (!tickets.length) {
-    list.innerHTML = '<div class="el-empty">No tickets in your assigned locations.</div>';
+  var rows;
+  if (currentTab === 'pool') {
+    rows = poolTickets.slice();
+  } else if (currentTab === 'active') {
+    rows = tickets.filter(function(t) { return t.status === 'OPEN' || t.status === 'IN_PROGRESS'; });
+  } else if (currentTab === 'verify') {
+    rows = tickets.filter(function(t) { return t.status === 'RESOLVED_PENDING_VERIFY'; });
+  } else {
+    rows = tickets.filter(function(t) { return t.status === 'RESOLVED' || t.status === 'CLOSED'; });
+  }
+
+  if (!rows.length) {
+    var msg = currentTab === 'pool' ? 'No unassigned tickets in your coverage right now.' :
+              currentTab === 'active' ? 'No active tickets. Pick one from the Pool to start.' :
+              currentTab === 'verify' ? 'Nothing awaiting supervisor verification.' :
+              'No resolved tickets here.';
+    list.innerHTML = '<div class="el-empty">' + msg + '</div>';
     return;
   }
 
-  tickets.sort(function(a, b) {
+  rows.sort(function(a, b) {
     var p = { URGENT: 4, HIGH: 3, NORMAL: 2, LOW: 1 };
     var pa = p[a.priority] || 1, pb = p[b.priority] || 1;
     if (pa !== pb) return pb - pa;
     return new Date(b.createdAt) - new Date(a.createdAt);
   });
 
-  list.innerHTML = tickets.map(function(t) {
-    var canResolve = t.status === 'OPEN' || t.status === 'IN_PROGRESS';
-    var isActive = t.status === 'OPEN' || t.status === 'IN_PROGRESS';
+  list.innerHTML = rows.map(function(t) {
+    var canResolve = t.status === 'IN_PROGRESS';
+    var canPickup = currentTab === 'pool' || (t.status === 'OPEN' && !isMine(t));
     var isPendingVerify = t.status === 'RESOLVED_PENDING_VERIFY';
+    var isActive = t.status === 'OPEN' || t.status === 'IN_PROGRESS';
     var timerHtml = isActive ? '<span class="' + timerClass(t.createdAt) + '">' + elapsedLabel(t.createdAt) + '</span>' : '';
     return '<article class="el-card">' +
       '<div class="el-top">' +
@@ -177,12 +229,33 @@ function renderList() {
       (t.imageUrl ? '<img class="el-img" src="' + esc(App.imgUrl(t.imageUrl)) + '" alt="Ticket photo" loading="lazy">' : '') +
       (t.resolvedImageUrl ? '<img class="el-img" src="' + esc(App.imgUrl(t.resolvedImageUrl)) + '" alt="Resolved proof" loading="lazy">' : '') +
       '<div class="el-actions">' +
+        (canPickup ? '<button class="btn btn-sm btn-primary" onclick="pickupTicket(\'' + t.id + '\')">⚡ Pick Up</button>' : '') +
         (canResolve ? '<button class="btn btn-sm btn-success" onclick="openResolve(\'' + t.id + '\')">📷 Resolve With Photo</button>' : '') +
         (isPendingVerify ? '<span style="font-size:.75rem;color:#c084fc;font-weight:600">⚡ Awaiting supervisor verification</span>' : '') +
-        (!canResolve && !isPendingVerify ? '<span style="font-size:.75rem;color:var(--text-muted)">✓ Done</span>' : '') +
+        (!canPickup && !canResolve && !isPendingVerify ? '<span style="font-size:.75rem;color:var(--text-muted)">✓ Done</span>' : '') +
       '</div>' +
     '</article>';
   }).join('');
+}
+
+function isMine(t) {
+  if (!t.resolvedWorkers) return false;
+  var me = (App.getElecUser && App.getElecUser()) || {};
+  return t.resolvedWorkers.some(function(w) { return w.id === me.id; });
+}
+
+async function pickupTicket(id) {
+  if (!confirm('Pick up this ticket and start work?')) return;
+  var res = await App.elecFetch('/worker/tickets/' + encodeURIComponent(id) + '/pickup', { method: 'POST' });
+  if (!res) return;
+  if (!res.ok) {
+    var d = await res.json().catch(function(){ return {}; });
+    App.toast(d.error || 'Failed to pick up ticket', 'error');
+    return;
+  }
+  App.toast('Ticket picked up — switched to Active', 'success');
+  setTab('active');
+  loadTickets();
 }
 
 function openResolve(id) {

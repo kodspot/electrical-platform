@@ -16,7 +16,7 @@ const MODULE_PAGES = [
   'supervisor-login', 'supervisor-scan', 'supervisor-tickets',
   'supervisor-attendance', 'supervisor-electrical',
   'supervisor-assets',
-  'electrician-login', 'electrician-tickets'
+  'electrician-login', 'electrician-tickets', 'electrician-scan', 'electrician-my-work'
 ];
 
 // Module metadata for dynamic manifests

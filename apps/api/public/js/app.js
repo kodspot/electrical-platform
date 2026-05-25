@@ -486,6 +486,16 @@ window.App = (function () {
     initModulePWA();
     _applyOrgBrand();
 
+    // Rewrite electrician nav links to module-scoped paths
+    var svNav = $('sv-nav');
+    if (svNav) {
+      var links = svNav.querySelectorAll('a[href]');
+      for (var i = 0; i < links.length; i++) {
+        var page = links[i].getAttribute('href').replace(/^\//, '');
+        if (page) links[i].href = orgPath(page);
+      }
+    }
+
     _buildUserMenu(user, 'electrician');
     return true;
   }
@@ -889,10 +899,14 @@ window.App = (function () {
   var _notifUnread = 0;
   var _notifPage = null; // which admin/supervisor page context
   var _notifSSE = null; // SSE EventSource connection
+  var _notifPathPrefix = '/notifications';
+
+  function _np(p) { return _notifPathPrefix + p; }
 
   function initNotifications(fetcher, pageContext) {
     _notifFetcher = fetcher;
     _notifPage = pageContext || null;
+    _notifPathPrefix = pageContext === 'electrician' ? '/worker/notifications' : '/notifications';
     // Create bell in topbar-right (before logout button)
     var topRight = document.querySelector('.topbar-right');
     if (!topRight) return;
@@ -951,7 +965,7 @@ window.App = (function () {
     // Mark all read
     $('notifMarkAll').addEventListener('click', async function(e) {
       e.stopPropagation();
-      await _notifFetcher('/notifications/read-all', { method: 'PATCH' });
+      await _notifFetcher(_np('/read-all'), { method: 'PATCH' });
       _pollUnreadCount();
       _loadNotifications();
     });
@@ -959,7 +973,7 @@ window.App = (function () {
     // Clear read
     $('notifClearRead').addEventListener('click', async function(e) {
       e.stopPropagation();
-      await _notifFetcher('/notifications/clear-read', { method: 'DELETE' });
+      await _notifFetcher(_np('/clear-read'), { method: 'DELETE' });
       _loadNotifications();
     });
 
@@ -979,30 +993,24 @@ window.App = (function () {
 
   function _connectSSE() {
     // Determine auth token and SSE endpoint
-    var token = getToken() || getSAToken() || getSupToken() || getElecToken();
+    var isElec = _notifPage === 'electrician';
+    var token = isElec ? getElecToken() : (getToken() || getSAToken() || getSupToken());
     if (!token || typeof EventSource === 'undefined') {
-      // Browser doesn't support SSE or no token — use polling fallback
       _startPolling();
       return;
     }
-
-    var sseUrl = '/api/notifications/stream';
-    // EventSource doesn't support custom headers, so we pass token as query param
-    // Note: SSE endpoint expects Authorization header, so we use a workaround with Fastify
-    // For simplicity, fall back to polling (standard SSE limitation with JWT)
-    // Use fetch-based SSE reader instead
-    _startSSEFetch(token, sseUrl);
+    // Workers use a token-query-based stream; admin/supervisor use bearer header
+    var sseUrl = isElec ? ('/api/notifications/worker-stream?token=' + encodeURIComponent(token)) : '/api/notifications/stream';
+    _startSSEFetch(token, sseUrl, isElec);
   }
 
-  function _startSSEFetch(token, sseUrl) {
+  function _startSSEFetch(token, sseUrl, isElec) {
     try {
       var ctrl = new AbortController();
       _notifSSE = ctrl;
-
-      fetch(sseUrl, {
-        headers: { 'Authorization': 'Bearer ' + token },
-        signal: ctrl.signal
-      }).then(function(response) {
+      var opts = { signal: ctrl.signal };
+      if (!isElec) opts.headers = { 'Authorization': 'Bearer ' + token };
+      fetch(sseUrl, opts).then(function(response) {
         if (!response.ok || !response.body) {
           _startPolling(); // Fallback to polling
           return;
@@ -1086,7 +1094,7 @@ window.App = (function () {
 
   async function _pollUnreadCount() {
     try {
-      var res = await _notifFetcher('/notifications/unread-count');
+      var res = await _notifFetcher(_np('/unread-count'));
       if (!res || !res.ok) return;
       var data = await res.json();
       var prev = _notifUnread;
@@ -1119,7 +1127,7 @@ window.App = (function () {
     var isAppend = offset && offset > 0;
     if (!isAppend) listEl.innerHTML = '<div class="notif-empty-state">Loading…</div>';
     try {
-      var res = await _notifFetcher('/notifications?limit=20&offset=' + (offset || 0));
+      var res = await _notifFetcher(_np('?limit=20&offset=' + (offset || 0)));
       if (!res || !res.ok) { if (!isAppend) listEl.innerHTML = '<div class="notif-empty-state">Could not load notifications</div>'; return; }
       var data = await res.json();
       var notifs = data.notifications || [];
@@ -1185,13 +1193,15 @@ window.App = (function () {
         var entityId = el.dataset.entity;
         var type = el.dataset.type;
         if (!el.classList.contains('read')) {
-          _notifFetcher('/notifications/' + nId + '/read', { method: 'PATCH' }).then(function() { _pollUnreadCount(); });
+          _notifFetcher(_np('/' + nId + '/read'), { method: 'PATCH' }).then(function() { _pollUnreadCount(); });
           el.classList.add('read');
         }
         // Navigate to relevant page
-        if (entityId && (type === 'ticket_assigned' || type === 'ticket_resolved' || type === 'public_complaint')) {
+        if (entityId && (type === 'ticket_assigned' || type === 'ticket_resolved' || type === 'public_complaint' || type === 'ticket_pending_verify' || type === 'ticket_picked_up')) {
           _notifPanelEl.classList.remove('open');
-          var base = _notifPage === 'supervisor' ? orgPath('supervisor-tickets') : orgPath('admin-tickets');
+          var base = _notifPage === 'supervisor' ? orgPath('supervisor-tickets')
+            : _notifPage === 'electrician' ? orgPath('electrician-tickets')
+            : orgPath('admin-tickets');
           window.location.href = base;
         }
       });
@@ -1204,7 +1214,7 @@ window.App = (function () {
           el.style.opacity = '0'; el.style.height = '0'; el.style.padding = '0'; el.style.overflow = 'hidden';
           el.style.transition = 'all .2s ease';
           setTimeout(function() { el.remove(); }, 200);
-          _notifFetcher('/notifications/' + nId, { method: 'DELETE' }).then(function() { _pollUnreadCount(); });
+          _notifFetcher(_np('/' + nId), { method: 'DELETE' }).then(function() { _pollUnreadCount(); });
         });
       }
     });

@@ -231,6 +231,15 @@ async function workerAuthRoutes(fastify) {
     return { success: true };
   });
 
+  fastify.delete('/worker/notifications/clear-read', {
+    preHandler: [authenticateWorkerJWT]
+  }, async (request) => {
+    const result = await prisma.notification.deleteMany({
+      where: { workerId: request.worker.id, isRead: true }
+    });
+    return { success: true, deleted: result.count };
+  });
+
   fastify.patch('/worker/notifications/:id/read', {
     preHandler: [authenticateWorkerJWT]
   }, async (request, reply) => {
@@ -408,6 +417,159 @@ async function workerAuthRoutes(fastify) {
     }
 
     return updated;
+  });
+
+  // ── Electrician: QR code → Location lookup (for scan) ──
+  fastify.get('/worker/locations/qr/:code', {
+    preHandler: [authenticateWorkerJWT]
+  }, async (request, reply) => {
+    const code = request.params.code.toUpperCase().trim();
+    const orgId = request.worker.orgId;
+    const location = await prisma.location.findUnique({
+      where: { qrCode: code },
+      include: { parent: { select: { id: true, name: true, type: true } } }
+    });
+    if (!location || location.orgId !== orgId) {
+      return reply.code(404).send({ error: 'Location not found' });
+    }
+    if (!location.isActive) {
+      return reply.code(410).send({ error: 'Location is deactivated' });
+    }
+    // Verify worker covers this location
+    const workerLocationIds = await getWorkerCoverageLocationIds(request.worker.id, orgId);
+    const isCovered = workerLocationIds.includes(location.id);
+
+    // Open ticket count at this location
+    const openTickets = await prisma.ticket.count({
+      where: { orgId, locationId: location.id, status: { in: ['OPEN', 'IN_PROGRESS'] } }
+    });
+
+    return { ...location, isCovered, openTickets };
+  });
+
+  // ── Electrician: Unassigned ticket pool (in worker's coverage) ──
+  fastify.get('/worker/tickets/pool', {
+    preHandler: [authenticateWorkerJWT]
+  }, async (request) => {
+    const orgId = request.worker.orgId;
+    const workerId = request.worker.id;
+    const locationIds = await getWorkerCoverageLocationIds(workerId, orgId);
+    if (!locationIds.length) return { tickets: [], total: 0 };
+
+    const tickets = await prisma.ticket.findMany({
+      where: {
+        orgId,
+        locationId: { in: locationIds },
+        status: 'OPEN',
+        NOT: { resolvedWorkers: { some: { id: workerId } } }
+      },
+      include: {
+        location: { select: { id: true, name: true, type: true } },
+        assignedTo: { select: { id: true, name: true } },
+        resolvedWorkers: { select: { id: true, name: true } }
+      },
+      orderBy: [{ priority: 'desc' }, { createdAt: 'asc' }],
+      take: 100
+    });
+    return { tickets, total: tickets.length };
+  });
+
+  // ── Electrician: Pickup ticket (claim and start work) ──
+  fastify.post('/worker/tickets/:id/pickup', {
+    preHandler: [authenticateWorkerJWT]
+  }, async (request, reply) => {
+    const orgId = request.worker.orgId;
+    const workerId = request.worker.id;
+    const locationIds = await getWorkerCoverageLocationIds(workerId, orgId);
+    if (!locationIds.length) return reply.code(403).send({ error: 'No assigned locations' });
+
+    const ticket = await prisma.ticket.findFirst({
+      where: { id: request.params.id, orgId, locationId: { in: locationIds } },
+      include: { resolvedWorkers: { select: { id: true } } }
+    });
+    if (!ticket) return reply.code(404).send({ error: 'Ticket not found' });
+    if (ticket.status !== 'OPEN' && ticket.status !== 'IN_PROGRESS') {
+      return reply.code(400).send({ error: 'Ticket cannot be picked up in its current state' });
+    }
+
+    const alreadyConnected = ticket.resolvedWorkers.some(w => w.id === workerId);
+    const updated = await prisma.ticket.update({
+      where: { id: ticket.id },
+      data: {
+        status: 'IN_PROGRESS',
+        acceptedAt: ticket.acceptedAt || new Date(),
+        resolvedWorkers: alreadyConnected ? undefined : { connect: [{ id: workerId }] }
+      },
+      include: {
+        location: { select: { id: true, name: true, type: true } },
+        resolvedWorkers: { select: { id: true, name: true } }
+      }
+    });
+
+    await prisma.auditLog.create({
+      data: {
+        orgId,
+        actorType: 'worker',
+        actorId: workerId,
+        action: 'ticket_picked_up',
+        entityType: 'Ticket',
+        entityId: ticket.id,
+        oldValue: { status: ticket.status },
+        newValue: { status: 'IN_PROGRESS' }
+      }
+    });
+
+    if (ticket.assignedToId) {
+      createNotification({
+        orgId,
+        userId: ticket.assignedToId,
+        type: 'ticket_picked_up',
+        title: 'Electrician started work',
+        body: updated.title + ' — picked up by ' + request.worker.name,
+        entityId: updated.id
+      }).catch(() => {});
+    }
+
+    return updated;
+  });
+
+  // ── Electrician: My Work history (last N days of work I did) ──
+  fastify.get('/worker/my-work', {
+    preHandler: [authenticateWorkerJWT]
+  }, async (request) => {
+    const orgId = request.worker.orgId;
+    const workerId = request.worker.id;
+    const days = Math.min(Math.max(parseInt(request.query.days, 10) || 30, 1), 90);
+    const cutoff = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+
+    const tickets = await prisma.ticket.findMany({
+      where: {
+        orgId,
+        resolvedWorkers: { some: { id: workerId } },
+        OR: [
+          { resolvedAt: { gte: cutoff } },
+          { acceptedAt: { gte: cutoff } },
+          { updatedAt: { gte: cutoff } }
+        ]
+      },
+      include: {
+        location: { select: { id: true, name: true, type: true } },
+        assignedTo: { select: { id: true, name: true } },
+        verifiedBy: { select: { id: true, name: true } }
+      },
+      orderBy: [{ resolvedAt: 'desc' }, { updatedAt: 'desc' }],
+      take: 200
+    });
+
+    const counts = { total: tickets.length, verified: 0, pendingVerify: 0, inProgress: 0, reopened: 0 };
+    for (const t of tickets) {
+      if (t.status === 'RESOLVED' || t.status === 'CLOSED') counts.verified++;
+      else if (t.status === 'RESOLVED_PENDING_VERIFY') counts.pendingVerify++;
+      else if (t.status === 'IN_PROGRESS') counts.inProgress++;
+      else if (t.status === 'OPEN') counts.reopened++;
+    }
+
+    return { tickets, days, counts };
   });
 }
 

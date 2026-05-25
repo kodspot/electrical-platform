@@ -89,7 +89,7 @@ $('loginForm').addEventListener('submit', async function(e) {
     if (data.org && data.org.name) localStorage.setItem('orgName', data.org.name);
     localStorage.setItem('activeModule', mod);
 
-    location.href = App.orgPath('electrician-tickets');
+    location.href = App.orgPath('electrician-scan');
   } catch (err) {
     showErr('Network error. Please try again.');
   } finally {
@@ -97,7 +97,7 @@ $('loginForm').addEventListener('submit', async function(e) {
   }
 });
 
-if (localStorage.getItem('elec_token')) location.href = App.orgPath('electrician-tickets');
+if (localStorage.getItem('elec_token')) location.href = App.orgPath('electrician-scan');
 </script>
 <footer style="position:fixed;bottom:0;left:0;right:0;text-align:center;padding:.8rem;font-size:.75rem;color:var(--text-muted)">
   <a href="/privacy" style="color:var(--text-muted);text-decoration:underline">Privacy Policy</a> · <a href="/terms" style="color:var(--text-muted);text-decoration:underline">Terms of Service</a>

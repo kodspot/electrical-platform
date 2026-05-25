@@ -3,18 +3,21 @@
 const { prisma } = require('../lib/prisma');
 const { deleteFromR2 } = require('../lib/r2');
 
-const RETENTION_DAYS = 7;
+const RETENTION_DAYS = 30;
 
 /**
- * Deletes electrical inspection images older than RETENTION_DAYS from R2 storage
- * and nulls out the imageUrl in the database.
- * Inspection records (metadata) are kept forever — only images are removed.
+ * Deletes images older than RETENTION_DAYS from R2 storage and nulls out the URLs in the DB.
+ * Covers electrical inspection images, ticket photos, and resolution proof photos.
+ * Metadata is kept forever — only image binaries and URLs are removed.
  */
 async function cleanupExpiredImages(logger) {
   const cutoff = new Date();
   cutoff.setDate(cutoff.getDate() - RETENTION_DAYS);
 
-  // Find images older than retention period that still have a valid URL
+  let deleted = 0;
+  let failed = 0;
+
+  // 1) Electrical inspection images
   const expiredImages = await prisma.electricalImage.findMany({
     where: {
       createdAt: { lt: cutoff },
@@ -23,21 +26,9 @@ async function cleanupExpiredImages(logger) {
     select: { id: true, imageUrl: true }
   });
 
-  if (expiredImages.length === 0) {
-    logger.info(`[cleanup] No expired images found (retention: ${RETENTION_DAYS} days)`);
-    return 0;
-  }
-
-  logger.info(`[cleanup] Found ${expiredImages.length} expired images to clean up`);
-
-  let deleted = 0;
-  let failed = 0;
-
   for (const img of expiredImages) {
     try {
-      // Delete from R2 storage
       await deleteFromR2(img.imageUrl);
-      // Null out the URL in the database
       await prisma.electricalImage.update({
         where: { id: img.id },
         data: { imageUrl: '' }
@@ -45,11 +36,43 @@ async function cleanupExpiredImages(logger) {
       deleted++;
     } catch (err) {
       failed++;
-      logger.error(`[cleanup] Failed to delete image ${img.id}: ${err.message}`);
+      logger.error(`[cleanup] Failed to delete inspection image ${img.id}: ${err.message}`);
     }
   }
 
-  logger.info(`[cleanup] Completed: ${deleted} deleted, ${failed} failed`);
+  // 2) Ticket photos (initial complaint image + resolved proof image)
+  const expiredTickets = await prisma.ticket.findMany({
+    where: {
+      createdAt: { lt: cutoff },
+      OR: [
+        { imageUrl: { not: null, startsWith: '/images/' } },
+        { resolvedImageUrl: { not: null, startsWith: '/images/' } }
+      ]
+    },
+    select: { id: true, imageUrl: true, resolvedImageUrl: true }
+  });
+
+  for (const t of expiredTickets) {
+    const updates = {};
+    if (t.imageUrl && t.imageUrl.startsWith('/images/')) {
+      try { await deleteFromR2(t.imageUrl); updates.imageUrl = null; deleted++; }
+      catch (err) { failed++; logger.error(`[cleanup] Failed ticket img ${t.id}: ${err.message}`); }
+    }
+    if (t.resolvedImageUrl && t.resolvedImageUrl.startsWith('/images/')) {
+      try { await deleteFromR2(t.resolvedImageUrl); updates.resolvedImageUrl = null; deleted++; }
+      catch (err) { failed++; logger.error(`[cleanup] Failed ticket resolve img ${t.id}: ${err.message}`); }
+    }
+    if (Object.keys(updates).length > 0) {
+      try { await prisma.ticket.update({ where: { id: t.id }, data: updates }); }
+      catch (err) { logger.error(`[cleanup] Failed ticket update ${t.id}: ${err.message}`); }
+    }
+  }
+
+  if (deleted === 0 && failed === 0) {
+    logger.info(`[cleanup] No expired images found (retention: ${RETENTION_DAYS} days)`);
+  } else {
+    logger.info(`[cleanup] Image retention completed: ${deleted} deleted, ${failed} failed (retention: ${RETENTION_DAYS} days)`);
+  }
   return deleted;
 }
 
