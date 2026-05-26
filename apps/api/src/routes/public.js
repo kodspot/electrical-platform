@@ -5,9 +5,9 @@ const { z } = require('zod');
 const { prisma } = require('../lib/prisma');
 const { uploadToR2 } = require('../lib/r2');
 const { validateImageBuffer } = require('../errors');
-const { notifyAdmins, notifySupervisors, createNotification } = require('./notifications');
+const { notifyAdmins, notifySupervisors, notifyWorkers, createNotification } = require('./notifications');
 const { emailAdmins, escHtml } = require('../lib/email');
-const { getAssignedSupervisorIds } = require('../services/assignment-resolver');
+const { getAssignedSupervisorIds, getAssignedWorkerIds, getLocationBreadcrumb } = require('../services/assignment-resolver');
 
 const ISSUE_TYPES = ['ELECTRICAL_FAULT', 'WIRING_ISSUE', 'POWER_OUTAGE', 'SHORT_CIRCUIT', 'LIGHT_NOT_WORKING', 'FAN_NOT_WORKING', 'AC_NOT_WORKING', 'SWITCH_SOCKET_ISSUE', 'OTHER'];
 
@@ -250,7 +250,13 @@ async function publicRoutes(fastify, opts) {
       }
     });
 
-    // Auto-assign to supervisors responsible for this location
+    // Build a rich notification body with location breadcrumb so the
+    // electrician knows exactly where to go without opening the app.
+    let locationCrumb = location.name;
+    try { locationCrumb = await getLocationBreadcrumb(data.locationId) || location.name; } catch (_) { /* non-fatal */ }
+    const notifBody = `${ticket.title} — ${locationCrumb}`;
+
+    // Auto-assign to supervisors (wardens) responsible for this location.
     try {
       const supervisorIds = await getAssignedSupervisorIds(data.locationId, location.orgId);
       if (supervisorIds.length > 0) {
@@ -262,11 +268,27 @@ async function publicRoutes(fastify, opts) {
             userId: supId,
             type: 'public_complaint',
             title: 'New public complaint assigned',
-            body: ticket.title,
+            body: notifBody,
             entityId: ticket.id,
             isUrgent: true
           }).catch(() => {});
         }
+      }
+    } catch (_) { /* non-fatal */ }
+
+    // Ring the electricians covering this location immediately so they can
+    // start moving while the warden triages. Notification goes to in-app bell
+    // + live SSE worker-stream (instant ring on the electrician app).
+    try {
+      const workerIds = await getAssignedWorkerIds(data.locationId, location.orgId);
+      if (workerIds.length > 0) {
+        await notifyWorkers(location.orgId, workerIds, {
+          type: 'public_complaint',
+          title: 'New complaint at your location',
+          body: notifBody,
+          entityId: ticket.id,
+          isUrgent: true
+        });
       }
     } catch (_) { /* non-fatal */ }
 
@@ -287,16 +309,18 @@ async function publicRoutes(fastify, opts) {
     notifyAdmins(location.orgId, {
       type: 'public_complaint',
       title: 'New public complaint',
-      body: ticket.title,
-      entityId: ticket.id
+      body: notifBody,
+      entityId: ticket.id,
+      isUrgent: true
     }).catch(() => {});
 
     // Notify supervisors about new public complaint
     notifySupervisors(location.orgId, {
       type: 'public_complaint',
       title: 'New public complaint',
-      body: ticket.title,
-      entityId: ticket.id
+      body: notifBody,
+      entityId: ticket.id,
+      isUrgent: true
     }).catch(() => {});
 
     // Email admins about the new complaint
