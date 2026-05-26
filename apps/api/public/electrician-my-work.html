@@ -89,7 +89,8 @@ var filter = 'all';
 async function loadWork() {
   var list = $('workList');
   App.showSkeletonCards(list, 3);
-  var res = await App.elecFetch('/worker/my-work?days=30');
+  var mod = (App.getModule && App.getModule()) || localStorage.getItem('activeModule') || 'ele';
+  var res = await App.elecFetch('/worker/my-work?days=30&module=' + encodeURIComponent(mod));
   if (!res || !res.ok) {
     list.innerHTML = '<div class="el-empty">Failed to load work history</div>';
     return;

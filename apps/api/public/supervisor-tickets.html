@@ -190,7 +190,8 @@ var activeTab = 'UNASSIGNED';
 
 async function loadTickets() {
   App.showSkeletonCards('ticketList', 3);
-  var res = await App.supFetch('/tickets?limit=100');
+  var mod = (App.getModule && App.getModule()) || localStorage.getItem('activeModule') || 'ele';
+  var res = await App.supFetch('/tickets?limit=100&module=' + encodeURIComponent(mod));
   if (!res) return;
   var data = await res.json();
   allTickets = data.tickets || [];

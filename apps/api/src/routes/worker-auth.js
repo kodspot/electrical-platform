@@ -11,6 +11,8 @@ const { validateImageBuffer } = require('../errors');
 const { getLocationDescendants } = require('../services/assignment-resolver');
 const { notifyAdmins, createNotification } = require('./notifications');
 
+const VALID_MODULES = ['ele', 'civil', 'asset', 'complaints'];
+
 // ── Worker JWT Authentication Middleware ──
 
 async function authenticateWorkerJWT(request, reply) {
@@ -50,6 +52,12 @@ async function authenticateWorkerJWT(request, reply) {
 }
 
 async function workerAuthRoutes(fastify) {
+
+  function getModuleFilter(queryModule) {
+    if (!queryModule) return null;
+    const mod = String(queryModule).trim().toLowerCase();
+    return VALID_MODULES.includes(mod) ? mod : null;
+  }
 
   async function getWorkerCoverageLocationIds(workerId, orgId) {
     const assignments = await prisma.workerAssignment.findMany({
@@ -269,6 +277,7 @@ async function workerAuthRoutes(fastify) {
   }, async (request) => {
     const orgId = request.worker.orgId;
     const workerId = request.worker.id;
+    const moduleFilter = getModuleFilter(request.query.module);
     const limit = Math.min(parseInt(request.query.limit, 10) || 50, 100);
     const page = Math.max(parseInt(request.query.page, 10) || 1, 1);
     const skip = (page - 1) * limit;
@@ -287,6 +296,10 @@ async function workerAuthRoutes(fastify) {
       locationId: { in: locationIds },
       status: statuses.length > 1 ? { in: statuses } : statuses[0]
     };
+    if (moduleFilter) where.module = moduleFilter;
+
+    const groupedWhere = { orgId, locationId: { in: locationIds } };
+    if (moduleFilter) groupedWhere.module = moduleFilter;
 
     const [tickets, total, grouped] = await Promise.all([
       prisma.ticket.findMany({
@@ -303,7 +316,7 @@ async function workerAuthRoutes(fastify) {
       prisma.ticket.count({ where }),
       prisma.ticket.groupBy({
         by: ['status'],
-        where: { orgId, locationId: { in: locationIds } },
+        where: groupedWhere,
         _count: true
       })
     ]);
@@ -319,11 +332,15 @@ async function workerAuthRoutes(fastify) {
   }, async (request, reply) => {
     const orgId = request.worker.orgId;
     const workerId = request.worker.id;
+    const moduleFilter = getModuleFilter(request.query.module);
     const locationIds = await getWorkerCoverageLocationIds(workerId, orgId);
     if (!locationIds.length) return reply.code(404).send({ error: 'Ticket not found' });
 
+    const where = { id: request.params.id, orgId, locationId: { in: locationIds } };
+    if (moduleFilter) where.module = moduleFilter;
+
     const ticket = await prisma.ticket.findFirst({
-      where: { id: request.params.id, orgId, locationId: { in: locationIds } },
+      where,
       include: {
         location: { select: { id: true, name: true, type: true } },
         assignedTo: { select: { id: true, name: true } },
@@ -425,6 +442,7 @@ async function workerAuthRoutes(fastify) {
   }, async (request, reply) => {
     const code = request.params.code.toUpperCase().trim();
     const orgId = request.worker.orgId;
+    const moduleFilter = getModuleFilter(request.query.module);
     const location = await prisma.location.findUnique({
       where: { qrCode: code },
       include: { parent: { select: { id: true, name: true, type: true } } }
@@ -440,8 +458,10 @@ async function workerAuthRoutes(fastify) {
     const isCovered = workerLocationIds.includes(location.id);
 
     // Open ticket count at this location
+    const openTicketWhere = { orgId, locationId: location.id, status: { in: ['OPEN', 'IN_PROGRESS'] } };
+    if (moduleFilter) openTicketWhere.module = moduleFilter;
     const openTickets = await prisma.ticket.count({
-      where: { orgId, locationId: location.id, status: { in: ['OPEN', 'IN_PROGRESS'] } }
+      where: openTicketWhere
     });
 
     return { ...location, isCovered, openTickets };
@@ -453,16 +473,20 @@ async function workerAuthRoutes(fastify) {
   }, async (request) => {
     const orgId = request.worker.orgId;
     const workerId = request.worker.id;
+    const moduleFilter = getModuleFilter(request.query.module);
     const locationIds = await getWorkerCoverageLocationIds(workerId, orgId);
     if (!locationIds.length) return { tickets: [], total: 0 };
 
+    const where = {
+      orgId,
+      locationId: { in: locationIds },
+      status: 'OPEN',
+      NOT: { resolvedWorkers: { some: { id: workerId } } }
+    };
+    if (moduleFilter) where.module = moduleFilter;
+
     const tickets = await prisma.ticket.findMany({
-      where: {
-        orgId,
-        locationId: { in: locationIds },
-        status: 'OPEN',
-        NOT: { resolvedWorkers: { some: { id: workerId } } }
-      },
+      where,
       include: {
         location: { select: { id: true, name: true, type: true } },
         assignedTo: { select: { id: true, name: true } },
@@ -539,19 +563,23 @@ async function workerAuthRoutes(fastify) {
   }, async (request) => {
     const orgId = request.worker.orgId;
     const workerId = request.worker.id;
+    const moduleFilter = getModuleFilter(request.query.module);
     const days = Math.min(Math.max(parseInt(request.query.days, 10) || 30, 1), 90);
     const cutoff = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
 
+    const where = {
+      orgId,
+      resolvedWorkers: { some: { id: workerId } },
+      OR: [
+        { resolvedAt: { gte: cutoff } },
+        { acceptedAt: { gte: cutoff } },
+        { updatedAt: { gte: cutoff } }
+      ]
+    };
+    if (moduleFilter) where.module = moduleFilter;
+
     const tickets = await prisma.ticket.findMany({
-      where: {
-        orgId,
-        resolvedWorkers: { some: { id: workerId } },
-        OR: [
-          { resolvedAt: { gte: cutoff } },
-          { acceptedAt: { gte: cutoff } },
-          { updatedAt: { gte: cutoff } }
-        ]
-      },
+      where,
       include: {
         location: { select: { id: true, name: true, type: true } },
         assignedTo: { select: { id: true, name: true } },

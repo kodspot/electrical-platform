@@ -292,7 +292,7 @@ function openQRPrint() {
   var w = window.open(App.orgPath('admin-qr-print'), '_blank');
   if (!w) { App.toast('Pop-up blocked — please allow pop-ups for this site', 'error'); return; }
   var sessionData = {};
-  ['token','user','orgSlug','orgName','activeModule','selectedOrgId','selectedOrgName'].forEach(function(key) {
+  ['token','user','sa_token','sa_user','orgSlug','orgName','activeModule','enabledModules','selectedOrgId','selectedOrgName'].forEach(function(key) {
     var v = localStorage.getItem(key);
     if (v) sessionData[key] = v;
   });

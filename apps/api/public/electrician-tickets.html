@@ -120,10 +120,12 @@ async function loadTickets() {
   var list = $('ticketList');
   App.showSkeletonCards(list, 3);
   // Fetch in parallel: assigned-coverage tickets + pool
-  var qs = locationFilter ? '&locationId=' + encodeURIComponent(locationFilter) : '';
+  var mod = (App.getModule && App.getModule()) || localStorage.getItem('activeModule') || 'ele';
+  var qs = '&module=' + encodeURIComponent(mod);
+  if (locationFilter) qs += '&locationId=' + encodeURIComponent(locationFilter);
   var [resTk, resPool] = await Promise.all([
     App.elecFetch('/worker/tickets?status=OPEN,IN_PROGRESS,RESOLVED_PENDING_VERIFY,RESOLVED&limit=100' + qs),
-    App.elecFetch('/worker/tickets/pool')
+    App.elecFetch('/worker/tickets/pool?module=' + encodeURIComponent(mod))
   ]);
   if (!resTk || !resTk.ok) {
     list.innerHTML = '<div class="el-empty">Failed to load tickets</div>';
