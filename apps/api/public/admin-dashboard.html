@@ -654,9 +654,9 @@ async function loadTrend() {
   }).join('') + '</div>';
 }
 
-// ── Active Tickets (OPEN + IN_PROGRESS) ──
+// ── Active Tickets (open-like + in-flight) ──
 async function loadTickets() {
-  var data = await App.apiFetchJson('/tickets?status=OPEN,IN_PROGRESS&limit=10');
+  var data = await App.apiFetchJson('/tickets?status=OPEN,ACKNOWLEDGED,ASSIGNED,IN_PROGRESS,ON_HOLD&limit=10');
   if (!data) { sectionError('ticketList', 'Failed to load tickets'); return; }
   $('ticketBadge').textContent = data.total;
   if (data.tickets.length === 0) {
@@ -664,7 +664,7 @@ async function loadTickets() {
     return;
   }
   var prCls = {URGENT:'badge-urgent',HIGH:'badge-high',NORMAL:'badge-normal',LOW:'badge-low'};
-  var stCls = {OPEN:'badge-open',IN_PROGRESS:'badge-in_progress'};
+  var stCls = {OPEN:'badge-open',ACKNOWLEDGED:'badge-open',ASSIGNED:'badge-in_progress',IN_PROGRESS:'badge-in_progress',ON_HOLD:'badge-warning'};
   var html = '<table class="dash-table"><thead><tr><th>Title</th><th>Priority</th><th class="hide-mobile">Status</th></tr></thead><tbody>';
   for (var i = 0; i < data.tickets.length; i++) {
     var t = data.tickets[i];

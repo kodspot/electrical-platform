@@ -33,9 +33,12 @@
 .el-pri.LOW{background:rgba(148,163,184,.16);color:#94a3b8}
 .el-status{font-size:.62rem;font-weight:700;padding:.14rem .4rem;border-radius:6px;letter-spacing:.03em}
 .el-status.OPEN{background:rgba(220,38,38,.13);color:#ef4444}
+.el-status.ACKNOWLEDGED,.el-status.ASSIGNED{background:rgba(249,115,22,.14);color:#fb923c}
 .el-status.IN_PROGRESS{background:rgba(245,158,11,.14);color:#f59e0b}
+.el-status.ON_HOLD{background:rgba(168,85,247,.14);color:#c084fc}
 .el-status.RESOLVED_PENDING_VERIFY{background:rgba(168,85,247,.14);color:#c084fc}
 .el-status.RESOLVED,.el-status.CLOSED{background:rgba(16,185,129,.15);color:#34d399}
+.el-status.CANCELLED{background:rgba(107,114,128,.18);color:#9ca3af}
 .el-timer{font-size:.68rem;font-weight:700;padding:.12rem .4rem;border-radius:6px;background:rgba(239,68,68,.1);color:#ef4444;font-variant-numeric:tabular-nums}
 .el-timer.warn{background:rgba(249,115,22,.1);color:#fb923c}
 .el-timer.ok{background:rgba(59,130,246,.1);color:#60a5fa}
@@ -124,7 +127,7 @@ async function loadTickets() {
   var qs = '&module=' + encodeURIComponent(mod);
   if (locationFilter) qs += '&locationId=' + encodeURIComponent(locationFilter);
   var [resTk, resPool] = await Promise.all([
-    App.elecFetch('/worker/tickets?status=OPEN,IN_PROGRESS,RESOLVED_PENDING_VERIFY,RESOLVED&limit=100' + qs),
+    App.elecFetch('/worker/tickets?status=OPEN,ACKNOWLEDGED,ASSIGNED,IN_PROGRESS,ON_HOLD,RESOLVED_PENDING_VERIFY,RESOLVED,CANCELLED,CLOSED&limit=100' + qs),
     App.elecFetch('/worker/tickets/pool?module=' + encodeURIComponent(mod))
   ]);
   if (!resTk || !resTk.ok) {
@@ -148,9 +151,17 @@ async function loadTickets() {
 function renderStats(stats) {
   $('sPool').textContent = poolTickets.length;
   $('tabPoolCount').textContent = poolTickets.length;
-  $('sActive').textContent = stats.IN_PROGRESS || 0;
+  $('sActive').textContent = (stats.IN_PROGRESS || 0) + (stats.ON_HOLD || 0);
   $('sVerify').textContent = stats.RESOLVED_PENDING_VERIFY || 0;
-  $('sDone').textContent = stats.RESOLVED || 0;
+  $('sDone').textContent = (stats.RESOLVED || 0) + (stats.CANCELLED || 0) + (stats.CLOSED || 0);
+}
+
+function isOpenLikeStatus(status) {
+  return status === 'OPEN' || status === 'ACKNOWLEDGED' || status === 'ASSIGNED';
+}
+
+function isActiveLikeStatus(status) {
+  return status === 'IN_PROGRESS' || status === 'ON_HOLD';
 }
 
 function setTab(t) {
@@ -185,11 +196,11 @@ function renderList() {
   if (currentTab === 'pool') {
     rows = poolTickets.slice();
   } else if (currentTab === 'active') {
-    rows = tickets.filter(function(t) { return t.status === 'OPEN' || t.status === 'IN_PROGRESS'; });
+    rows = tickets.filter(function(t) { return isOpenLikeStatus(t.status) || isActiveLikeStatus(t.status); });
   } else if (currentTab === 'verify') {
     rows = tickets.filter(function(t) { return t.status === 'RESOLVED_PENDING_VERIFY'; });
   } else {
-    rows = tickets.filter(function(t) { return t.status === 'RESOLVED' || t.status === 'CLOSED'; });
+    rows = tickets.filter(function(t) { return t.status === 'RESOLVED' || t.status === 'CANCELLED' || t.status === 'CLOSED'; });
   }
 
   if (!rows.length) {
@@ -209,10 +220,10 @@ function renderList() {
   });
 
   list.innerHTML = rows.map(function(t) {
-    var canResolve = t.status === 'IN_PROGRESS';
-    var canPickup = currentTab === 'pool' || (t.status === 'OPEN' && !isMine(t));
+    var canResolve = isActiveLikeStatus(t.status);
+    var canPickup = currentTab === 'pool' || (isOpenLikeStatus(t.status) && !isMine(t));
     var isPendingVerify = t.status === 'RESOLVED_PENDING_VERIFY';
-    var isActive = t.status === 'OPEN' || t.status === 'IN_PROGRESS';
+    var isActive = isOpenLikeStatus(t.status) || isActiveLikeStatus(t.status);
     var timerHtml = isActive ? '<span class="' + timerClass(t.createdAt) + '">' + elapsedLabel(t.createdAt) + '</span>' : '';
     return '<article class="el-card">' +
       '<div class="el-top">' +

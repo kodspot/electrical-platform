@@ -4,8 +4,9 @@ const crypto = require('crypto');
 const QRCode = require('qrcode');
 const { z } = require('zod');
 const { prisma } = require('../lib/prisma');
-const { authenticateJWT, requireRole } = require('../middleware/auth');
+const { authenticateJWT, requirePolicy } = require('../middleware/auth');
 const { APP_URL } = require('../config/env');
+const { ACTIVE_TICKET_STATUSES } = require('../services/ticket-status');
 
 const LOCATION_TYPES = [
   'BUILDING', 'FLOOR', 'ROOM', 'CORRIDOR', 'WASHROOM', 'ICU', 'LOBBY', 'KITCHEN', 'WARD', 'MEETING_ROOM',
@@ -29,7 +30,7 @@ async function locationRoutes(fastify, opts) {
 
   // List locations (flat or tree)
   fastify.get('/locations', {
-    preHandler: [requireRole('ADMIN', 'SUPERVISOR')]
+    preHandler: [requirePolicy('ORG_STAFF')]
   }, async (request) => {
     const orgId = request.user.orgId;
     const { tree, parentId, type, active } = request.query;
@@ -64,7 +65,7 @@ async function locationRoutes(fastify, opts) {
 
   // Get single location
   fastify.get('/locations/:id', {
-    preHandler: [requireRole('ADMIN', 'SUPERVISOR')]
+    preHandler: [requirePolicy('ORG_STAFF')]
   }, async (request, reply) => {
     const { id } = request.params;
     const location = await prisma.location.findFirst({
@@ -80,7 +81,7 @@ async function locationRoutes(fastify, opts) {
 
   // Resolve QR code → location (used by supervisor scan)
   fastify.get('/locations/qr/:code', {
-    preHandler: [requireRole('ADMIN', 'SUPERVISOR')]
+    preHandler: [requirePolicy('ORG_STAFF')]
   }, async (request, reply) => {
     const code = request.params.code.toUpperCase().trim();
     const location = await prisma.location.findUnique({
@@ -100,7 +101,7 @@ async function locationRoutes(fastify, opts) {
 
   // Generate QR image (SVG) for printing
   fastify.get('/locations/:id/qr-image', {
-    preHandler: [requireRole('ADMIN')]
+    preHandler: [requirePolicy('ORG_ADMIN')]
   }, async (request, reply) => {
     const { id } = request.params;
     const location = await prisma.location.findFirst({
@@ -125,7 +126,7 @@ async function locationRoutes(fastify, opts) {
 
   // Create location (Admin only)
   fastify.post('/locations', {
-    preHandler: [requireRole('ADMIN')]
+    preHandler: [requirePolicy('ORG_ADMIN')]
   }, async (request, reply) => {
     const schema = z.object({
       name: z.string().min(1).max(200).trim(),
@@ -167,7 +168,7 @@ async function locationRoutes(fastify, opts) {
 
   // Update location (Admin only)
   fastify.patch('/locations/:id', {
-    preHandler: [requireRole('ADMIN')]
+    preHandler: [requirePolicy('ORG_ADMIN')]
   }, async (request, reply) => {
     const { id } = request.params;
     const schema = z.object({
@@ -219,7 +220,7 @@ async function locationRoutes(fastify, opts) {
 
   // Deactivate location (Admin only) — with dependency check
   fastify.delete('/locations/:id', {
-    preHandler: [requireRole('ADMIN')]
+    preHandler: [requirePolicy('ORG_ADMIN')]
   }, async (request, reply) => {
     const { id } = request.params;
     const { force } = request.query;
@@ -261,7 +262,7 @@ async function locationRoutes(fastify, opts) {
 
   // Full location hierarchy as a tree for admin UI
   fastify.get('/locations/tree', {
-    preHandler: [requireRole('ADMIN', 'SUPERVISOR')]
+    preHandler: [requirePolicy('ORG_STAFF')]
   }, async (request) => {
     const orgId = request.user.orgId;
     const { active } = request.query;
@@ -278,7 +279,7 @@ async function locationRoutes(fastify, opts) {
         _count: {
           select: {
             electricalInspections: true,
-            tickets: { where: { status: { in: ['OPEN', 'IN_PROGRESS'] } } },
+            tickets: { where: { status: { in: ACTIVE_TICKET_STATUSES } } },
             children: true
           }
         }

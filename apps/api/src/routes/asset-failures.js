@@ -4,7 +4,7 @@ const { z } = require('zod');
 const { prisma } = require('../lib/prisma');
 const { uploadToR2 } = require('../lib/r2');
 const { validateImageBuffer } = require('../errors');
-const { authenticateJWT, requireRole, requireModule } = require('../middleware/auth');
+const { authenticateJWT, requirePolicy, requireModule } = require('../middleware/auth');
 const { evaluateEvent } = require('../services/automation');
 
 const FAILURE_INCLUDE = {
@@ -46,7 +46,7 @@ async function assetFailureRoutes(fastify, opts) {
 
   // ─── LIST FAILURES ────────────────────────────────────────
   fastify.get('/asset-failures', {
-    preHandler: [requireRole('ADMIN', 'SUPERVISOR')]
+    preHandler: [requirePolicy('ORG_STAFF')]
   }, async (request) => {
     const orgId = request.user.orgId;
     const { assetId, status, severity, page, limit, from, to, search, sort } = request.query;
@@ -113,7 +113,7 @@ async function assetFailureRoutes(fastify, opts) {
 
   // ─── GET SINGLE FAILURE ───────────────────────────────────
   fastify.get('/asset-failures/:id', {
-    preHandler: [requireRole('ADMIN', 'SUPERVISOR')]
+    preHandler: [requirePolicy('ORG_STAFF')]
   }, async (request, reply) => {
     const failure = await prisma.assetFailure.findFirst({
       where: { id: request.params.id, orgId: request.user.orgId },
@@ -125,7 +125,7 @@ async function assetFailureRoutes(fastify, opts) {
 
   // ─── REPORT FAILURE ───────────────────────────────────────
   fastify.post('/asset-failures', {
-    preHandler: [requireRole('ADMIN', 'SUPERVISOR')]
+    preHandler: [requirePolicy('ORG_STAFF')]
   }, async (request, reply) => {
     const data = createFailureSchema.parse(request.body);
     const orgId = request.user.orgId;
@@ -135,48 +135,56 @@ async function assetFailureRoutes(fastify, opts) {
     });
     if (!asset) return reply.code(404).send({ error: 'Asset not found' });
 
-    const failure = await prisma.assetFailure.create({
-      data: {
-        orgId,
-        assetId: asset.id,
-        loggedById: request.user.id,
-        title: data.title,
-        description: data.description || null,
-        severity: data.severity || 'MEDIUM',
-        failedAt: data.failedAt ? new Date(data.failedAt) : new Date()
-      },
-      include: FAILURE_LIST_INCLUDE
-    });
+    // The failure record, the asset's FAULTY status, its timeline event, and
+    // the audit-log entry must all commit together — a partial write would
+    // leave a reported failure whose asset never actually shows as FAULTY
+    // (or vice versa). [WP9]
+    const failure = await prisma.$transaction(async (tx) => {
+      const created = await tx.assetFailure.create({
+        data: {
+          orgId,
+          assetId: asset.id,
+          loggedById: request.user.id,
+          title: data.title,
+          description: data.description || null,
+          severity: data.severity || 'MEDIUM',
+          failedAt: data.failedAt ? new Date(data.failedAt) : new Date()
+        },
+        include: FAILURE_LIST_INCLUDE
+      });
 
-    // Update asset status to FAULTY
-    await prisma.asset.update({
-      where: { id: asset.id },
-      data: { status: 'FAULTY' }
-    });
+      // Update asset status to FAULTY
+      await tx.asset.update({
+        where: { id: asset.id },
+        data: { status: 'FAULTY' }
+      });
 
-    // Auto-create event on asset timeline
-    await prisma.assetEvent.create({
-      data: {
-        orgId,
-        assetId: asset.id,
-        loggedById: request.user.id,
-        type: 'NOTE',
-        summary: 'Failure reported: ' + data.title,
-        statusBefore: asset.status,
-        statusAfter: 'FAULTY'
-      }
-    });
+      // Auto-create event on asset timeline
+      await tx.assetEvent.create({
+        data: {
+          orgId,
+          assetId: asset.id,
+          loggedById: request.user.id,
+          type: 'NOTE',
+          summary: 'Failure reported: ' + data.title,
+          statusBefore: asset.status,
+          statusAfter: 'FAULTY'
+        }
+      });
 
-    await prisma.auditLog.create({
-      data: {
-        orgId,
-        actorType: 'user',
-        actorId: request.user.id,
-        action: 'asset_failure_reported',
-        entityType: 'AssetFailure',
-        entityId: failure.id,
-        newValue: { assetCode: asset.assetCode, title: data.title, severity: data.severity }
-      }
+      await tx.auditLog.create({
+        data: {
+          orgId,
+          actorType: 'user',
+          actorId: request.user.id,
+          action: 'asset_failure_reported',
+          entityType: 'AssetFailure',
+          entityId: created.id,
+          newValue: { assetCode: asset.assetCode, title: data.title, severity: data.severity }
+        }
+      });
+
+      return created;
     });
 
     // Fire-and-forget: alert evaluation
@@ -192,7 +200,7 @@ async function assetFailureRoutes(fastify, opts) {
 
   // ─── UPDATE FAILURE (Status transitions, resolution) ─────
   fastify.patch('/asset-failures/:id', {
-    preHandler: [requireRole('ADMIN', 'SUPERVISOR')]
+    preHandler: [requirePolicy('ORG_STAFF')]
   }, async (request, reply) => {
     const data = updateFailureSchema.parse(request.body);
     const orgId = request.user.orgId;
@@ -230,84 +238,93 @@ async function assetFailureRoutes(fastify, opts) {
     if (data.resolutionCost !== undefined) updateData.resolutionCost = data.resolutionCost || null;
     if (data.downtime !== undefined) updateData.downtime = data.downtime;
 
-    if (data.status) {
-      updateData.status = data.status;
+    // A status transition here can also flip the parent asset's status
+    // (FAULTY <-> OPERATIONAL) and add a timeline event — all of it must
+    // commit together, or the failure record and the asset's own status can
+    // end up describing two different realities (e.g. a failure marked
+    // RESOLVED while the asset itself is still stuck on FAULTY). [WP9]
+    const updated = await prisma.$transaction(async (tx) => {
+      if (data.status) {
+        updateData.status = data.status;
 
-      if (data.status === 'ACKNOWLEDGED' && !existing.acknowledgedAt) {
-        updateData.acknowledgedAt = new Date();
-      }
-
-      if (data.status === 'RESOLVED') {
-        updateData.resolvedAt = new Date();
-        updateData.resolvedById = request.user.id;
-
-        // Auto-calculate downtime
-        if (data.downtime == null) {
-          const minutes = Math.floor((Date.now() - new Date(existing.failedAt).getTime()) / 60000);
-          updateData.downtime = minutes;
+        if (data.status === 'ACKNOWLEDGED' && !existing.acknowledgedAt) {
+          updateData.acknowledgedAt = new Date();
         }
 
-        // Check if asset has other open failures; if not, set back to OPERATIONAL
-        const otherOpenFailures = await prisma.assetFailure.count({
-          where: {
-            assetId: existing.assetId,
-            id: { not: existing.id },
-            status: { in: ['OPEN', 'ACKNOWLEDGED', 'IN_PROGRESS'] }
+        if (data.status === 'RESOLVED') {
+          updateData.resolvedAt = new Date();
+          updateData.resolvedById = request.user.id;
+
+          // Auto-calculate downtime
+          if (data.downtime == null) {
+            const minutes = Math.floor((Date.now() - new Date(existing.failedAt).getTime()) / 60000);
+            updateData.downtime = minutes;
           }
-        });
 
-        if (otherOpenFailures === 0) {
-          await prisma.asset.update({
-            where: { id: existing.assetId },
-            data: { status: 'OPERATIONAL' }
-          });
-
-          await prisma.assetEvent.create({
-            data: {
-              orgId,
+          // Check if asset has other open failures; if not, set back to OPERATIONAL
+          const otherOpenFailures = await tx.assetFailure.count({
+            where: {
               assetId: existing.assetId,
-              loggedById: request.user.id,
-              type: 'REPAIRED',
-              summary: 'Failure resolved: ' + (data.resolution || existing.title),
-              statusBefore: 'FAULTY',
-              statusAfter: 'OPERATIONAL',
-              cost: data.resolutionCost || null
+              id: { not: existing.id },
+              status: { in: ['OPEN', 'ACKNOWLEDGED', 'IN_PROGRESS'] }
             }
           });
+
+          if (otherOpenFailures === 0) {
+            await tx.asset.update({
+              where: { id: existing.assetId },
+              data: { status: 'OPERATIONAL' }
+            });
+
+            await tx.assetEvent.create({
+              data: {
+                orgId,
+                assetId: existing.assetId,
+                loggedById: request.user.id,
+                type: 'REPAIRED',
+                summary: 'Failure resolved: ' + (data.resolution || existing.title),
+                statusBefore: 'FAULTY',
+                statusAfter: 'OPERATIONAL',
+                cost: data.resolutionCost || null
+              }
+            });
+          }
+        }
+
+        if (data.status === 'OPEN' && (existing.status === 'RESOLVED' || existing.status === 'CLOSED')) {
+          // Reopened — set asset back to FAULTY
+          updateData.resolvedAt = null;
+          updateData.resolvedById = null;
+          updateData.resolution = null;
+          updateData.downtime = null;
+
+          await tx.asset.update({
+            where: { id: existing.assetId },
+            data: { status: 'FAULTY' }
+          });
         }
       }
 
-      if (data.status === 'OPEN' && (existing.status === 'RESOLVED' || existing.status === 'CLOSED')) {
-        // Reopened — set asset back to FAULTY
-        updateData.resolvedAt = null;
-        updateData.resolvedById = null;
-        updateData.resolution = null;
-        updateData.downtime = null;
+      const result = await tx.assetFailure.update({
+        where: { id: existing.id },
+        data: updateData,
+        include: FAILURE_INCLUDE
+      });
 
-        await prisma.asset.update({
-          where: { id: existing.assetId },
-          data: { status: 'FAULTY' }
-        });
-      }
-    }
+      await tx.auditLog.create({
+        data: {
+          orgId,
+          actorType: 'user',
+          actorId: request.user.id,
+          action: 'asset_failure_updated',
+          entityType: 'AssetFailure',
+          entityId: existing.id,
+          oldValue: { status: existing.status, severity: existing.severity },
+          newValue: updateData
+        }
+      });
 
-    const updated = await prisma.assetFailure.update({
-      where: { id: existing.id },
-      data: updateData,
-      include: FAILURE_INCLUDE
-    });
-
-    await prisma.auditLog.create({
-      data: {
-        orgId,
-        actorType: 'user',
-        actorId: request.user.id,
-        action: 'asset_failure_updated',
-        entityType: 'AssetFailure',
-        entityId: existing.id,
-        oldValue: { status: existing.status, severity: existing.severity },
-        newValue: updateData
-      }
+      return result;
     });
 
     return updated;
@@ -315,7 +332,7 @@ async function assetFailureRoutes(fastify, opts) {
 
   // ─── UPLOAD FAILURE IMAGE ────────────────────────────────
   fastify.post('/asset-failures/:id/images', {
-    preHandler: [requireRole('ADMIN', 'SUPERVISOR')]
+    preHandler: [requirePolicy('ORG_STAFF')]
   }, async (request, reply) => {
     const orgId = request.user.orgId;
     const failure = await prisma.assetFailure.findFirst({
@@ -355,7 +372,7 @@ async function assetFailureRoutes(fastify, opts) {
 
   // ─── EXPORT CSV ──────────────────────────────────────────
   fastify.get('/asset-failures/export', {
-    preHandler: [requireRole('ADMIN')]
+    preHandler: [requirePolicy('ORG_ADMIN')]
   }, async (request, reply) => {
     const orgId = request.user.orgId;
     const { status, severity, from, to } = request.query;

@@ -1,7 +1,12 @@
 #!/bin/bash
 # ═══════════════════════════════════════════════════════════
-# VM Setup Script — Run ONCE on a fresh Ubuntu 22.04 GCP VM
-# Target: kodspot-electrical-api (asia-south1-b)
+# VM Setup Script — Run ONCE on a fresh Ubuntu 22.04 VM
+#
+# Nothing below is cloud-provider-specific (plain apt/docker/ufw/fail2ban), so this
+# works unmodified on any Ubuntu 22.04 host. Production currently runs on AWS EC2 —
+# see .github/workflows/deploy.yml (uses AWS_HOST/AWS_USERNAME/AWS_SSH_PRIVATE_KEY
+# secrets). Run this same script again on a separate host to provision a staging
+# environment — see docs/DEPLOYMENT.md.
 # ═══════════════════════════════════════════════════════════
 set -euo pipefail
 

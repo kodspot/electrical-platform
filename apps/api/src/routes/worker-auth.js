@@ -1,15 +1,37 @@
 'use strict';
 
+const crypto = require('crypto');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const { z } = require('zod');
 const { prisma } = require('../lib/prisma');
 const { BCRYPT_COST } = require('../lib/security');
-const { loginRateLimit } = require('../middleware/rateLimits');
+const { loginRateLimit, strictRateLimit } = require('../middleware/rateLimits');
 const { uploadToR2 } = require('../lib/r2');
 const { validateImageBuffer } = require('../errors');
 const { getLocationDescendants } = require('../services/assignment-resolver');
+const { normalizeEnabledModules } = require('../services/module-policy');
 const { notifyAdmins, createNotification } = require('./notifications');
+const { attachTenantContextFromWorker } = require('../middleware/tenant-context');
+const { sendEmail, escHtml } = require('../lib/email');
+const { APP_URL } = require('../config/env');
+
+const RESET_TOKEN_TTL_MS = 60 * 60 * 1000; // 1 hour
+
+// Matches the anti-enumeration delay already used on worker-login's
+// invalid-credential paths below.
+async function antiEnumerationDelay() {
+  await new Promise(r => setTimeout(r, 200 + Math.random() * 300));
+}
+const {
+  TICKET_STATUSES,
+  OPEN_TICKET_STATUSES,
+  ACTIVE_TICKET_STATUSES,
+  VERIFY_PENDING_TICKET_STATUSES,
+  EDITABLE_TICKET_STATUSES,
+  isOpenLikeStatus,
+  isActiveLikeStatus
+} = require('../services/ticket-status');
 
 const VALID_MODULES = ['ele', 'civil', 'asset', 'complaints'];
 
@@ -46,6 +68,7 @@ async function authenticateWorkerJWT(request, reply) {
     }
 
     request.worker = worker;
+    attachTenantContextFromWorker(request, worker);
   } catch {
     return reply.code(401).send({ error: 'Unauthorized' });
   }
@@ -105,7 +128,7 @@ async function workerAuthRoutes(fastify) {
     // Find org by slug
     const org = await prisma.organization.findUnique({
       where: { slug: data.orgSlug },
-      select: { id: true, name: true, status: true }
+      select: { id: true, name: true, status: true, enabledModules: true }
     });
     if (!org || org.status !== 'ACTIVE') {
       await new Promise(r => setTimeout(r, 200 + Math.random() * 300));
@@ -142,7 +165,11 @@ async function workerAuthRoutes(fastify) {
         employeeId: worker.employeeId,
         phone: worker.phone
       },
-      org: { id: org.id, name: org.name }
+      org: {
+        id: org.id,
+        name: org.name,
+        enabledModules: normalizeEnabledModules(org.enabledModules)
+      }
     };
   });
 
@@ -159,8 +186,11 @@ async function workerAuthRoutes(fastify) {
     });
     const org = await prisma.organization.findUnique({
       where: { id: worker.orgId },
-      select: { id: true, name: true, slug: true }
+      select: { id: true, name: true, slug: true, enabledModules: true }
     });
+    if (org) {
+      org.enabledModules = normalizeEnabledModules(org.enabledModules);
+    }
     return { worker, org };
   });
 
@@ -195,7 +225,121 @@ async function workerAuthRoutes(fastify) {
       data: { pinHash: newPinHash, tokenInvalidBefore: new Date() }
     });
 
-    return { success: true };
+    // Reissue a fresh token so the current session stays alive — previously
+    // this endpoint set tokenInvalidBefore (correctly invalidating the old
+    // token) without ever giving the worker a new one, forcing an immediate
+    // re-login right after a successful PIN change. Matches the existing
+    // pattern in PATCH /auth/password for admin/supervisor users. [WP14]
+    const newToken = jwt.sign(
+      { workerId: request.worker.id, orgId: request.worker.orgId },
+      process.env.JWT_SECRET,
+      { expiresIn: '30d' }
+    );
+
+    return { success: true, token: newToken };
+  });
+
+  // Request a self-service PIN reset via email. Always returns the same
+  // generic response regardless of whether the org/employeeId matches a
+  // worker, or whether that worker has an email on file. [WP14]
+  fastify.post('/auth/worker-forgot-pin', {
+    config: { rateLimit: strictRateLimit }
+  }, async (request, reply) => {
+    const schema = z.object({
+      orgSlug: z.string().min(1).max(100).trim(),
+      employeeId: z.string().min(1).max(50).trim()
+    });
+
+    let data;
+    try { data = schema.parse(request.body); } catch (err) {
+      return reply.code(400).send({ error: 'Invalid input', details: err.errors });
+    }
+
+    const genericResponse = { success: true, message: 'If a matching worker account with an email on file exists, a PIN reset link has been sent.' };
+
+    const org = await prisma.organization.findUnique({
+      where: { slug: data.orgSlug },
+      select: { id: true, status: true }
+    });
+
+    if (org && org.status === 'ACTIVE') {
+      const worker = await prisma.worker.findFirst({
+        where: { orgId: org.id, employeeId: data.employeeId, isActive: true },
+        select: { id: true, name: true, email: true }
+      });
+
+      if (worker && worker.email) {
+        const token = crypto.randomBytes(32).toString('hex');
+        const resetTokenExpiresAt = new Date(Date.now() + RESET_TOKEN_TTL_MS);
+        await prisma.worker.update({
+          where: { id: worker.id },
+          data: { resetToken: token, resetTokenExpiresAt }
+        });
+
+        const resetUrl = `${APP_URL}/worker-reset-pin?token=${token}`;
+        sendEmail(
+          worker.email,
+          'Reset your PIN',
+          `<p>Hi ${escHtml(worker.name)},</p>
+           <p>We received a request to reset your login PIN. This link is valid for 1 hour and can only be used once.</p>
+           <p><a class="btn" href="${resetUrl}">Reset PIN</a></p>
+           <p>If you didn't request this, you can safely ignore this email — your PIN won't be changed.</p>`
+        ).catch(() => {});
+      }
+    }
+
+    await antiEnumerationDelay();
+    return genericResponse;
+  });
+
+  // Complete a self-service PIN reset. [WP14]
+  fastify.post('/auth/worker-reset-pin', {
+    config: { rateLimit: strictRateLimit }
+  }, async (request, reply) => {
+    const schema = z.object({
+      token: z.string().min(1),
+      newPin: z.string().min(6).max(6).regex(/^\d+$/, 'PIN must be exactly 6 digits')
+    });
+
+    let data;
+    try { data = schema.parse(request.body); } catch (err) {
+      return reply.code(400).send({ error: 'Invalid input', details: err.errors });
+    }
+
+    const worker = await prisma.worker.findUnique({
+      where: { resetToken: data.token },
+      select: { id: true, orgId: true, name: true, employeeId: true, isActive: true, resetTokenExpiresAt: true }
+    });
+
+    if (!worker || !worker.isActive || !worker.resetTokenExpiresAt || worker.resetTokenExpiresAt < new Date()) {
+      await antiEnumerationDelay();
+      return reply.code(400).send({ error: 'This reset link is invalid or has expired. Please request a new one.' });
+    }
+
+    const newPinHash = await bcrypt.hash(data.newPin, BCRYPT_COST);
+    // Single-use + session invalidation, matching /auth/reset-password.
+    await prisma.worker.update({
+      where: { id: worker.id },
+      data: {
+        pinHash: newPinHash,
+        tokenInvalidBefore: new Date(),
+        resetToken: null,
+        resetTokenExpiresAt: null
+      }
+    });
+
+    const newToken = jwt.sign(
+      { workerId: worker.id, orgId: worker.orgId },
+      process.env.JWT_SECRET,
+      { expiresIn: '30d' }
+    );
+
+    return {
+      success: true,
+      message: 'PIN reset successfully',
+      token: newToken,
+      worker: { id: worker.id, name: worker.name, employeeId: worker.employeeId }
+    };
   });
 
   // ── Worker Notifications ──
@@ -284,12 +428,16 @@ async function workerAuthRoutes(fastify) {
 
     const locationIds = await getWorkerCoverageLocationIds(workerId, orgId);
     if (!locationIds.length) {
-      return { tickets: [], total: 0, page, pages: 0, stats: { OPEN: 0, IN_PROGRESS: 0, RESOLVED_PENDING_VERIFY: 0, RESOLVED: 0, CLOSED: 0 } };
+      const emptyStats = EDITABLE_TICKET_STATUSES.reduce((acc, status) => {
+        acc[status] = 0;
+        return acc;
+      }, {});
+      return { tickets: [], total: 0, page, pages: 0, stats: emptyStats };
     }
 
     const statuses = request.query.status
       ? String(request.query.status).split(',').map(s => s.trim()).filter(Boolean)
-      : ['OPEN', 'IN_PROGRESS', 'RESOLVED_PENDING_VERIFY'];
+      : [...ACTIVE_TICKET_STATUSES, ...VERIFY_PENDING_TICKET_STATUSES];
 
     const where = {
       orgId,
@@ -321,7 +469,10 @@ async function workerAuthRoutes(fastify) {
       })
     ]);
 
-    const stats = { OPEN: 0, IN_PROGRESS: 0, RESOLVED_PENDING_VERIFY: 0, RESOLVED: 0, CLOSED: 0 };
+    const stats = EDITABLE_TICKET_STATUSES.reduce((acc, status) => {
+      acc[status] = 0;
+      return acc;
+    }, {});
     for (const g of grouped) stats[g.status] = (stats[g.status] || 0) + g._count;
 
     return { tickets, total, page, pages: Math.ceil(total / limit), stats };
@@ -364,7 +515,9 @@ async function workerAuthRoutes(fastify) {
       include: { resolvedWorkers: { select: { id: true } } }
     });
     if (!ticket) return reply.code(404).send({ error: 'Ticket not found' });
-    if (ticket.status === 'CLOSED') return reply.code(400).send({ error: 'Ticket is already closed' });
+    if (ticket.status === TICKET_STATUSES.CLOSED || ticket.status === TICKET_STATUSES.CANCELLED) {
+      return reply.code(400).send({ error: 'Ticket is already closed' });
+    }
 
     const fieldValue = (f) => {
       if (f == null) return undefined;
@@ -388,7 +541,7 @@ async function workerAuthRoutes(fastify) {
     const updated = await prisma.ticket.update({
       where: { id: ticket.id },
       data: {
-        status: 'RESOLVED_PENDING_VERIFY',
+        status: TICKET_STATUSES.RESOLVED_PENDING_VERIFY,
         resolvedAt: new Date(),
         resolvedImageUrl,
         resolvedNote: note,
@@ -409,7 +562,7 @@ async function workerAuthRoutes(fastify) {
         entityType: 'Ticket',
         entityId: ticket.id,
         oldValue: { status: ticket.status },
-        newValue: { status: 'RESOLVED_PENDING_VERIFY', resolvedNote: note }
+        newValue: { status: TICKET_STATUSES.RESOLVED_PENDING_VERIFY, resolvedNote: note }
       }
     });
 
@@ -458,7 +611,7 @@ async function workerAuthRoutes(fastify) {
     const isCovered = workerLocationIds.includes(location.id);
 
     // Open ticket count at this location
-    const openTicketWhere = { orgId, locationId: location.id, status: { in: ['OPEN', 'IN_PROGRESS'] } };
+    const openTicketWhere = { orgId, locationId: location.id, status: { in: ACTIVE_TICKET_STATUSES } };
     if (moduleFilter) openTicketWhere.module = moduleFilter;
     const openTickets = await prisma.ticket.count({
       where: openTicketWhere
@@ -480,7 +633,7 @@ async function workerAuthRoutes(fastify) {
     const where = {
       orgId,
       locationId: { in: locationIds },
-      status: 'OPEN',
+      status: { in: OPEN_TICKET_STATUSES },
       NOT: { resolvedWorkers: { some: { id: workerId } } }
     };
     if (moduleFilter) where.module = moduleFilter;
@@ -512,7 +665,7 @@ async function workerAuthRoutes(fastify) {
       include: { resolvedWorkers: { select: { id: true } } }
     });
     if (!ticket) return reply.code(404).send({ error: 'Ticket not found' });
-    if (ticket.status !== 'OPEN' && ticket.status !== 'IN_PROGRESS') {
+    if (!isOpenLikeStatus(ticket.status) && !isActiveLikeStatus(ticket.status)) {
       return reply.code(400).send({ error: 'Ticket cannot be picked up in its current state' });
     }
 
@@ -520,7 +673,7 @@ async function workerAuthRoutes(fastify) {
     const updated = await prisma.ticket.update({
       where: { id: ticket.id },
       data: {
-        status: 'IN_PROGRESS',
+        status: TICKET_STATUSES.IN_PROGRESS,
         acceptedAt: ticket.acceptedAt || new Date(),
         resolvedWorkers: alreadyConnected ? undefined : { connect: [{ id: workerId }] }
       },
@@ -539,7 +692,7 @@ async function workerAuthRoutes(fastify) {
         entityType: 'Ticket',
         entityId: ticket.id,
         oldValue: { status: ticket.status },
-        newValue: { status: 'IN_PROGRESS' }
+        newValue: { status: TICKET_STATUSES.IN_PROGRESS }
       }
     });
 
@@ -591,10 +744,10 @@ async function workerAuthRoutes(fastify) {
 
     const counts = { total: tickets.length, verified: 0, pendingVerify: 0, inProgress: 0, reopened: 0 };
     for (const t of tickets) {
-      if (t.status === 'RESOLVED' || t.status === 'CLOSED') counts.verified++;
-      else if (t.status === 'RESOLVED_PENDING_VERIFY') counts.pendingVerify++;
-      else if (t.status === 'IN_PROGRESS') counts.inProgress++;
-      else if (t.status === 'OPEN') counts.reopened++;
+      if (t.status === TICKET_STATUSES.RESOLVED || t.status === TICKET_STATUSES.CLOSED) counts.verified++;
+      else if (t.status === TICKET_STATUSES.RESOLVED_PENDING_VERIFY) counts.pendingVerify++;
+      else if (t.status === TICKET_STATUSES.IN_PROGRESS || t.status === TICKET_STATUSES.ON_HOLD) counts.inProgress++;
+      else if (isOpenLikeStatus(t.status)) counts.reopened++;
     }
 
     return { tickets, days, counts };

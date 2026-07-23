@@ -1,9 +1,28 @@
 {
+  "name": "electrical-platform",
+  "private": true,
+  "description": "Kodspot Electrical Platform — developer command surface. App-level commands live in apps/api/package.json; see docs/README.md.",
+  "scripts": {
+    "setup": "node apps/api/scripts/setup.js",
+    "dev": "npm --prefix apps/api run dev",
+    "doctor": "node apps/api/scripts/doctor.js",
+    "verify": "npm --prefix apps/api run verify",
+    "clean": "node apps/api/scripts/clean.js",
+    "reset": "node apps/api/scripts/reset.js",
+    "seed": "node apps/api/scripts/seed.js",
+    "scenario": "node apps/api/scripts/scenario.js",
+    "demo": "node apps/api/scripts/demo.js",
+    "bug:list": "node apps/api/scripts/bug.js list",
+    "bug:run": "node apps/api/scripts/bug.js run",
+    "bug:validate": "node apps/api/scripts/bug.js validate",
+    "bug:test": "npm --prefix apps/api run bug:test",
+    "ci": "npm --prefix apps/api run ci",
+    "release:check": "npm --prefix apps/api run release:check"
+  },
   "devDependencies": {
     "prisma": "^5.9.0"
   },
   "dependencies": {
     "@prisma/client": "^5.9.0"
-
   }
 }

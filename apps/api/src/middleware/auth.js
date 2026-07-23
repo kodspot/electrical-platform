@@ -2,6 +2,9 @@
 
 const jwt = require('jsonwebtoken');
 const { prisma } = require('../lib/prisma');
+const { isModuleEnabled } = require('../services/module-policy');
+const { getPermissionPolicy } = require('./permission-policy');
+const { attachTenantContextFromUser, getTenantOrgId } = require('./tenant-context');
 
 // JWT authentication — verifies token, attaches user to request
 async function authenticateJWT(request, reply) {
@@ -52,30 +55,41 @@ async function authenticateJWT(request, reply) {
     }
 
     request.user = user;
+    attachTenantContextFromUser(request, user);
   } catch (err) {
     return reply.code(401).send({ error: 'Unauthorized' });
   }
 }
 
 /**
- * Register onResponse hook to audit-log SuperAdmin org-context switches.
+ * Register onResponse hook to audit-log every SuperAdmin org-context (X-Org-Id)
+ * request — reads included, not just writes. A SuperAdmin "entering" an org via
+ * this header is this platform's only impersonation-like mechanism, and browsing
+ * an org's dashboard is almost entirely GET requests (tickets, workers,
+ * attendance, PII) — excluding reads left the vast majority of a SuperAdmin's
+ * cross-tenant access with no audit trail at all. [WP8]
  * Call once during server setup: registerSAuditHook(fastify)
  */
 function registerSAuditHook(fastify) {
   fastify.addHook('onResponse', async (request) => {
-    if (request.user?._saOrgSwitch && request.method !== 'GET') {
+    if (request.user?._saOrgSwitch) {
       const { orgId, orgName } = request.user._saOrgSwitch;
-      prisma.auditLog.create({
+      // onResponse runs after the client already has the response, so awaiting
+      // here costs no user-facing latency — but it does make this audit write
+      // deterministic rather than a bare, trackable-nowhere fire-and-forget,
+      // which matters for an audit log specifically (compliance record, not a
+      // best-effort side effect like a notification). Still never throws.
+      await prisma.auditLog.create({
         data: {
           orgId,
           actorType: 'super_admin',
           actorId: request.user.id,
-          action: 'sa_org_context_write',
+          action: request.method === 'GET' ? 'sa_org_context_read' : 'sa_org_context_write',
           entityType: 'Organization',
           entityId: orgId,
           newValue: { orgName, method: request.method, url: request.url }
         }
-      }).catch(() => {}); // fire-and-forget, never block response
+      }).catch(() => {});
     }
   });
 }
@@ -91,22 +105,56 @@ function requireRole(...roles) {
   };
 }
 
+// Permission policy contract — standardized role + tenant + optional module checks
+function requirePolicy(policyName, options = {}) {
+  const policy = getPermissionPolicy(policyName);
+
+  return async function (request, reply) {
+    if (!request.user) return reply.code(403).send({ error: 'Forbidden' });
+
+    const role = request.user.role;
+    const roleAllowed = policy.roles.includes(role);
+    const superAdminAllowed = policy.allowSuperAdmin && role === 'SUPER_ADMIN';
+
+    if (!roleAllowed && !superAdminAllowed) {
+      return reply.code(403).send({ error: 'Forbidden' });
+    }
+
+    const requireOrgContext = options.requireOrgContext ?? policy.requireOrgContext;
+    const orgId = getTenantOrgId(request);
+    if (requireOrgContext && !orgId) {
+      return reply.code(403).send({ error: 'No organization context' });
+    }
+
+    const moduleCode = options.moduleCode || null;
+    if (moduleCode) {
+      if (!orgId) return reply.code(403).send({ error: 'No organization context' });
+      const org = await prisma.organization.findUnique({
+        where: { id: orgId },
+        select: { enabledModules: true }
+      });
+      if (!isModuleEnabled(org, moduleCode)) {
+        return reply.code(403).send({ error: 'Module not enabled for your organization' });
+      }
+    }
+  };
+}
+
 // Module gating — verify org has the requested module enabled
 function requireModule(moduleCode) {
   return async function (request, reply) {
     if (!request.user) return reply.code(403).send({ error: 'Forbidden' });
     if (request.user.role === 'SUPER_ADMIN') return; // SA bypasses
-    const orgId = request.user.orgId;
+    const orgId = getTenantOrgId(request);
     if (!orgId) return reply.code(403).send({ error: 'No organization context' });
     const org = await prisma.organization.findUnique({
       where: { id: orgId },
       select: { enabledModules: true }
     });
-    const modules = org?.enabledModules || ['ele'];
-    if (!modules.includes(moduleCode)) {
+    if (!isModuleEnabled(org, moduleCode)) {
       return reply.code(403).send({ error: 'Module not enabled for your organization' });
     }
   };
 }
 
-module.exports = { authenticateJWT, requireRole, requireModule, registerSAuditHook };
+module.exports = { authenticateJWT, requireRole, requirePolicy, requireModule, registerSAuditHook };

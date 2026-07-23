@@ -51,6 +51,8 @@ model Organization {
   alertRules            AlertRule[]
   alerts                Alert[]
   aiInsights            AiInsight[]
+  complaintCategories   ComplaintCategory[]
+  moduleActivations     OrgModuleActivation[]
 
   deletedAt  DateTime?
   purgeAfter DateTime?
@@ -59,6 +61,66 @@ model Organization {
   updatedAt DateTime @updatedAt
 
   @@index([status])
+}
+
+model ModuleDefinition {
+  id          String   @id @default(uuid())
+  code        String   @unique
+  name        String
+  description String?
+  isCore      Boolean  @default(false)
+  isActive    Boolean  @default(true)
+  sortOrder   Int      @default(0)
+
+  dependencies ModuleDependency[] @relation("ModuleDependencyFrom")
+  requiredBy   ModuleDependency[] @relation("ModuleDependencyTo")
+  orgActivations OrgModuleActivation[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([isActive, sortOrder])
+}
+
+model ModuleDependency {
+  id String @id @default(uuid())
+
+  moduleId String
+  module   ModuleDefinition @relation("ModuleDependencyFrom", fields: [moduleId], references: [id], onDelete: Cascade)
+
+  dependsOnModuleId String
+  dependsOnModule   ModuleDefinition @relation("ModuleDependencyTo", fields: [dependsOnModuleId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@unique([moduleId, dependsOnModuleId])
+  @@index([dependsOnModuleId])
+}
+
+model OrgModuleActivation {
+  id String @id @default(uuid())
+
+  orgId String
+  org   Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  moduleId String
+  module   ModuleDefinition @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+
+  isActive Boolean @default(true)
+
+  activatedAt DateTime @default(now())
+  activatedById String?
+
+  deactivatedAt DateTime?
+  deactivatedById String?
+
+  note String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([orgId, moduleId])
+  @@index([orgId, isActive])
 }
 
 model User {
@@ -84,6 +146,10 @@ model User {
 
   isActive           Boolean   @default(true)
   tokenInvalidBefore DateTime?
+
+  // Self-service password reset (WP14) — single-use, time-limited token
+  resetToken          String?   @unique
+  resetTokenExpiresAt DateTime?
 
   ticketsCreated        Ticket[]               @relation("TicketCreatedBy")
   ticketsAssigned       Ticket[]               @relation("TicketAssignedTo")
@@ -128,6 +194,10 @@ model Worker {
   tokenInvalidBefore DateTime? // Reject tokens issued before this timestamp
   isActive    Boolean   @default(true)
 
+  // Self-service PIN reset (WP14) — single-use, time-limited token
+  resetToken          String?   @unique
+  resetTokenExpiresAt DateTime?
+
   ticketsResolved       Ticket[]               @relation("TicketResolvedWorkers")
   assignments           WorkerAssignment[]
   attendance            Attendance[]
@@ -163,6 +233,7 @@ model Location {
   dutyRosters           DutyRoster[]
   electricalInspections ElectricalInspection[]
   assets                Asset[]
+  hostelComplaintCategories ComplaintCategory[] @relation("HostelComplaintCategories")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -232,6 +303,34 @@ model Ticket {
   @@index([orgId, createdAt])
   @@index([orgId, source])
   @@index([orgId, module, status])
+}
+
+model ComplaintCategory {
+  id String @id @default(uuid())
+
+  orgId String
+  org   Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  module      String  @default("ele") // ele, civil, asset, complaints
+  key         String  // canonical issue key used in Ticket.issueType
+  name        String
+  description String?
+  sortOrder   Int     @default(0)
+  isActive    Boolean @default(true)
+
+  // Optional hostel-level override; null means org-wide category.
+  hostelLocationId String?
+  hostelLocation   Location? @relation("HostelComplaintCategories", fields: [hostelLocationId], references: [id], onDelete: SetNull)
+
+  createdById String?
+  updatedById String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([orgId, module, isActive, sortOrder])
+  @@index([orgId, hostelLocationId])
+  @@index([orgId, module, key])
 }
 
 model AuditLog {
@@ -364,9 +463,13 @@ enum TicketPriority {
 
 enum TicketStatus {
   OPEN
+  ACKNOWLEDGED
+  ASSIGNED
   IN_PROGRESS
+  ON_HOLD
   RESOLVED_PENDING_VERIFY
   RESOLVED
+  CANCELLED
   CLOSED
 }
 

@@ -2,7 +2,7 @@
 
 const { z } = require('zod');
 const { prisma } = require('../lib/prisma');
-const { authenticateJWT, requireRole } = require('../middleware/auth');
+const { authenticateJWT, requirePolicy } = require('../middleware/auth');
 const { generateAiInsights, runScheduledChecks, runEscalationChecks } = require('../services/automation');
 
 const VALID_TRIGGERS = [
@@ -21,7 +21,7 @@ async function alertRoutes(fastify) {
 
   // ── List rules ──
   fastify.get('/alert-rules', {
-    preHandler: [requireRole('ADMIN')]
+    preHandler: [requirePolicy('ORG_ADMIN')]
   }, async (request) => {
     const orgId = request.user.orgId;
     const { trigger, active } = request.query;
@@ -42,7 +42,7 @@ async function alertRoutes(fastify) {
 
   // ── Get single rule ──
   fastify.get('/alert-rules/:id', {
-    preHandler: [requireRole('ADMIN')]
+    preHandler: [requirePolicy('ORG_ADMIN')]
   }, async (request, reply) => {
     const rule = await prisma.alertRule.findFirst({
       where: { id: request.params.id, orgId: request.user.orgId },
@@ -72,7 +72,7 @@ async function alertRoutes(fastify) {
   });
 
   fastify.post('/alert-rules', {
-    preHandler: [requireRole('ADMIN')]
+    preHandler: [requirePolicy('ORG_ADMIN')]
   }, async (request, reply) => {
     const data = createRuleSchema.parse(request.body);
     const orgId = request.user.orgId;
@@ -126,7 +126,7 @@ async function alertRoutes(fastify) {
   });
 
   fastify.patch('/alert-rules/:id', {
-    preHandler: [requireRole('ADMIN')]
+    preHandler: [requirePolicy('ORG_ADMIN')]
   }, async (request, reply) => {
     const data = updateRuleSchema.parse(request.body);
     const orgId = request.user.orgId;
@@ -156,7 +156,7 @@ async function alertRoutes(fastify) {
 
   // ── Delete rule ──
   fastify.delete('/alert-rules/:id', {
-    preHandler: [requireRole('ADMIN')]
+    preHandler: [requirePolicy('ORG_ADMIN')]
   }, async (request, reply) => {
     const orgId = request.user.orgId;
     const existing = await prisma.alertRule.findFirst({
@@ -187,7 +187,7 @@ async function alertRoutes(fastify) {
 
   // ── List alerts ──
   fastify.get('/alerts', {
-    preHandler: [requireRole('ADMIN')]
+    preHandler: [requirePolicy('ORG_ADMIN')]
   }, async (request) => {
     const orgId = request.user.orgId;
     const { trigger, severity, acknowledged, from, to, page, limit } = request.query;
@@ -241,7 +241,7 @@ async function alertRoutes(fastify) {
 
   // ── Get single alert ──
   fastify.get('/alerts/:id', {
-    preHandler: [requireRole('ADMIN')]
+    preHandler: [requirePolicy('ORG_ADMIN')]
   }, async (request, reply) => {
     const alert = await prisma.alert.findFirst({
       where: { id: request.params.id, orgId: request.user.orgId },
@@ -253,7 +253,7 @@ async function alertRoutes(fastify) {
 
   // ── Acknowledge alert ──
   fastify.patch('/alerts/:id/acknowledge', {
-    preHandler: [requireRole('ADMIN')]
+    preHandler: [requirePolicy('ORG_ADMIN')]
   }, async (request, reply) => {
     const alert = await prisma.alert.findFirst({
       where: { id: request.params.id, orgId: request.user.orgId }
@@ -274,7 +274,7 @@ async function alertRoutes(fastify) {
 
   // ── Acknowledge all unacknowledged ──
   fastify.patch('/alerts/acknowledge-all', {
-    preHandler: [requireRole('ADMIN')]
+    preHandler: [requirePolicy('ORG_ADMIN')]
   }, async (request) => {
     const result = await prisma.alert.updateMany({
       where: { orgId: request.user.orgId, acknowledged: false },
@@ -289,7 +289,7 @@ async function alertRoutes(fastify) {
 
   // ── Alert summary (dashboard widget) ──
   fastify.get('/alerts/summary', {
-    preHandler: [requireRole('ADMIN')]
+    preHandler: [requirePolicy('ORG_ADMIN')]
   }, async (request) => {
     const orgId = request.user.orgId;
     const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
@@ -326,7 +326,7 @@ async function alertRoutes(fastify) {
 
   // ── List insights ──
   fastify.get('/ai-insights', {
-    preHandler: [requireRole('ADMIN')]
+    preHandler: [requirePolicy('ORG_ADMIN')]
   }, async (request) => {
     const orgId = request.user.orgId;
     const { type, page, limit } = request.query;
@@ -353,7 +353,7 @@ async function alertRoutes(fastify) {
 
   // ── Get single insight ──
   fastify.get('/ai-insights/:id', {
-    preHandler: [requireRole('ADMIN')]
+    preHandler: [requirePolicy('ORG_ADMIN')]
   }, async (request, reply) => {
     const insight = await prisma.aiInsight.findFirst({
       where: { id: request.params.id, orgId: request.user.orgId }
@@ -371,7 +371,7 @@ async function alertRoutes(fastify) {
 
   // ── Trigger insight generation now (admin manual trigger) ──
   fastify.post('/ai-insights/generate', {
-    preHandler: [requireRole('ADMIN')]
+    preHandler: [requirePolicy('ORG_ADMIN')]
   }, async (request, reply) => {
     const org = await prisma.organization.findUnique({
       where: { id: request.user.orgId },
@@ -396,7 +396,7 @@ async function alertRoutes(fastify) {
 
   // ── Trigger scheduled checks now (admin manual trigger) ──
   fastify.post('/alerts/run-checks', {
-    preHandler: [requireRole('ADMIN')]
+    preHandler: [requirePolicy('ORG_ADMIN')]
   }, async (request) => {
     runScheduledChecks(fastify.log).catch(err =>
       fastify.log.error({ err }, 'Manual scheduled check failed')
@@ -406,7 +406,7 @@ async function alertRoutes(fastify) {
 
   // ── Trigger escalation checks now (admin manual trigger) ──
   fastify.post('/alerts/run-escalations', {
-    preHandler: [requireRole('ADMIN')]
+    preHandler: [requirePolicy('ORG_ADMIN')]
   }, async (request) => {
     runEscalationChecks(fastify.log).catch(err =>
       fastify.log.error({ err }, 'Manual escalation check failed')

@@ -2,7 +2,7 @@
 
 const { z } = require('zod');
 const { prisma } = require('../lib/prisma');
-const { authenticateJWT, requireRole, requireModule } = require('../middleware/auth');
+const { authenticateJWT, requirePolicy, requireModule } = require('../middleware/auth');
 
 // Zod schemas
 const templateItemSchema = z.object({
@@ -42,7 +42,7 @@ async function templateRoutes(fastify, opts) {
 
   // ─── LIST TEMPLATES ────────────────────────────────────────
   fastify.get('/inspection-templates', {
-    preHandler: [requireRole('ADMIN', 'SUPERVISOR')]
+    preHandler: [requirePolicy('ORG_STAFF')]
   }, async (request) => {
     const orgId = request.user.orgId;
     const { active, locationType } = request.query;
@@ -71,7 +71,7 @@ async function templateRoutes(fastify, opts) {
 
   // ─── GET SINGLE TEMPLATE ──────────────────────────────────
   fastify.get('/inspection-templates/:id', {
-    preHandler: [requireRole('ADMIN', 'SUPERVISOR')]
+    preHandler: [requirePolicy('ORG_STAFF')]
   }, async (request, reply) => {
     const template = await prisma.inspectionTemplate.findFirst({
       where: { id: request.params.id, orgId: request.user.orgId },
@@ -86,7 +86,7 @@ async function templateRoutes(fastify, opts) {
 
   // ─── CREATE TEMPLATE ──────────────────────────────────────
   fastify.post('/inspection-templates', {
-    preHandler: [requireRole('ADMIN')]
+    preHandler: [requirePolicy('ORG_ADMIN')]
   }, async (request, reply) => {
     const data = createTemplateSchema.parse(request.body);
     const orgId = request.user.orgId;
@@ -141,7 +141,7 @@ async function templateRoutes(fastify, opts) {
 
   // ─── UPDATE TEMPLATE ──────────────────────────────────────
   fastify.patch('/inspection-templates/:id', {
-    preHandler: [requireRole('ADMIN')]
+    preHandler: [requirePolicy('ORG_ADMIN')]
   }, async (request, reply) => {
     const data = updateTemplateSchema.parse(request.body);
     const orgId = request.user.orgId;
@@ -230,7 +230,7 @@ async function templateRoutes(fastify, opts) {
 
   // ─── DELETE TEMPLATE ──────────────────────────────────────
   fastify.delete('/inspection-templates/:id', {
-    preHandler: [requireRole('ADMIN')]
+    preHandler: [requirePolicy('ORG_ADMIN')]
   }, async (request, reply) => {
     const orgId = request.user.orgId;
 
@@ -256,7 +256,7 @@ async function templateRoutes(fastify, opts) {
 
   // ─── DUPLICATE TEMPLATE ───────────────────────────────────
   fastify.post('/inspection-templates/:id/duplicate', {
-    preHandler: [requireRole('ADMIN')]
+    preHandler: [requirePolicy('ORG_ADMIN')]
   }, async (request, reply) => {
     const orgId = request.user.orgId;
     const source = await prisma.inspectionTemplate.findFirst({
@@ -294,7 +294,7 @@ async function templateRoutes(fastify, opts) {
   // ─── RESOLVE TEMPLATE FOR LOCATION ────────────────────────
   // Used by supervisor UI to find the right template for a scanned location
   fastify.get('/inspection-templates/resolve', {
-    preHandler: [requireRole('ADMIN', 'SUPERVISOR')]
+    preHandler: [requirePolicy('ORG_STAFF')]
   }, async (request, reply) => {
     const orgId = request.user.orgId;
     const { locationId } = request.query;

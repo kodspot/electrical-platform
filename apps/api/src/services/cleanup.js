@@ -2,6 +2,7 @@
 
 const { prisma } = require('../lib/prisma');
 const { deleteFromR2 } = require('../lib/r2');
+const { runExclusive, LOCK_KEYS } = require('../lib/scheduler-lock');
 
 const RETENTION_DAYS = 30;
 
@@ -155,37 +156,37 @@ async function seedDefaultTemplates(logger) {
 
 const INTERVAL_MS = 24 * 60 * 60 * 1000; // 24 hours
 
+// Wraps each job with an advisory-lock gate (src/lib/scheduler-lock.js) so that if
+// more than one instance ever runs this scheduler concurrently, only one of them
+// actually executes a given tick — the others skip it and pick it up next interval.
+// A skipped tick is not lost: every job here only acts on rows past an age cutoff,
+// so the next scheduled run naturally catches whatever the skipped one would have.
+function runJob(lockKey, jobFn, logger, jobLabel) {
+  return runExclusive(prisma, lockKey, jobFn, logger).catch(err => {
+    logger.error(`[cleanup] ${jobLabel} failed:`, err.message);
+  });
+}
+
 function startCleanupScheduler(logger) {
   // Run once on startup (with a short delay to not block boot)
-  setTimeout(() => {
-    cleanupExpiredImages(logger).catch(err => {
-      logger.error('[cleanup] Startup cleanup failed:', err.message);
-    });
-    anonymizeGuestData(logger).catch(err => {
-      logger.error('[cleanup] Startup guest anonymization failed:', err.message);
-    });
-    seedDefaultTemplates(logger).catch(err => {
-      logger.error('[seed] Startup template seeding failed:', err.message);
-    });
+  const startupTimeout = setTimeout(() => {
+    runJob(LOCK_KEYS.IMAGE_CLEANUP, () => cleanupExpiredImages(logger), logger, 'Startup cleanup');
+    runJob(LOCK_KEYS.GUEST_ANONYMIZATION, () => anonymizeGuestData(logger), logger, 'Startup guest anonymization');
+    runJob(LOCK_KEYS.TEMPLATE_SEEDING, () => seedDefaultTemplates(logger), logger, 'Startup template seeding');
   }, 30000); // 30 seconds after boot
 
   // Then run every 24 hours
-  const interval = setInterval(() => {
-    cleanupExpiredImages(logger).catch(err => {
-      logger.error('[cleanup] Scheduled cleanup failed:', err.message);
-    });
-    anonymizeGuestData(logger).catch(err => {
-      logger.error('[cleanup] Scheduled guest anonymization failed:', err.message);
-    });
+  const dailyInterval = setInterval(() => {
+    runJob(LOCK_KEYS.IMAGE_CLEANUP, () => cleanupExpiredImages(logger), logger, 'Scheduled cleanup');
+    runJob(LOCK_KEYS.GUEST_ANONYMIZATION, () => anonymizeGuestData(logger), logger, 'Scheduled guest anonymization');
     // Clean up old alerts/insights (90-day retention)
     const { cleanupOldAlerts } = require('./automation');
-    cleanupOldAlerts(logger).catch(err => {
-      logger.error('[cleanup] Alert cleanup failed:', err.message);
-    });
+    runJob(LOCK_KEYS.ALERT_INSIGHT_CLEANUP, () => cleanupOldAlerts(logger), logger, 'Alert cleanup');
   }, INTERVAL_MS);
 
-  // Allow graceful shutdown to clear the interval
-  return interval;
+  // Returned so index.js can clear every timer on graceful shutdown, instead of
+  // leaving them pending when the process exits.
+  return { startupTimeout, dailyInterval };
 }
 
 module.exports = { cleanupExpiredImages, startCleanupScheduler };

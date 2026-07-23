@@ -16,47 +16,53 @@ const { prisma } = require('../lib/prisma');
 /**
  * Build the ancestor chain for a location (self + parent + grandparent...).
  * Returns array of location IDs from leaf to root.
+ *
+ * A single recursive CTE, not one round trip per hierarchy level — this is
+ * called on the ticket-creation and public-complaint hot paths (via
+ * getAssignedWorkerIds/getAssignedSupervisorIds below), so a deep hierarchy
+ * used to mean up to `maxDepth` sequential DB round trips per call. [WP11]
  */
 async function getLocationAncestors(locationId, maxDepth = 10) {
-  const chain = [locationId];
-  let currentId = locationId;
-
-  for (let i = 0; i < maxDepth; i++) {
-    const loc = await prisma.location.findUnique({
-      where: { id: currentId },
-      select: { parentId: true }
-    });
-    if (!loc || !loc.parentId) break;
-    chain.push(loc.parentId);
-    currentId = loc.parentId;
-  }
-
-  return chain;
+  const rows = await prisma.$queryRaw`
+    WITH RECURSIVE ancestors AS (
+      SELECT id, "parentId", 0 AS depth
+      FROM "Location"
+      WHERE id = ${locationId}
+      UNION ALL
+      SELECT l.id, l."parentId", a.depth + 1
+      FROM "Location" l
+      INNER JOIN ancestors a ON l.id = a."parentId"
+      WHERE a.depth < ${maxDepth}
+    )
+    SELECT id FROM ancestors ORDER BY depth
+  `;
+  return rows.map(r => r.id);
 }
 
 /**
  * Get all descendant location IDs for a given location.
  * Returns flat array of child + grandchild + ... IDs.
+ *
+ * Single recursive CTE instead of one query per node in the descendant
+ * subtree — this backs getWorkerCoverageLocationIds (worker-auth.js), which
+ * runs on essentially every worker-app request (list/detail/pickup/resolve),
+ * so this was the hottest N+1 path in the app. [WP11]
  */
 async function getLocationDescendants(locationId, orgId, maxDepth = 10) {
-  const descendants = [];
-  const visited = new Set();
-
-  async function walkChildren(parentId, depth) {
-    if (depth >= maxDepth || visited.has(parentId)) return;
-    visited.add(parentId);
-    const children = await prisma.location.findMany({
-      where: { parentId, orgId, isActive: true },
-      select: { id: true }
-    });
-    for (const child of children) {
-      descendants.push(child.id);
-      await walkChildren(child.id, depth + 1);
-    }
-  }
-
-  await walkChildren(locationId, 0);
-  return descendants;
+  const rows = await prisma.$queryRaw`
+    WITH RECURSIVE descendants AS (
+      SELECT id, "parentId", 0 AS depth
+      FROM "Location"
+      WHERE "parentId" = ${locationId} AND "orgId" = ${orgId} AND "isActive" = true
+      UNION ALL
+      SELECT l.id, l."parentId", d.depth + 1
+      FROM "Location" l
+      INNER JOIN descendants d ON l."parentId" = d.id
+      WHERE l."orgId" = ${orgId} AND l."isActive" = true AND d.depth < ${maxDepth - 1}
+    )
+    SELECT id FROM descendants
+  `;
+  return rows.map(r => r.id);
 }
 
 /**
@@ -141,25 +147,28 @@ async function getAssignedSupervisorIds(locationId, orgId) {
 
 /**
  * Build a full location breadcrumb string (Room 101, Floor 1, Boys Hostel).
+ *
+ * Single recursive CTE instead of one query per level — called on every
+ * public complaint submission and alert/escalation evaluation. [WP11]
  * @param {string} locationId
+ * @param {number} [maxDepth]
  * @returns {Promise<string>}
  */
-async function getLocationBreadcrumb(locationId) {
-  const parts = [];
-  let currentId = locationId;
-
-  for (let i = 0; i < 10; i++) {
-    const loc = await prisma.location.findUnique({
-      where: { id: currentId },
-      select: { name: true, parentId: true }
-    });
-    if (!loc) break;
-    parts.push(loc.name);
-    if (!loc.parentId) break;
-    currentId = loc.parentId;
-  }
-
-  return parts.join(', ');
+async function getLocationBreadcrumb(locationId, maxDepth = 10) {
+  const rows = await prisma.$queryRaw`
+    WITH RECURSIVE ancestors AS (
+      SELECT id, name, "parentId", 0 AS depth
+      FROM "Location"
+      WHERE id = ${locationId}
+      UNION ALL
+      SELECT l.id, l.name, l."parentId", a.depth + 1
+      FROM "Location" l
+      INNER JOIN ancestors a ON l.id = a."parentId"
+      WHERE a.depth < ${maxDepth - 1}
+    )
+    SELECT name FROM ancestors ORDER BY depth
+  `;
+  return rows.map(r => r.name).join(', ');
 }
 
 module.exports = {

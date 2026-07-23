@@ -1,0 +1,15 @@
+#!/bin/sh
+# Interim local quality gate ahead of WP4's CI pipeline (Engineering Charter §14).
+# Not active until a developer opts in — see .githooks/README.md.
+set -e
+
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+cd "$REPO_ROOT/apps/api"
+
+echo "[pre-push] Linting apps/api..."
+npm run lint
+
+echo "[pre-push] Running apps/api test suite..."
+npm test
+
+echo "[pre-push] Lint and tests passed."

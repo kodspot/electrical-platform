@@ -17,11 +17,31 @@ function buildDatabaseUrl() {
   return `${base}${sep}connection_limit=10&pool_timeout=10`;
 }
 
-const prisma = new PrismaClient({
+const rawPrismaClient = new PrismaClient({
   log: isProduction ? ['error'] : ['query', 'info', 'warn', 'error'],
   datasources: {
     db: {
       url: buildDatabaseUrl()
+    }
+  }
+});
+
+// Route every query through the database circuit breaker transparently, so
+// every route file gets fast-fail-on-outage behavior for free without
+// changing any of them. Previously dbBreaker existed and was even reported
+// on /health, but nothing ever called it — every route hit Prisma directly,
+// so a real DB outage would still queue up requests against a known-down
+// database instead of fast-failing, and /health's circuitBreakers.database
+// field could never reflect reality (always CLOSED, 0 failures). $extends
+// preserves $connect/$disconnect/$transaction/$queryRaw as normal top-level
+// client methods — only per-model operations (findMany/create/update/...)
+// are wrapped; raw queries and the transaction boundary itself are not
+// individually gated by this (see docs/ENGINEERING_CHARTER.md §12). [WP12]
+const prisma = rawPrismaClient.$extends({
+  name: 'db-circuit-breaker',
+  query: {
+    async $allOperations({ query, args }) {
+      return dbBreaker.exec(() => query(args));
     }
   }
 });
@@ -46,12 +66,4 @@ async function connectWithRetry(logger, retries = 5, baseDelay = 2000) {
   }
 }
 
-/**
- * Execute a Prisma operation through the database circuit breaker.
- * Use for critical read paths where you want fast-fail on DB outage.
- */
-async function dbExec(fn) {
-  return dbBreaker.exec(fn);
-}
-
-module.exports = { prisma, connectWithRetry, dbExec };
+module.exports = { prisma, connectWithRetry };

@@ -4,7 +4,7 @@ const { z } = require('zod');
 const { prisma } = require('../lib/prisma');
 const { uploadToR2, deleteFromR2 } = require('../lib/r2');
 const { validateImageBuffer } = require('../errors');
-const { authenticateJWT, requireRole, requireModule } = require('../middleware/auth');
+const { authenticateJWT, requirePolicy, requireModule } = require('../middleware/auth');
 
 const VALID_CATEGORIES = [
   'Transformer', 'Panel Board', 'Generator', 'UPS', 'Motor',
@@ -52,7 +52,7 @@ async function assetRoutes(fastify, opts) {
 
   // ─── LIST ASSETS ──────────────────────────────────────────
   fastify.get('/assets', {
-    preHandler: [requireRole('ADMIN', 'SUPERVISOR')]
+    preHandler: [requirePolicy('ORG_STAFF')]
   }, async (request) => {
     const orgId = request.user.orgId;
     const { locationId, category, status, condition, search, page, limit, sort, active } = request.query;
@@ -115,7 +115,7 @@ async function assetRoutes(fastify, opts) {
 
   // ─── GET SINGLE ASSET ────────────────────────────────────
   fastify.get('/assets/:id', {
-    preHandler: [requireRole('ADMIN', 'SUPERVISOR')]
+    preHandler: [requirePolicy('ORG_STAFF')]
   }, async (request, reply) => {
     const asset = await prisma.asset.findFirst({
       where: { id: request.params.id, orgId: request.user.orgId },
@@ -127,7 +127,7 @@ async function assetRoutes(fastify, opts) {
 
   // ─── CREATE ASSET ────────────────────────────────────────
   fastify.post('/assets', {
-    preHandler: [requireRole('ADMIN')]
+    preHandler: [requirePolicy('ORG_ADMIN')]
   }, async (request, reply) => {
     const data = createAssetSchema.parse(request.body);
     const orgId = request.user.orgId;
@@ -144,53 +144,60 @@ async function assetRoutes(fastify, opts) {
     });
     if (dupCode) return reply.code(409).send({ error: 'Asset code already exists in this organization' });
 
-    const asset = await prisma.asset.create({
-      data: {
-        orgId,
-        assetCode: data.assetCode,
-        name: data.name,
-        category: data.category,
-        locationId: data.locationId,
-        make: data.make || null,
-        model: data.model || null,
-        serialNo: data.serialNo || null,
-        ratedCapacity: data.ratedCapacity || null,
-        description: data.description || null,
-        status: data.status || 'OPERATIONAL',
-        condition: data.condition || 'GOOD',
-        installDate: data.installDate ? new Date(data.installDate) : null,
-        warrantyExpiry: data.warrantyExpiry ? new Date(data.warrantyExpiry) : null,
-        nextMaintenanceDue: data.nextMaintenanceDue ? new Date(data.nextMaintenanceDue) : null,
-        maintenanceCycleDays: data.maintenanceCycleDays || null,
-        purchaseCost: data.purchaseCost || null,
-        metadata: data.metadata || null
-      },
-      include: ASSET_INCLUDE
-    });
+    // Registering an asset, its INSTALLED event, and the audit-log entry must
+    // all commit together — a partial write would leave an asset with no
+    // installation event on its own timeline. [WP9]
+    const asset = await prisma.$transaction(async (tx) => {
+      const created = await tx.asset.create({
+        data: {
+          orgId,
+          assetCode: data.assetCode,
+          name: data.name,
+          category: data.category,
+          locationId: data.locationId,
+          make: data.make || null,
+          model: data.model || null,
+          serialNo: data.serialNo || null,
+          ratedCapacity: data.ratedCapacity || null,
+          description: data.description || null,
+          status: data.status || 'OPERATIONAL',
+          condition: data.condition || 'GOOD',
+          installDate: data.installDate ? new Date(data.installDate) : null,
+          warrantyExpiry: data.warrantyExpiry ? new Date(data.warrantyExpiry) : null,
+          nextMaintenanceDue: data.nextMaintenanceDue ? new Date(data.nextMaintenanceDue) : null,
+          maintenanceCycleDays: data.maintenanceCycleDays || null,
+          purchaseCost: data.purchaseCost || null,
+          metadata: data.metadata || null
+        },
+        include: ASSET_INCLUDE
+      });
 
-    // Create INSTALLED event
-    await prisma.assetEvent.create({
-      data: {
-        orgId,
-        assetId: asset.id,
-        loggedById: request.user.id,
-        type: 'INSTALLED',
-        summary: 'Asset registered in system',
-        statusAfter: asset.status,
-        conditionAfter: asset.condition
-      }
-    });
+      // Create INSTALLED event
+      await tx.assetEvent.create({
+        data: {
+          orgId,
+          assetId: created.id,
+          loggedById: request.user.id,
+          type: 'INSTALLED',
+          summary: 'Asset registered in system',
+          statusAfter: created.status,
+          conditionAfter: created.condition
+        }
+      });
 
-    await prisma.auditLog.create({
-      data: {
-        orgId,
-        actorType: 'user',
-        actorId: request.user.id,
-        action: 'asset_created',
-        entityType: 'Asset',
-        entityId: asset.id,
-        newValue: { name: asset.name, assetCode: asset.assetCode, category: asset.category }
-      }
+      await tx.auditLog.create({
+        data: {
+          orgId,
+          actorType: 'user',
+          actorId: request.user.id,
+          action: 'asset_created',
+          entityType: 'Asset',
+          entityId: created.id,
+          newValue: { name: created.name, assetCode: created.assetCode, category: created.category }
+        }
+      });
+
+      return created;
     });
 
     return reply.code(201).send(asset);
@@ -198,7 +205,7 @@ async function assetRoutes(fastify, opts) {
 
   // ─── UPDATE ASSET ────────────────────────────────────────
   fastify.patch('/assets/:id', {
-    preHandler: [requireRole('ADMIN')]
+    preHandler: [requirePolicy('ORG_ADMIN')]
   }, async (request, reply) => {
     const data = updateAssetSchema.parse(request.body);
     const orgId = request.user.orgId;
@@ -222,6 +229,24 @@ async function assetRoutes(fastify, opts) {
         where: { id: data.locationId, orgId, isActive: true }
       });
       if (!loc) return reply.code(404).send({ error: 'Location not found or inactive' });
+    }
+
+    // A FAULTY asset with open failure records can't be manually marked
+    // OPERATIONAL/UNDER_MAINTENANCE via this generic PATCH — that would make
+    // the asset's own status contradict its still-open AssetFailure rows.
+    // The correct path is resolving the failure(s) via PATCH
+    // /asset-failures/:id, which already flips the asset's status back
+    // correctly once none remain open. Decommissioning is exempt — it makes
+    // open failures moot, not contradicted. [WP10]
+    if (data.status && data.status !== existing.status && existing.status === 'FAULTY' && data.status !== 'FAULTY' && data.status !== 'DECOMMISSIONED') {
+      const openFailures = await prisma.assetFailure.count({
+        where: { assetId: existing.id, status: { in: ['OPEN', 'ACKNOWLEDGED', 'IN_PROGRESS'] } }
+      });
+      if (openFailures > 0) {
+        return reply.code(409).send({
+          error: `Cannot set status to ${data.status} — ${openFailures} failure(s) are still open. Resolve them via the asset failure record instead.`
+        });
+      }
     }
 
     const updateData = {};
@@ -248,48 +273,55 @@ async function assetRoutes(fastify, opts) {
     const conditionChanged = data.condition && data.condition !== existing.condition;
     const locationChanged = data.locationId && data.locationId !== existing.locationId;
 
-    const updated = await prisma.asset.update({
-      where: { id: existing.id },
-      data: updateData,
-      include: ASSET_INCLUDE
-    });
+    // The asset update, its auto-created event, and the audit-log entry must
+    // all commit together — a partial write would leave a status/condition
+    // change with no corresponding event on the asset's timeline. [WP9]
+    const updated = await prisma.$transaction(async (tx) => {
+      const result = await tx.asset.update({
+        where: { id: existing.id },
+        data: updateData,
+        include: ASSET_INCLUDE
+      });
 
-    // Auto-create event on significant changes
-    if (statusChanged || conditionChanged || locationChanged) {
-      let eventType = 'NOTE';
-      let summary = 'Asset updated';
-      if (locationChanged) { eventType = 'RELOCATED'; summary = 'Asset relocated'; }
-      if (data.status === 'DECOMMISSIONED') { eventType = 'DECOMMISSIONED'; summary = 'Asset decommissioned'; }
-      if (existing.status === 'DECOMMISSIONED' && data.status && data.status !== 'DECOMMISSIONED') {
-        eventType = 'RECOMMISSIONED'; summary = 'Asset recommissioned';
+      // Auto-create event on significant changes
+      if (statusChanged || conditionChanged || locationChanged) {
+        let eventType = 'NOTE';
+        let summary = 'Asset updated';
+        if (locationChanged) { eventType = 'RELOCATED'; summary = 'Asset relocated'; }
+        if (data.status === 'DECOMMISSIONED') { eventType = 'DECOMMISSIONED'; summary = 'Asset decommissioned'; }
+        if (existing.status === 'DECOMMISSIONED' && data.status && data.status !== 'DECOMMISSIONED') {
+          eventType = 'RECOMMISSIONED'; summary = 'Asset recommissioned';
+        }
+
+        await tx.assetEvent.create({
+          data: {
+            orgId,
+            assetId: existing.id,
+            loggedById: request.user.id,
+            type: eventType,
+            summary,
+            statusBefore: statusChanged ? existing.status : null,
+            statusAfter: statusChanged ? data.status : null,
+            conditionBefore: conditionChanged ? existing.condition : null,
+            conditionAfter: conditionChanged ? data.condition : null
+          }
+        });
       }
 
-      await prisma.assetEvent.create({
+      await tx.auditLog.create({
         data: {
           orgId,
-          assetId: existing.id,
-          loggedById: request.user.id,
-          type: eventType,
-          summary,
-          statusBefore: statusChanged ? existing.status : null,
-          statusAfter: statusChanged ? data.status : null,
-          conditionBefore: conditionChanged ? existing.condition : null,
-          conditionAfter: conditionChanged ? data.condition : null
+          actorType: 'user',
+          actorId: request.user.id,
+          action: 'asset_updated',
+          entityType: 'Asset',
+          entityId: existing.id,
+          oldValue: { status: existing.status, condition: existing.condition },
+          newValue: updateData
         }
       });
-    }
 
-    await prisma.auditLog.create({
-      data: {
-        orgId,
-        actorType: 'user',
-        actorId: request.user.id,
-        action: 'asset_updated',
-        entityType: 'Asset',
-        entityId: existing.id,
-        oldValue: { status: existing.status, condition: existing.condition },
-        newValue: updateData
-      }
+      return result;
     });
 
     return updated;
@@ -297,7 +329,7 @@ async function assetRoutes(fastify, opts) {
 
   // ─── DELETE / DEACTIVATE ASSET ───────────────────────────
   fastify.delete('/assets/:id', {
-    preHandler: [requireRole('ADMIN')]
+    preHandler: [requirePolicy('ORG_ADMIN')]
   }, async (request, reply) => {
     const orgId = request.user.orgId;
     const asset = await prisma.asset.findFirst({
@@ -306,41 +338,47 @@ async function assetRoutes(fastify, opts) {
     });
     if (!asset) return reply.code(404).send({ error: 'Asset not found' });
 
-    // If asset has history, soft-deactivate
+    // If asset has history, soft-deactivate. The status update and its
+    // DECOMMISSIONED event must commit together — a partial write would
+    // leave an asset deactivated with no record of why. [WP9]
     if (asset._count.events > 1 || asset._count.failures > 0) {
-      await prisma.asset.update({
-        where: { id: asset.id },
-        data: { isActive: false, status: 'DECOMMISSIONED' }
-      });
+      await prisma.$transaction(async (tx) => {
+        await tx.asset.update({
+          where: { id: asset.id },
+          data: { isActive: false, status: 'DECOMMISSIONED' }
+        });
 
-      await prisma.assetEvent.create({
-        data: {
-          orgId,
-          assetId: asset.id,
-          loggedById: request.user.id,
-          type: 'DECOMMISSIONED',
-          summary: 'Asset decommissioned and deactivated',
-          statusBefore: asset.status,
-          statusAfter: 'DECOMMISSIONED'
-        }
+        await tx.assetEvent.create({
+          data: {
+            orgId,
+            assetId: asset.id,
+            loggedById: request.user.id,
+            type: 'DECOMMISSIONED',
+            summary: 'Asset decommissioned and deactivated',
+            statusBefore: asset.status,
+            statusAfter: 'DECOMMISSIONED'
+          }
+        });
       });
 
       return { message: 'Asset decommissioned (has existing history)' };
     }
 
-    // No history — hard delete
-    await prisma.asset.delete({ where: { id: asset.id } });
+    // No history — hard delete, together with its audit-log entry. [WP9]
+    await prisma.$transaction(async (tx) => {
+      await tx.asset.delete({ where: { id: asset.id } });
 
-    await prisma.auditLog.create({
-      data: {
-        orgId,
-        actorType: 'user',
-        actorId: request.user.id,
-        action: 'asset_deleted',
-        entityType: 'Asset',
-        entityId: asset.id,
-        oldValue: { name: asset.name, assetCode: asset.assetCode }
-      }
+      await tx.auditLog.create({
+        data: {
+          orgId,
+          actorType: 'user',
+          actorId: request.user.id,
+          action: 'asset_deleted',
+          entityType: 'Asset',
+          entityId: asset.id,
+          oldValue: { name: asset.name, assetCode: asset.assetCode }
+        }
+      });
     });
 
     return { message: 'Asset deleted' };
@@ -348,7 +386,7 @@ async function assetRoutes(fastify, opts) {
 
   // ─── UPLOAD ASSET IMAGE ──────────────────────────────────
   fastify.post('/assets/:id/images', {
-    preHandler: [requireRole('ADMIN', 'SUPERVISOR')]
+    preHandler: [requirePolicy('ORG_STAFF')]
   }, async (request, reply) => {
     const orgId = request.user.orgId;
     const asset = await prisma.asset.findFirst({
@@ -404,7 +442,7 @@ async function assetRoutes(fastify, opts) {
 
   // ─── DELETE ASSET IMAGE ──────────────────────────────────
   fastify.delete('/assets/:assetId/images/:imageId', {
-    preHandler: [requireRole('ADMIN')]
+    preHandler: [requirePolicy('ORG_ADMIN')]
   }, async (request, reply) => {
     const orgId = request.user.orgId;
     const asset = await prisma.asset.findFirst({
@@ -426,7 +464,7 @@ async function assetRoutes(fastify, opts) {
 
   // ─── ASSET CATEGORIES ───────────────────────────────────
   fastify.get('/assets/categories', {
-    preHandler: [requireRole('ADMIN', 'SUPERVISOR')]
+    preHandler: [requirePolicy('ORG_STAFF')]
   }, async (request) => {
     const orgId = request.user.orgId;
     // Return hardcoded + custom categories used by org
@@ -442,7 +480,7 @@ async function assetRoutes(fastify, opts) {
 
   // ─── ASSET SUMMARY FOR DASHBOARD ────────────────────────
   fastify.get('/assets/summary', {
-    preHandler: [requireRole('ADMIN')]
+    preHandler: [requirePolicy('ORG_ADMIN')]
   }, async (request) => {
     const orgId = request.user.orgId;
 
@@ -467,7 +505,7 @@ async function assetRoutes(fastify, opts) {
 
   // ─── EXPORT CSV ──────────────────────────────────────────
   fastify.get('/assets/export', {
-    preHandler: [requireRole('ADMIN')]
+    preHandler: [requirePolicy('ORG_ADMIN')]
   }, async (request, reply) => {
     const orgId = request.user.orgId;
     const { category, status, locationId } = request.query;

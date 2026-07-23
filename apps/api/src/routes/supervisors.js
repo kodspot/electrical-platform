@@ -1,16 +1,17 @@
-﻿'use strict';
+'use strict';
 
 const bcrypt = require('bcrypt');
 const { z } = require('zod');
 const { prisma } = require('../lib/prisma');
 const { BCRYPT_COST, passwordSchema } = require('../lib/security');
-const { authenticateJWT, requireRole } = require('../middleware/auth');
+const { authenticateJWT, requirePolicy } = require('../middleware/auth');
+const { ACTIVE_TICKET_STATUSES } = require('../services/ticket-status');
 
 async function supervisorRoutes(fastify, opts) {
   fastify.addHook('preHandler', authenticateJWT);
-  fastify.addHook('preHandler', requireRole('ADMIN'));
+  fastify.addHook('preHandler', requirePolicy('ORG_ADMIN'));
 
-  // List supervisors â€” with search, filter, sort, pagination
+  // List supervisors — with search, filter, sort, pagination
   fastify.get('/supervisors', async (request) => {
     const { active, search, sort, page, limit } = request.query;
     const orgId = request.user.orgId;
@@ -144,7 +145,7 @@ async function supervisorRoutes(fastify, opts) {
     return supervisor;
   });
 
-  // Update supervisor â€” with audit logging
+  // Update supervisor — with audit logging
   fastify.patch('/supervisors/:id', async (request, reply) => {
     const { id } = request.params;
     const schema = z.object({
@@ -193,7 +194,7 @@ async function supervisorRoutes(fastify, opts) {
       select: { id: true, name: true, email: true, phone: true, designation: true, isActive: true }
     });
 
-    // Audit log â€” track changes
+    // Audit log — track changes
     const changes = {};
     for (const key of Object.keys(data)) {
       if (data[key] !== user[key]) changes[key] = { from: user[key], to: data[key] };
@@ -273,7 +274,7 @@ async function supervisorRoutes(fastify, opts) {
     return { success: true, message: 'Supervisor deactivated' };
   });
 
-  // Supervisor stats â€” enriched with flagged, tickets, shifts, top locations, late submissions
+  // Supervisor stats — enriched with flagged, tickets, shifts, top locations, late submissions
   fastify.get('/supervisors/:id/stats', async (request, reply) => {
     const { id } = request.params;
     const orgId = request.user.orgId;
@@ -301,7 +302,7 @@ async function supervisorRoutes(fastify, opts) {
       prisma.electricalInspection.groupBy({ by: ['locationId'], where: base, _count: true, orderBy: { _count: { locationId: 'desc' } }, take: 5 }),
       prisma.ticket.count({ where: { assignedToId: id } }),
       prisma.ticket.count({ where: { assignedToId: id, status: { in: ['RESOLVED', 'CLOSED'] } } }),
-      prisma.ticket.count({ where: { assignedToId: id, status: { in: ['OPEN', 'IN_PROGRESS'] } } })
+      prisma.ticket.count({ where: { assignedToId: id, status: { in: ACTIVE_TICKET_STATUSES } } })
     ]);
 
     // Resolve location names
@@ -367,7 +368,7 @@ async function supervisorRoutes(fastify, opts) {
     return { success: true, message: 'Supervisor permanently deleted' };
   });
 
-  // ── Supervisor Location Assignments ──
+  // -- Supervisor Location Assignments --
 
   // Get assignments for a supervisor
   fastify.get('/supervisors/:id/assignments', async (request, reply) => {
@@ -411,7 +412,7 @@ async function supervisorRoutes(fastify, opts) {
       }
     }
 
-    // Delete existing and create new — atomic transaction
+    // Delete existing and create new � atomic transaction
     await prisma.$transaction(async (tx) => {
       await tx.supervisorAssignment.deleteMany({ where: { supervisorId: id, orgId } });
 

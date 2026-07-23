@@ -7,23 +7,25 @@
 #   Add to crontab for automated daily backups:
 #     0 2 * * * /path/to/backup-db.sh >> /var/log/kodspot-backup.log 2>&1
 #
-# Retention: keeps the last 14 daily backups (configurable below)
+# Retention: keeps the last 14 daily backups locally (configurable below), and the
+# last 14 days of offsite copies in Cloudflare R2 (see docs/DISASTER_RECOVERY.md) —
+# a local-only backup does not survive the loss of the host it protects.
 # ─────────────────────────────────────────────────────────────────
 
 set -euo pipefail
 
 # ── Configuration ──
 CONTAINER_NAME="electrical-db"
-BACKUP_DIR="/opt/kodspot-backups"
+BACKUP_DIR="${BACKUP_DIR:-/opt/kodspot-backups}"
 RETENTION_DAYS=14
 TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
 BACKUP_FILE="${BACKUP_DIR}/kodspot_${TIMESTAMP}.sql.gz"
 
-# Load env vars (DB_USER, DB_NAME) from project .env
+# Load env vars (DB_USER, DB_NAME, and R2_* for offsite upload) from project .env
 SCRIPT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 if [ -f "${SCRIPT_DIR}/.env" ]; then
   # shellcheck disable=SC2046
-  export $(grep -E '^(DB_USER|DB_NAME)=' "${SCRIPT_DIR}/.env" | xargs)
+  export $(grep -E '^(DB_USER|DB_NAME|R2_ACCOUNT_ID|R2_ACCESS_KEY_ID|R2_SECRET_ACCESS_KEY|R2_BUCKET_NAME|R2_BACKUP_BUCKET_NAME)=' "${SCRIPT_DIR}/.env" | xargs)
 fi
 
 DB_USER="${DB_USER:-kodspot}"
@@ -58,10 +60,19 @@ if [ "${FILE_SIZE}" -lt "${MIN_SIZE}" ]; then
   exit 1
 fi
 
-# ── Prune old backups ──
+# ── Upload offsite (Cloudflare R2) — a local-only backup does not survive losing
+#    this host, which is the exact scenario a backup exists to protect against ──
+echo "[$(date -Iseconds)] Uploading backup offsite..."
+node "${SCRIPT_DIR}/apps/api/scripts/backup-r2.js" upload "${BACKUP_FILE}"
+echo "[$(date -Iseconds)] Offsite upload complete"
+
+# ── Prune old local backups ──
 DELETED=$(find "${BACKUP_DIR}" -name "kodspot_*.sql.gz" -type f -mtime "+${RETENTION_DAYS}" -print -delete | wc -l)
 if [ "${DELETED}" -gt 0 ]; then
-  echo "[$(date -Iseconds)] Pruned ${DELETED} backup(s) older than ${RETENTION_DAYS} days"
+  echo "[$(date -Iseconds)] Pruned ${DELETED} local backup(s) older than ${RETENTION_DAYS} days"
 fi
+
+# ── Prune old offsite backups (same retention window) ──
+node "${SCRIPT_DIR}/apps/api/scripts/backup-r2.js" prune "${RETENTION_DAYS}"
 
 echo "[$(date -Iseconds)] Backup job finished successfully"

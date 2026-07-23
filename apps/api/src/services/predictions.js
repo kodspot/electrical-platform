@@ -14,15 +14,7 @@
  */
 
 const { prisma } = require('../lib/prisma');
-const { aiBreaker } = require('../lib/circuit-breaker');
-
-// Re-use AI callers from automation service
-const automationPath = require.resolve('./automation');
-let _automationModule = null;
-function getAutomation() {
-  if (!_automationModule) _automationModule = require(automationPath);
-  return _automationModule;
-}
+const { resolveAiCredentials, callAiProvider } = require('../lib/ai-provider');
 
 // ─────────────────────────────────────────────
 // 1. ASSET RISK SCORING
@@ -233,7 +225,7 @@ async function detectAnomalies(orgId) {
     having: { assetId: { _count: { gte: 3 } } }
   });
   for (const rpt of repeatAssets) {
-    const asset = await prisma.asset.findUnique({ where: { id: rpt.assetId }, select: { assetCode: true, name: true } });
+    const asset = await prisma.asset.findFirst({ where: { id: rpt.assetId, orgId }, select: { assetCode: true, name: true } });
     anomalies.push({
       type: 'REPEAT_FAILURE',
       severity: 'HIGH',
@@ -271,16 +263,6 @@ async function detectAnomalies(orgId) {
  * Calls the configured AI provider through the circuit breaker.
  */
 async function generatePredictions(orgId, logger) {
-  // Lazy-require to avoid circular deps
-  const auto = getAutomation();
-  const resolveAiCredentials = auto.resolveAiCredentials;
-  const callAiProvider = auto.callAiProvider;
-
-  if (!resolveAiCredentials || !callAiProvider) {
-    if (logger) logger.warn('AI functions not available — skipping AI predictions');
-    return null;
-  }
-
   const org = await prisma.organization.findUnique({
     where: { id: orgId },
     select: { name: true, aiApiKey: true, aiProvider: true, aiModel: true }
@@ -335,7 +317,7 @@ DETECTED ANOMALIES:
 ${anomalies.length > 0 ? anomalies.map(a => `- [${a.severity}] ${a.title}: ${a.description}`).join('\n') : 'None'}`;
 
   try {
-    const result = await aiBreaker.exec(() => callAiProvider(creds, systemPrompt, userMessage, 1500));
+    const result = await callAiProvider(creds, systemPrompt, userMessage, 1500, 60000);
 
     // Try to parse JSON from response
     let parsed;

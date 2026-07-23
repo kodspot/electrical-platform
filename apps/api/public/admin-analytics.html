@@ -769,7 +769,17 @@ function renderLocTable(locs) {
 function renderTicketStats(ts) {
   if (ts.total === 0) { $('ticketStats').innerHTML = '<div class="an-empty">No tickets in this period</div>'; return; }
   var prColors = { URGENT: '#ef4444', HIGH: '#f97316', NORMAL: '#3b82f6', LOW: '#94a3b8' };
-  var stColors = { OPEN: '#ef4444', IN_PROGRESS: '#f59e0b', RESOLVED: '#10b981', CLOSED: '#6b7280' };
+  var stColors = {
+    OPEN: '#ef4444',
+    ACKNOWLEDGED: '#f97316',
+    ASSIGNED: '#fb923c',
+    IN_PROGRESS: '#f59e0b',
+    ON_HOLD: '#a78bfa',
+    RESOLVED_PENDING_VERIFY: '#8b5cf6',
+    RESOLVED: '#10b981',
+    CANCELLED: '#6b7280',
+    CLOSED: '#4b5563'
+  };
   var html = '<div class="ticket-stats">';
   for (var p in prColors) {
     var cnt = ts.byPriority[p] || 0;

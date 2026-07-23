@@ -142,10 +142,10 @@
 
   <!-- Stats cards (clickable to filter) -->
   <div class="tk-stats" id="statsBar">
-    <div class="tk-stat open" onclick="filterByStatus('OPEN')"><div class="tk-stat-num" id="statOpen">-</div><div class="tk-stat-label">Open</div></div>
-    <div class="tk-stat progress" onclick="filterByStatus('IN_PROGRESS')"><div class="tk-stat-num" id="statProgress">-</div><div class="tk-stat-label">In Progress</div></div>
-    <div class="tk-stat resolved" onclick="filterByStatus('RESOLVED')"><div class="tk-stat-num" id="statResolved">-</div><div class="tk-stat-label">Resolved</div></div>
-    <div class="tk-stat closed" onclick="filterByStatus('CLOSED')"><div class="tk-stat-num" id="statClosed">-</div><div class="tk-stat-label">Closed</div></div>
+    <div class="tk-stat open" onclick="filterByStatus('OPEN,ACKNOWLEDGED,ASSIGNED')"><div class="tk-stat-num" id="statOpen">-</div><div class="tk-stat-label">Open</div></div>
+    <div class="tk-stat progress" onclick="filterByStatus('IN_PROGRESS,ON_HOLD')"><div class="tk-stat-num" id="statProgress">-</div><div class="tk-stat-label">Active</div></div>
+    <div class="tk-stat resolved" onclick="filterByStatus('RESOLVED_PENDING_VERIFY')"><div class="tk-stat-num" id="statResolved">-</div><div class="tk-stat-label">Verify</div></div>
+    <div class="tk-stat closed" onclick="filterByStatus('RESOLVED,CANCELLED,CLOSED')"><div class="tk-stat-num" id="statClosed">-</div><div class="tk-stat-label">Done</div></div>
   </div>
 
   <!-- Filter bar -->
@@ -154,8 +154,15 @@
       <input class="form-input tk-search" id="tkSearch" placeholder="Search tickets…" oninput="debounceSearch()">
       <select class="form-select tk-filter-sel" id="filterStatus" onchange="loadTickets(1)">
         <option value="">All Status</option>
-        <option value="OPEN">Open</option><option value="IN_PROGRESS">In Progress</option>
-        <option value="RESOLVED">Resolved</option><option value="CLOSED">Closed</option>
+        <option value="OPEN">Open</option>
+        <option value="ACKNOWLEDGED">Acknowledged</option>
+        <option value="ASSIGNED">Assigned</option>
+        <option value="IN_PROGRESS">In Progress</option>
+        <option value="ON_HOLD">On Hold</option>
+        <option value="RESOLVED_PENDING_VERIFY">Pending Verify</option>
+        <option value="RESOLVED">Resolved</option>
+        <option value="CANCELLED">Cancelled</option>
+        <option value="CLOSED">Closed</option>
       </select>
       <select class="form-select tk-filter-sel" id="filterPriority" onchange="loadTickets(1)">
         <option value="">All Priority</option>
@@ -250,8 +257,15 @@
       <div class="form-row">
         <div class="form-group"><label class="form-label">Status</label>
           <select class="form-select" id="eStatus">
-            <option value="OPEN">Open</option><option value="IN_PROGRESS">In Progress</option>
-            <option value="RESOLVED">Resolved</option><option value="CLOSED">Closed</option>
+            <option value="OPEN">Open</option>
+            <option value="ACKNOWLEDGED">Acknowledged</option>
+            <option value="ASSIGNED">Assigned</option>
+            <option value="IN_PROGRESS">In Progress</option>
+            <option value="ON_HOLD">On Hold</option>
+            <option value="RESOLVED_PENDING_VERIFY">Pending Verify</option>
+            <option value="RESOLVED">Resolved</option>
+            <option value="CANCELLED">Cancelled</option>
+            <option value="CLOSED">Closed</option>
           </select>
         </div>
         <div class="form-group"><label class="form-label">Priority</label>
@@ -303,17 +317,37 @@ function debounceSearch() { clearTimeout(searchTimer); searchTimer = setTimeout(
 // ── Stats (from API response) ──
 function updateStats(stats) {
   if (!stats) return;
-  $('statOpen').textContent = stats.OPEN || 0;
-  $('statProgress').textContent = stats.IN_PROGRESS || 0;
-  $('statResolved').textContent = stats.RESOLVED || 0;
-  $('statClosed').textContent = stats.CLOSED || 0;
+  var openLike = (stats.OPEN || 0) + (stats.ACKNOWLEDGED || 0) + (stats.ASSIGNED || 0);
+  var activeLike = (stats.IN_PROGRESS || 0) + (stats.ON_HOLD || 0);
+  var pendingVerify = stats.RESOLVED_PENDING_VERIFY || 0;
+  var done = (stats.RESOLVED || 0) + (stats.CANCELLED || 0) + (stats.CLOSED || 0);
+  $('statOpen').textContent = openLike;
+  $('statProgress').textContent = activeLike;
+  $('statResolved').textContent = pendingVerify;
+  $('statClosed').textContent = done;
   // Highlight active stat card
   var activeStatus = $('filterStatus').value;
   var cards = document.querySelectorAll('.tk-stat');
-  var statusMap = ['OPEN', 'IN_PROGRESS', 'RESOLVED', 'CLOSED'];
+  var statusMap = [
+    ['OPEN', 'ACKNOWLEDGED', 'ASSIGNED'],
+    ['IN_PROGRESS', 'ON_HOLD'],
+    ['RESOLVED_PENDING_VERIFY'],
+    ['RESOLVED', 'CANCELLED', 'CLOSED']
+  ];
   for (var i = 0; i < cards.length; i++) {
-    cards[i].classList.toggle('active-filter', activeStatus === statusMap[i]);
+    var joined = statusMap[i].join(',');
+    var inGroup = statusMap[i].indexOf(activeStatus) >= 0 || activeStatus === joined;
+    cards[i].classList.toggle('active-filter', inGroup);
   }
+}
+
+function statusBadgeClass(status) {
+  if (status === 'OPEN') return 'badge-danger';
+  if (status === 'ACKNOWLEDGED' || status === 'ASSIGNED' || status === 'IN_PROGRESS') return 'badge-warning';
+  if (status === 'ON_HOLD' || status === 'RESOLVED_PENDING_VERIFY') return 'badge-info';
+  if (status === 'RESOLVED') return 'badge-success';
+  if (status === 'CANCELLED' || status === 'CLOSED') return 'badge-muted';
+  return 'badge-muted';
 }
 
 function filterByStatus(status) {
@@ -356,7 +390,7 @@ async function loadTickets(page) {
   $('ticketBody').innerHTML = tickets.map(function(t, i) {
     var num = (currentPage - 1) * PAGE_SIZE + i + 1;
     var priClass = t.priority === 'URGENT' ? 'badge-danger' : t.priority === 'HIGH' ? 'badge-warning' : t.priority === 'NORMAL' ? 'badge-info' : 'badge-muted';
-    var statClass = t.status === 'OPEN' ? 'badge-danger' : t.status === 'IN_PROGRESS' ? 'badge-warning' : t.status === 'RESOLVED' ? 'badge-success' : 'badge-muted';
+    var statClass = statusBadgeClass(t.status);
     var srcBadge = t.source === 'PUBLIC' ? ' <span class="badge badge-info" style="font-size:.58rem;vertical-align:middle;">QR</span>' : '';
     var rowCls = t.priority === 'URGENT' ? ' class="tk-urgent-row"' : '';
     var descSub = t.description ? '<span class="tk-desc-sub">' + esc(t.description) + '</span>' : '';
@@ -536,7 +570,7 @@ async function viewDetail(id) {
   var t = await res.json();
 
   var priClass = t.priority === 'URGENT' ? 'badge-danger' : t.priority === 'HIGH' ? 'badge-warning' : t.priority === 'NORMAL' ? 'badge-info' : 'badge-muted';
-  var statClass = t.status === 'OPEN' ? 'badge-danger' : t.status === 'IN_PROGRESS' ? 'badge-warning' : t.status === 'RESOLVED' ? 'badge-success' : 'badge-muted';
+  var statClass = statusBadgeClass(t.status);
   var srcBadge = t.source === 'PUBLIC' ? '<span class="badge badge-info" style="margin-left:.3rem">Public QR</span>' : '<span class="badge badge-muted" style="margin-left:.3rem">Internal</span>';
 
   var html = '<div class="tk-detail-grid">';

@@ -1,0 +1,204 @@
+name: Deploy to Staging
+
+# Mirrors deploy.yml's structure exactly (same test gate, same docker-compose.yml,
+# same deploy script shape) but targets a separate staging host via STAGING_-prefixed
+# secrets, triggered by pushing to the `staging` branch rather than `main`.
+#
+# This workflow is intentionally inert until a staging host exists and its secrets
+# are configured — see docs/DEPLOYMENT.md for exactly what's needed to activate it.
+# It will not affect production: it only ever runs against the `staging` branch and
+# the STAGING_* secrets, which are entirely separate from deploy.yml's secrets.
+
+on:
+  push:
+    branches:
+      - staging
+
+jobs:
+  test:
+    name: Lint & Test
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_USER: ci
+          POSTGRES_PASSWORD: ci
+          POSTGRES_DB: electrical_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U ci -d electrical_ci"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      NODE_ENV: test
+      DATABASE_URL: postgresql://ci:ci@localhost:5432/electrical_ci
+      JWT_SECRET: ci-only-placeholder-jwt-secret
+      COOKIE_SECRET: ci-only-placeholder-cookie-secret
+      ADMIN_KEY: ci-only-placeholder-admin-key
+      DATA_ENCRYPTION_KEY: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+      R2_ACCOUNT_ID: ci-placeholder
+      R2_ACCESS_KEY_ID: ci-placeholder
+      R2_SECRET_ACCESS_KEY: ci-placeholder
+      R2_BUCKET_NAME: ci-placeholder
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: apps/api/package-lock.json
+
+      - name: Install dependencies
+        working-directory: apps/api
+        run: npm ci
+
+      - name: Apply database migrations
+        working-directory: apps/api
+        run: npx prisma migrate deploy
+
+      - name: Lint
+        working-directory: apps/api
+        run: npm run lint
+
+      - name: Test
+        working-directory: apps/api
+        run: npm test
+
+  deploy:
+    name: Deploy to Staging Host
+    needs: test
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Deploy to staging host
+        uses: appleboy/ssh-action@v1.2.0
+
+        env:
+          NODE_ENV: production
+          PORT: "3000"
+          DOMAIN: ${{ secrets.STAGING_DOMAIN }}
+
+          APP_URL: ${{ secrets.STAGING_APP_URL }}
+          COOKIE_DOMAIN: ${{ secrets.STAGING_COOKIE_DOMAIN }}
+
+          DATABASE_URL: ${{ secrets.STAGING_DATABASE_URL }}
+          DB_USER: ${{ secrets.STAGING_DB_USER }}
+          DB_PASSWORD: ${{ secrets.STAGING_DB_PASSWORD }}
+          DB_NAME: ${{ secrets.STAGING_DB_NAME }}
+
+          JWT_SECRET: ${{ secrets.STAGING_JWT_SECRET }}
+          COOKIE_SECRET: ${{ secrets.STAGING_COOKIE_SECRET }}
+          ADMIN_KEY: ${{ secrets.STAGING_ADMIN_KEY }}
+
+          R2_ACCOUNT_ID: ${{ secrets.STAGING_R2_ACCOUNT_ID }}
+          R2_ACCESS_KEY_ID: ${{ secrets.STAGING_R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.STAGING_R2_SECRET_ACCESS_KEY }}
+          R2_BUCKET_NAME: ${{ secrets.STAGING_R2_BUCKET_NAME }}
+
+          CORS_ORIGINS: ${{ secrets.STAGING_CORS_ORIGINS }}
+
+          SES_SMTP_HOST: ${{ secrets.STAGING_SES_SMTP_HOST }}
+          SES_SMTP_USER: ${{ secrets.STAGING_SES_SMTP_USER }}
+          SES_SMTP_PASS: ${{ secrets.STAGING_SES_SMTP_PASS }}
+          SES_FROM_EMAIL: ${{ secrets.STAGING_SES_FROM_EMAIL }}
+
+          DATA_ENCRYPTION_KEY: ${{ secrets.STAGING_DATA_ENCRYPTION_KEY }}
+
+          ALERT_TELEGRAM_BOT_TOKEN: ${{ secrets.STAGING_ALERT_TELEGRAM_BOT_TOKEN }}
+          ALERT_TELEGRAM_CHAT_ID: ${{ secrets.STAGING_ALERT_TELEGRAM_CHAT_ID }}
+          ALERT_WEBHOOK_URL: ${{ secrets.STAGING_ALERT_WEBHOOK_URL }}
+
+          GLOBAL_AI_API_KEY: ${{ secrets.STAGING_GLOBAL_AI_API_KEY }}
+          GLOBAL_AI_PROVIDER: ${{ secrets.STAGING_GLOBAL_AI_PROVIDER }}
+          GLOBAL_AI_MODEL: ${{ secrets.STAGING_GLOBAL_AI_MODEL }}
+
+        with:
+          host: ${{ secrets.STAGING_AWS_HOST }}
+          username: ${{ secrets.STAGING_AWS_USERNAME }}
+          key: ${{ secrets.STAGING_AWS_SSH_PRIVATE_KEY }}
+
+          timeout: 30m
+          command_timeout: 30m
+
+          envs: NODE_ENV,PORT,DOMAIN,APP_URL,COOKIE_DOMAIN,DATABASE_URL,DB_USER,DB_PASSWORD,DB_NAME,JWT_SECRET,COOKIE_SECRET,ADMIN_KEY,R2_ACCOUNT_ID,R2_ACCESS_KEY_ID,R2_SECRET_ACCESS_KEY,R2_BUCKET_NAME,CORS_ORIGINS,SES_SMTP_HOST,SES_SMTP_USER,SES_SMTP_PASS,SES_FROM_EMAIL,DATA_ENCRYPTION_KEY,ALERT_TELEGRAM_BOT_TOKEN,ALERT_TELEGRAM_CHAT_ID,ALERT_WEBHOOK_URL,GLOBAL_AI_API_KEY,GLOBAL_AI_PROVIDER,GLOBAL_AI_MODEL
+
+          # Deploys to a separate directory from production (~/electrical-platform-staging
+          # vs ~/electrical-platform) so the same host *could* run both if ever needed,
+          # though a dedicated staging host is the recommended setup — see docs/DEPLOYMENT.md.
+          script: |
+            set -e
+
+            cd ~/electrical-platform-staging
+
+            echo "=== PULLING LATEST CODE (staging branch) ==="
+            git pull origin staging
+
+            echo "=== WRITING ENV FILE ==="
+
+            cat > .env << EOF
+            NODE_ENV=${NODE_ENV}
+            PORT=${PORT}
+            DOMAIN=${DOMAIN}
+            APP_URL=${APP_URL}
+            COOKIE_DOMAIN=${COOKIE_DOMAIN}
+            DATABASE_URL=${DATABASE_URL}
+            DB_USER=${DB_USER}
+            DB_PASSWORD=${DB_PASSWORD}
+            DB_NAME=${DB_NAME}
+            JWT_SECRET=${JWT_SECRET}
+            COOKIE_SECRET=${COOKIE_SECRET}
+            ADMIN_KEY=${ADMIN_KEY}
+            R2_ACCOUNT_ID=${R2_ACCOUNT_ID}
+            R2_ACCESS_KEY_ID=${R2_ACCESS_KEY_ID}
+            R2_SECRET_ACCESS_KEY=${R2_SECRET_ACCESS_KEY}
+            R2_BUCKET_NAME=${R2_BUCKET_NAME}
+            CORS_ORIGINS=${CORS_ORIGINS}
+            SES_SMTP_HOST=${SES_SMTP_HOST}
+            SES_SMTP_USER=${SES_SMTP_USER}
+            SES_SMTP_PASS=${SES_SMTP_PASS}
+            SES_FROM_EMAIL=${SES_FROM_EMAIL}
+            DATA_ENCRYPTION_KEY=${DATA_ENCRYPTION_KEY}
+            ALERT_TELEGRAM_BOT_TOKEN=${ALERT_TELEGRAM_BOT_TOKEN}
+            ALERT_TELEGRAM_CHAT_ID=${ALERT_TELEGRAM_CHAT_ID}
+            ALERT_WEBHOOK_URL=${ALERT_WEBHOOK_URL}
+            GLOBAL_AI_API_KEY=${GLOBAL_AI_API_KEY}
+            GLOBAL_AI_PROVIDER=${GLOBAL_AI_PROVIDER}
+            GLOBAL_AI_MODEL=${GLOBAL_AI_MODEL}
+            EOF
+
+            chmod 600 .env
+
+            echo "=== STOPPING OLD CONTAINERS ==="
+            docker compose -p electrical-staging down --remove-orphans
+
+            echo "=== BUILDING NEW IMAGE ==="
+            docker compose -p electrical-staging build
+
+            echo "=== STARTING ALL SERVICES ==="
+            docker compose -p electrical-staging up -d
+
+            echo "=== WAITING FOR API TO BECOME HEALTHY ==="
+            for i in $(seq 1 24); do
+              if docker compose -p electrical-staging exec -T api wget -qO- http://127.0.0.1:3000/health/ready > /dev/null 2>&1; then
+                echo "✅ Staging API is healthy (after ~${i}0s)"
+                break
+              fi
+              echo "  Attempt $i/24 — not ready yet..."
+              sleep 10
+              if [ "$i" -eq 24 ]; then
+                echo "❌ STAGING API HEALTH CHECK TIMED OUT after 240s"
+                docker compose -p electrical-staging logs --tail 150 api
+                exit 1
+              fi
+            done
+
+            echo "✅ STAGING DEPLOYMENT SUCCESSFUL"

@@ -6,19 +6,22 @@ const { prisma } = require('../lib/prisma');
 const { uploadToR2 } = require('../lib/r2');
 const { validateImageBuffer } = require('../errors');
 const { notifyAdmins, notifySupervisors, notifyWorkers, createNotification } = require('./notifications');
-const { emailAdmins, escHtml } = require('../lib/email');
+const { notify } = require('../services/notification-service');
+const { escHtml } = require('../lib/email');
 const { getAssignedSupervisorIds, getAssignedWorkerIds, getLocationBreadcrumb } = require('../services/assignment-resolver');
+const { normalizeEnabledModules } = require('../services/module-policy');
+const {
+  VALID_MODULES,
+  DEFAULT_MODULE_ISSUES,
+  normalizeModuleCode,
+  humanizeIssueKey,
+  getComplaintCategoriesForLocation
+} = require('../services/complaint-categories');
 
-const ISSUE_TYPES = ['ELECTRICAL_FAULT', 'WIRING_ISSUE', 'POWER_OUTAGE', 'SHORT_CIRCUIT', 'LIGHT_NOT_WORKING', 'FAN_NOT_WORKING', 'AC_NOT_WORKING', 'SWITCH_SOCKET_ISSUE', 'OTHER'];
-
-const MODULE_ISSUE_TYPES = {
-  ele: ['ELECTRICAL_FAULT', 'WIRING_ISSUE', 'POWER_OUTAGE', 'SHORT_CIRCUIT', 'LIGHT_NOT_WORKING', 'FAN_NOT_WORKING', 'AC_NOT_WORKING', 'SWITCH_SOCKET_ISSUE', 'OTHER'],
-  civil: ['STRUCTURAL_DAMAGE', 'PLUMBING_LEAK', 'PAINT_DAMAGE', 'CEILING_DAMAGE', 'FLOOR_DAMAGE', 'DOOR_WINDOW_ISSUE', 'WALL_CRACK', 'OTHER'],
-  asset: ['ASSET_DAMAGED', 'ASSET_MISSING', 'ASSET_MALFUNCTION', 'OTHER'],
-  complaints: ['NOISE', 'TEMPERATURE', 'STAFF_BEHAVIOUR', 'SAFETY_CONCERN', 'OTHER']
-};
-
-const ALL_ISSUE_TYPES = [...new Set(Object.values(MODULE_ISSUE_TYPES).flat())];
+function getDefaultIssueKeys(moduleCode) {
+  const mod = normalizeModuleCode(moduleCode);
+  return (DEFAULT_MODULE_ISSUES[mod] || []).map((item) => item.key);
+}
 
 async function publicRoutes(fastify, opts) {
 
@@ -58,7 +61,122 @@ async function publicRoutes(fastify, opts) {
       parentName: location.parent?.name || null,
       orgName: location.org.name,
       orgSlug: location.org.slug,
-      enabledModules: location.org.enabledModules || ['ele']
+      enabledModules: normalizeEnabledModules(location.org.enabledModules)
+    };
+  });
+
+  // ── Public: Get active child locations for a parent location (no auth required) ──
+  fastify.get('/public/location-children/:locationId', {
+    config: {
+      rateLimit: {
+        max: 40,
+        timeWindow: 60000,
+        keyGenerator: (req) => req.ip
+      }
+    }
+  }, async (request, reply) => {
+    const schema = z.object({
+      locationId: z.string().uuid()
+    });
+    const { locationId } = schema.parse(request.params || {});
+
+    const parent = await prisma.location.findUnique({
+      where: { id: locationId },
+      select: {
+        id: true,
+        orgId: true,
+        name: true,
+        type: true,
+        isActive: true,
+        parent: { select: { id: true, name: true, type: true } },
+        org: { select: { status: true } }
+      }
+    });
+
+    if (!parent || !parent.isActive) {
+      return reply.code(404).send({ error: 'Location not found' });
+    }
+    if (!parent.org || parent.org.status !== 'ACTIVE') {
+      return reply.code(410).send({ error: 'This facility is currently not accepting complaints' });
+    }
+
+    const children = await prisma.location.findMany({
+      where: {
+        orgId: parent.orgId,
+        parentId: parent.id,
+        isActive: true
+      },
+      select: {
+        id: true,
+        name: true,
+        type: true,
+        sortOrder: true,
+        parent: { select: { id: true, name: true, type: true } }
+      },
+      orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }]
+    });
+
+    return {
+      parent: {
+        id: parent.id,
+        name: parent.name,
+        type: parent.type,
+        parentName: parent.parent?.name || null
+      },
+      children
+    };
+  });
+
+  // ── Public: Get complaint categories for a location/module (no auth required) ──
+  fastify.get('/public/complaint-categories/:locationId', {
+    config: {
+      rateLimit: {
+        max: 30,
+        timeWindow: 60000,
+        keyGenerator: (req) => req.ip
+      }
+    }
+  }, async (request, reply) => {
+    const schema = z.object({
+      locationId: z.string().uuid()
+    });
+    const querySchema = z.object({
+      module: z.string().optional()
+    });
+
+    const { locationId } = schema.parse(request.params || {});
+    const { module } = querySchema.parse(request.query || {});
+    const mod = normalizeModuleCode(module || 'ele');
+
+    const location = await prisma.location.findUnique({
+      where: { id: locationId },
+      select: {
+        id: true,
+        orgId: true,
+        isActive: true,
+        org: { select: { status: true } }
+      }
+    });
+
+    if (!location || !location.isActive) {
+      return reply.code(404).send({ error: 'Location not found' });
+    }
+    if (!location.org || location.org.status !== 'ACTIVE') {
+      return reply.code(410).send({ error: 'This facility is currently not accepting complaints' });
+    }
+
+    const categories = await getComplaintCategoriesForLocation({
+      orgId: location.orgId,
+      locationId,
+      module: mod,
+      includeDefaults: true
+    });
+
+    return {
+      module: mod,
+      locationId,
+      hostelLocationId: categories.hostelLocationId,
+      categories: categories.categories
     };
   });
 
@@ -134,13 +252,6 @@ async function publicRoutes(fastify, opts) {
       return reply.code(400).send({ error: 'Invalid locationId format' });
     }
 
-    // Validate module
-    const mod = data.module || 'ele';
-    const allowedIssues = MODULE_ISSUE_TYPES[mod] || ISSUE_TYPES;
-    if (!allowedIssues.includes(data.issueType)) {
-      return reply.code(400).send({ error: 'Invalid issue type for module ' + mod });
-    }
-
     // Sanitize phone — only keep digits, +, -, spaces
     if (data.guestPhone) {
       data.guestPhone = data.guestPhone.replace(/[^\d+\-\s()]/g, '').substring(0, 20);
@@ -160,51 +271,18 @@ async function publicRoutes(fastify, opts) {
       return reply.code(410).send({ error: 'This facility is currently not accepting complaints' });
     }
 
-    // Handle image upload with proper orgId
-    if (imageUrl === '__pending__' && _pendingImageBuffer) {
-      imageUrl = await uploadToR2(_pendingImageBuffer, _pendingImageMime, location.orgId);
-    }
-
-    // Map issue type to a readable title
-    const ISSUE_LABELS = {
-      // Electrical
-      ELECTRICAL_FAULT: 'Electrical Fault',
-      WIRING_ISSUE: 'Wiring Issue',
-      POWER_OUTAGE: 'Power Outage',
-      SHORT_CIRCUIT: 'Short Circuit',
-      LIGHT_NOT_WORKING: 'Light Not Working',
-      FAN_NOT_WORKING: 'Fan Not Working',
-      AC_NOT_WORKING: 'AC Not Working',
-      SWITCH_SOCKET_ISSUE: 'Switch / Socket Issue',
-      BROKEN_EQUIPMENT: 'Broken Equipment',
-      WATER_ISSUE: 'Water / Plumbing Issue',
-      // Civil
-      STRUCTURAL_DAMAGE: 'Structural Damage',
-      PLUMBING_LEAK: 'Plumbing Leak',
-      PAINT_DAMAGE: 'Paint Damage',
-      CEILING_DAMAGE: 'Ceiling Damage',
-      FLOOR_DAMAGE: 'Floor Damage',
-      DOOR_WINDOW_ISSUE: 'Door / Window Issue',
-      WALL_CRACK: 'Wall Crack',
-      // Asset
-      ASSET_DAMAGED: 'Asset Damaged',
-      ASSET_MISSING: 'Asset Missing',
-      ASSET_MALFUNCTION: 'Asset Malfunction',
-      // Complaints
-      NOISE: 'Noise Complaint',
-      TEMPERATURE: 'Temperature Issue',
-      STAFF_BEHAVIOUR: 'Staff Behaviour',
-      SAFETY_CONCERN: 'Safety Concern',
-      // Generic
-      OTHER: 'Other Issue'
-    };
-
-    const title = (ISSUE_LABELS[data.issueType] || data.issueType) + ' — ' + location.name;
-
-    // Compute complaint provenance (privacy-safe)
+    // Compute complaint provenance (privacy-safe) and enforce abuse detection
+    // as early as possible — before category validation, image upload, or
+    // ticket creation — so a rejected submission never wastes an R2 upload
+    // or any further work. Peppered with IP_HASH_PEPPER (HMAC-SHA256) when
+    // configured; falls back to a plain digest, identical to pre-WP11
+    // behavior, when it isn't set. Duplicate detection only ever compares
+    // submissions from the last 30 minutes, so a change in hash scheme never
+    // needs to reconcile against older, differently-hashed rows. [WP11]
     const rawIp = request.ip || request.headers['x-forwarded-for']?.split(',')[0]?.trim() || '';
-    const sourceIp = rawIp ? crypto.createHash('sha256').update(rawIp).digest('hex').slice(0, 16) : null;
-    const userAgent = (request.headers['user-agent'] || '').slice(0, 200) || null;
+    const sourceIp = rawIp
+      ? crypto.createHmac('sha256', process.env.IP_HASH_PEPPER || '').update(rawIp).digest('hex').slice(0, 16)
+      : null;
 
     // Risk scoring: duplicate detection within last 30 min from same IP hash + same location
     let riskScore = 0;
@@ -222,10 +300,64 @@ async function publicRoutes(fastify, opts) {
       else if (recentCount >= 1) riskScore = 40;
     }
 
+    // Enforce the risk score instead of only recording it — this closes the
+    // exact gap audit finding H8 described. The threshold (80 = 3+ identical-
+    // location submissions from the same IP within 30 minutes) reuses the
+    // scoring exactly as already computed above; it does not introduce a new
+    // scoring scheme. Lower-risk submissions (40) are still recorded on the
+    // ticket for staff triage but are not blocked, so a single legitimate
+    // repeat report (e.g. two guests behind the same NAT/hostel WiFi) is
+    // never rejected. [WP11]
+    if (riskScore >= 80) {
+      return reply.code(429).send({
+        error: 'Too many complaints submitted recently from this connection for this location. Please wait before submitting again.'
+      });
+    }
+
+    const mod = normalizeModuleCode(data.module || 'ele');
+    if (!VALID_MODULES.includes(mod)) {
+      return reply.code(400).send({ error: 'Invalid module' });
+    }
+
+    const issueType = String(data.issueType || '').trim().toUpperCase();
+    const categoryBundle = await getComplaintCategoriesForLocation({
+      orgId: location.orgId,
+      locationId: data.locationId,
+      module: mod,
+      includeDefaults: true
+    });
+    const allowedIssues = categoryBundle.categories.length
+      ? categoryBundle.categories.map((cat) => cat.key)
+      : getDefaultIssueKeys(mod);
+
+    if (!allowedIssues.includes(issueType)) {
+      return reply.code(400).send({ error: 'Invalid issue type for module ' + mod });
+    }
+
+    // Handle image upload with proper orgId
+    if (imageUrl === '__pending__' && _pendingImageBuffer) {
+      imageUrl = await uploadToR2(_pendingImageBuffer, _pendingImageMime, location.orgId);
+    }
+
+    const chosenCategory = categoryBundle.categories.find((cat) => cat.key === issueType);
+    const issueLabel = chosenCategory?.label || humanizeIssueKey(issueType);
+    const title = issueLabel + ' — ' + location.name;
+    const userAgent = (request.headers['user-agent'] || '').slice(0, 200) || null;
+
+    // Resolve auto-assignment before creating the ticket so it's set in the
+    // same write, instead of a separate update afterward — a complaint that
+    // should have been auto-assigned to a warden but wasn't (because a
+    // second write failed) is a real workflow-integrity gap. [WP9]
+    let supervisorIds = [];
+    try {
+      supervisorIds = await getAssignedSupervisorIds(data.locationId, location.orgId);
+    } catch (_) { /* non-fatal */ }
+
     const ticket = await prisma.ticket.create({
       data: {
         orgId: location.orgId,
         locationId: data.locationId,
+        assignedToId: supervisorIds[0] || null,
         title,
         description: data.description || null,
         imageUrl: imageUrl && imageUrl !== '__pending__' ? imageUrl : null,
@@ -234,7 +366,7 @@ async function publicRoutes(fastify, opts) {
         module: mod,
         guestName: data.guestName || null,
         guestPhone: data.guestPhone || null,
-        issueType: data.issueType,
+        issueType,
         sourceIp,
         userAgent,
         riskScore,
@@ -256,25 +388,19 @@ async function publicRoutes(fastify, opts) {
     try { locationCrumb = await getLocationBreadcrumb(data.locationId) || location.name; } catch (_) { /* non-fatal */ }
     const notifBody = `${ticket.title} — ${locationCrumb}`;
 
-    // Auto-assign to supervisors (wardens) responsible for this location.
-    try {
-      const supervisorIds = await getAssignedSupervisorIds(data.locationId, location.orgId);
-      if (supervisorIds.length > 0) {
-        await prisma.ticket.update({ where: { id: ticket.id }, data: { assignedToId: supervisorIds[0] } });
-        // Notify each assigned supervisor directly
-        for (const supId of supervisorIds) {
-          createNotification({
-            orgId: location.orgId,
-            userId: supId,
-            type: 'public_complaint',
-            title: 'New public complaint assigned',
-            body: notifBody,
-            entityId: ticket.id,
-            isUrgent: true
-          }).catch(() => {});
-        }
-      }
-    } catch (_) { /* non-fatal */ }
+    // Notify each assigned supervisor directly (all of them, not just the
+    // one auto-assigned above).
+    for (const supId of supervisorIds) {
+      createNotification({
+        orgId: location.orgId,
+        userId: supId,
+        type: 'public_complaint',
+        title: 'New public complaint assigned',
+        body: notifBody,
+        entityId: ticket.id,
+        isUrgent: true
+      }).catch(() => {});
+    }
 
     // Ring the electricians covering this location immediately so they can
     // start moving while the warden triages. Notification goes to in-app bell
@@ -301,20 +427,31 @@ async function publicRoutes(fastify, opts) {
         action: 'ticket_public_create',
         entityType: 'Ticket',
         entityId: ticket.id,
-        newValue: { issueType: data.issueType, locationName: location.name, guestName: data.guestName }
+        newValue: { issueType, locationName: location.name, guestName: data.guestName }
       }
     });
 
-    // Notify admins about new public complaint
-    notifyAdmins(location.orgId, {
+    // Notify admins about new public complaint (in-app + paired email)
+    notify({
+      orgId: location.orgId,
+      to: { admins: true },
       type: 'public_complaint',
       title: 'New public complaint',
       body: notifBody,
       entityId: ticket.id,
-      isUrgent: true
+      isUrgent: true,
+      email: {
+        toAdmins: true,
+        subject: 'New Public Complaint',
+        html: `<p><span class="label">Issue:</span> <span class="val">${escHtml(ticket.title)}</span></p>
+       <p><span class="label">Location:</span> <span class="val">${escHtml(location.name)}</span></p>
+       ${data.guestName ? `<p><span class="label">Guest:</span> <span class="val">${escHtml(data.guestName)}</span></p>` : ''}
+       ${data.description ? `<p><span class="label">Details:</span> <span class="val">${escHtml(data.description)}</span></p>` : ''}
+       <p style="margin-top:16px;color:#888;font-size:12px">Please log in to the dashboard to review and assign this ticket.</p>`
+      }
     }).catch(() => {});
 
-    // Notify supervisors about new public complaint
+    // Notify supervisors about new public complaint (no paired email)
     notifySupervisors(location.orgId, {
       type: 'public_complaint',
       title: 'New public complaint',
@@ -322,15 +459,6 @@ async function publicRoutes(fastify, opts) {
       entityId: ticket.id,
       isUrgent: true
     }).catch(() => {});
-
-    // Email admins about the new complaint
-    emailAdmins(prisma, location.orgId, 'New Public Complaint',
-      `<p><span class="label">Issue:</span> <span class="val">${escHtml(ticket.title)}</span></p>
-       <p><span class="label">Location:</span> <span class="val">${escHtml(location.name)}</span></p>
-       ${data.guestName ? `<p><span class="label">Guest:</span> <span class="val">${escHtml(data.guestName)}</span></p>` : ''}
-       ${data.description ? `<p><span class="label">Details:</span> <span class="val">${escHtml(data.description)}</span></p>` : ''}
-       <p style="margin-top:16px;color:#888;font-size:12px">Please log in to the dashboard to review and assign this ticket.</p>`
-    ).catch(() => {});
 
     return {
       success: true,

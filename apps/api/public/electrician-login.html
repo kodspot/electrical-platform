@@ -87,6 +87,7 @@ $('loginForm').addEventListener('submit', async function(e) {
     localStorage.setItem('elec_user', JSON.stringify(data.worker || {}));
     if (orgSlug) localStorage.setItem('orgSlug', orgSlug);
     if (data.org && data.org.name) localStorage.setItem('orgName', data.org.name);
+    if (data.org && data.org.enabledModules) localStorage.setItem('enabledModules', JSON.stringify(data.org.enabledModules));
     localStorage.setItem('activeModule', mod);
 
     location.href = App.orgPath('electrician-scan');

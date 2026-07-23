@@ -3,7 +3,7 @@
 const bcrypt = require('bcrypt');
 const { z } = require('zod');
 const { prisma } = require('../lib/prisma');
-const { authenticateJWT, requireRole } = require('../middleware/auth');
+const { authenticateJWT, requirePolicy } = require('../middleware/auth');
 const { encryptWorkerPII, decryptWorkerPII } = require('../lib/crypto');
 const { BCRYPT_COST } = require('../lib/security');
 const { getAssignedWorkerIds } = require('../services/assignment-resolver');
@@ -13,7 +13,7 @@ async function workerRoutes(fastify, opts) {
 
   // List workers — with search, department filter, sort, pagination
   fastify.get('/workers', {
-    preHandler: [requireRole('ADMIN', 'SUPERVISOR')]
+    preHandler: [requirePolicy('ORG_STAFF')]
   }, async (request) => {
     const { active, search, department, sort, page, limit } = request.query;
     const orgId = request.user.orgId;
@@ -76,7 +76,7 @@ async function workerRoutes(fastify, opts) {
 
   // Get single worker
   fastify.get('/workers/:id', {
-    preHandler: [requireRole('ADMIN')]
+    preHandler: [requirePolicy('ORG_ADMIN')]
   }, async (request, reply) => {
     const { id } = request.params;
     const worker = await prisma.worker.findFirst({
@@ -88,7 +88,7 @@ async function workerRoutes(fastify, opts) {
 
   // Create worker
   fastify.post('/workers', {
-    preHandler: [requireRole('ADMIN')]
+    preHandler: [requirePolicy('ORG_ADMIN')]
   }, async (request, reply) => {
     const schema = z.object({
       employeeId: z.string().max(50).optional(),
@@ -155,7 +155,7 @@ async function workerRoutes(fastify, opts) {
 
   // Update worker
   fastify.patch('/workers/:id', {
-    preHandler: [requireRole('ADMIN')]
+    preHandler: [requirePolicy('ORG_ADMIN')]
   }, async (request, reply) => {
     const { id } = request.params;
     const schema = z.object({
@@ -229,7 +229,7 @@ async function workerRoutes(fastify, opts) {
 
   // Deactivate worker (using DELETE for REST convention)
   fastify.delete('/workers/:id', {
-    preHandler: [requireRole('ADMIN')]
+    preHandler: [requirePolicy('ORG_ADMIN')]
   }, async (request, reply) => {
     const { id } = request.params;
 
@@ -257,7 +257,7 @@ async function workerRoutes(fastify, opts) {
 
   // Worker inspection stats by period
   fastify.get('/workers/:id/stats', {
-    preHandler: [requireRole('ADMIN')]
+    preHandler: [requirePolicy('ORG_ADMIN')]
   }, async (request, reply) => {
     const { id } = request.params;
     const worker = await prisma.worker.findFirst({
@@ -312,7 +312,7 @@ async function workerRoutes(fastify, opts) {
 
   // Permanent delete worker (must be deactivated first)
   fastify.delete('/workers/:id/permanent', {
-    preHandler: [requireRole('ADMIN')]
+    preHandler: [requirePolicy('ORG_ADMIN')]
   }, async (request, reply) => {
     const { id } = request.params;
     const worker = await prisma.worker.findFirst({
@@ -323,11 +323,21 @@ async function workerRoutes(fastify, opts) {
       return reply.code(400).send({ error: 'Worker must be deactivated before permanent deletion' });
     }
 
-    // Disconnect from inspection records, then delete
-    await prisma.worker.update({
-      where: { id },
-      data: { electricalInspections: { set: [] } }
-    });
+    // Standardized with supervisors.js's equivalent check [WP17]: block
+    // permanent deletion while inspection history exists, rather than
+    // silently disconnecting the worker from it. Workers relate to
+    // ElectricalInspection via an implicit many-to-many (no FK constraint
+    // would stop the old disconnect-then-delete), but disconnecting still
+    // lost the historical worker↔inspection association with no warning to
+    // the admin performing the delete.
+    const recordCount = await prisma.electricalInspection.count({ where: { workers: { some: { id } } } });
+    if (recordCount > 0) {
+      return reply.code(409).send({
+        error: 'Cannot permanently delete worker with ' + recordCount + ' inspection records. They will remain archived.',
+        electricalInspections: recordCount
+      });
+    }
+
     await prisma.worker.delete({ where: { id } });
 
     await prisma.auditLog.create({
@@ -349,7 +359,7 @@ async function workerRoutes(fastify, opts) {
 
   // Get assignments for a worker
   fastify.get('/workers/:id/assignments', {
-    preHandler: [requireRole('ADMIN', 'SUPERVISOR')]
+    preHandler: [requirePolicy('ORG_STAFF')]
   }, async (request, reply) => {
     const { id } = request.params;
     const worker = await prisma.worker.findFirst({
@@ -368,7 +378,7 @@ async function workerRoutes(fastify, opts) {
 
   // Set assignments for a worker (replace all)
   fastify.put('/workers/:id/assignments', {
-    preHandler: [requireRole('ADMIN')]
+    preHandler: [requirePolicy('ORG_ADMIN')]
   }, async (request, reply) => {
     const { id } = request.params;
     const orgId = request.user.orgId;
@@ -432,7 +442,7 @@ async function workerRoutes(fastify, opts) {
 
   // Get workers assigned to a location (includes inherited parent assignments)
   fastify.get('/workers/by-location/:locationId', {
-    preHandler: [requireRole('ADMIN', 'SUPERVISOR')]
+    preHandler: [requirePolicy('ORG_STAFF')]
   }, async (request, reply) => {
     const { locationId } = request.params;
     const orgId = request.user.orgId;
@@ -459,7 +469,7 @@ async function workerRoutes(fastify, opts) {
     let inheritedWorkers = [];
     if (inheritedIds.length) {
       inheritedWorkers = await prisma.worker.findMany({
-        where: { id: { in: inheritedIds }, isActive: true },
+        where: { id: { in: inheritedIds }, orgId, isActive: true },
         select: { id: true, name: true, employeeId: true, phone: true, isActive: true, department: true }
       });
     }
@@ -475,7 +485,7 @@ async function workerRoutes(fastify, opts) {
 
   // ── Set/Reset Worker PIN (admin only) ──
   fastify.patch('/workers/:id/pin', {
-    preHandler: [requireRole('ADMIN')]
+    preHandler: [requirePolicy('ORG_ADMIN')]
   }, async (request, reply) => {
     const schema = z.object({
       pin: z.string().min(6).max(6).regex(/^\d+$/, 'PIN must be exactly 6 digits')

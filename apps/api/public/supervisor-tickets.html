@@ -203,13 +203,13 @@ function updateCounts(unassignedCount) {
   var open = 0, progress = 0, done = 0, urgent = 0, unassigned = 0, verify = 0;
   for (var i = 0; i < allTickets.length; i++) {
     var t = allTickets[i];
-    if (!t.assignedToId && t.status === 'OPEN') {
+    if (!t.assignedToId && isOpenLikeStatus(t.status)) {
       unassigned++;
       if (t.priority === 'URGENT' || t.priority === 'HIGH') urgent++;
-    } else if (t.status === 'OPEN') {
+    } else if (isOpenLikeStatus(t.status)) {
       open++;
       if (t.priority === 'URGENT' || t.priority === 'HIGH') urgent++;
-    } else if (t.status === 'IN_PROGRESS') {
+    } else if (isActiveLikeStatus(t.status)) {
       progress++;
     } else if (t.status === 'RESOLVED_PENDING_VERIFY') {
       verify++;
@@ -245,13 +245,30 @@ function switchTab(tab) {
   renderList();
 }
 
+function isOpenLikeStatus(status) {
+  return status === 'OPEN' || status === 'ACKNOWLEDGED' || status === 'ASSIGNED';
+}
+
+function isActiveLikeStatus(status) {
+  return status === 'IN_PROGRESS' || status === 'ON_HOLD';
+}
+
+function statusBadgeClass(status) {
+  if (status === 'OPEN') return 'badge-danger';
+  if (status === 'ACKNOWLEDGED' || status === 'ASSIGNED' || status === 'IN_PROGRESS') return 'badge-warning';
+  if (status === 'ON_HOLD' || status === 'RESOLVED_PENDING_VERIFY') return 'badge-info';
+  if (status === 'RESOLVED') return 'badge-success';
+  if (status === 'CANCELLED' || status === 'CLOSED') return 'badge-muted';
+  return 'badge-muted';
+}
+
 function renderList() {
   var filtered = allTickets.filter(function(t) {
-    if (activeTab === 'UNASSIGNED') return !t.assignedToId && t.status === 'OPEN';
-    if (activeTab === 'OPEN') return t.assignedToId && t.status === 'OPEN';
+    if (activeTab === 'UNASSIGNED') return !t.assignedToId && isOpenLikeStatus(t.status);
+    if (activeTab === 'OPEN') return t.assignedToId && isOpenLikeStatus(t.status);
     if (activeTab === 'RESOLVED_PENDING_VERIFY') return t.status === 'RESOLVED_PENDING_VERIFY';
-    if (activeTab === 'done') return t.status === 'RESOLVED' || t.status === 'CLOSED';
-    return t.status === activeTab;
+    if (activeTab === 'done') return t.status === 'RESOLVED' || t.status === 'CANCELLED' || t.status === 'CLOSED';
+    return isActiveLikeStatus(t.status);
   });
   // Sort: urgent/high first, then newest first
   filtered.sort(function(a, b) {
@@ -262,7 +279,7 @@ function renderList() {
   });
 
   if (!filtered.length) {
-    var msgs = { UNASSIGNED: 'No unassigned tickets available', OPEN: 'No open tickets assigned to you', IN_PROGRESS: 'No tickets in progress', RESOLVED_PENDING_VERIFY: 'No tickets waiting for verification', done: 'No resolved tickets yet' };
+    var msgs = { UNASSIGNED: 'No unassigned tickets available', OPEN: 'No open tickets assigned to you', IN_PROGRESS: 'No active tickets right now', RESOLVED_PENDING_VERIFY: 'No tickets waiting for verification', done: 'No resolved tickets yet' };
     var icons = {
       UNASSIGNED: '<svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="opacity:.5"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4-4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>',
       OPEN: '<svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="opacity:.5"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/></svg>',
@@ -312,7 +329,7 @@ async function showDetail(id) {
   var t = await res.json();
 
   var priCls = t.priority.toLowerCase();
-  var statCls = t.status === 'OPEN' ? 'badge-danger' : t.status === 'IN_PROGRESS' ? 'badge-warning' : t.status === 'RESOLVED' ? 'badge-success' : 'badge-muted';
+  var statCls = statusBadgeClass(t.status);
   var srcBadge = t.source === 'PUBLIC' ? ' <span class="tk-source" style="font-size:.6rem">Public QR</span>' : '';
 
   var html = '<div class="tk-detail-top">';
@@ -375,12 +392,12 @@ async function showDetail(id) {
   }
 
   html += '<div class="tk-actions" id="ticketActions">';
-  if (t.status === 'OPEN' && !t.assignedToId) {
+  if (isOpenLikeStatus(t.status) && !t.assignedToId) {
     // Unassigned ticket — show Pick Up button
     html += '<button class="btn btn-primary btn-block" onclick="pickupTicket(\'' + t.id + '\')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px"><path d="M16 21v-2a4 4 0 00-4-4H5a4 4 0 00-4-4v2"/><circle cx="8.5" cy="7" r="4"/><line x1="20" y1="8" x2="20" y2="14"/><line x1="23" y1="11" x2="17" y2="11"/></svg> Pick Up This Ticket</button>';
-  } else if (t.status === 'OPEN') {
+  } else if (isOpenLikeStatus(t.status)) {
     html += '<button class="btn btn-primary btn-block" onclick="acceptTicket(\'' + t.id + '\')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" style="vertical-align:-2px"><polyline points="20 6 9 17 4 12"/></svg> Accept &amp; Start Work</button>';
-  } else if (t.status === 'IN_PROGRESS') {
+  } else if (isActiveLikeStatus(t.status)) {
     html += '<div style="width:100%"><div class="tk-resolve">';
     html += '<h4>Resolve This Ticket</h4>';
     html += '<p class="tk-resolve-hint">Take a photo proving the issue is fixed.</p>';
@@ -420,7 +437,7 @@ async function showDetail(id) {
   $('detailCard').innerHTML = html;
 
   // Load workers for resolve form
-  if (t.status === 'IN_PROGRESS') loadResolveWorkers();
+  if (isActiveLikeStatus(t.status)) loadResolveWorkers();
 }
 
 function showList() {

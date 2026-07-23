@@ -1,17 +1,36 @@
-﻿'use strict';
+'use strict';
 
 const bcrypt = require('bcrypt');
 const QRCode = require('qrcode');
 const { z } = require('zod');
 const { prisma } = require('../lib/prisma');
 const { BCRYPT_COST, passwordSchema } = require('../lib/security');
-const { authenticateJWT, requireRole } = require('../middleware/auth');
+const { authenticateJWT, requirePolicy } = require('../middleware/auth');
 const { encryptWorkerPII, decryptWorkerPII, encryptField, decryptField } = require('../lib/crypto');
 const { APP_URL } = require('../config/env');
+const { isModuleEnabled } = require('../services/module-policy');
+const { validateActivationPlan, syncOrgModuleActivations } = require('../services/module-registry');
+const { ACTIVE_TICKET_STATUSES } = require('../services/ticket-status');
+
+const VALID_MODULES = ['ele', 'civil', 'asset', 'complaints'];
+
+function normalizeModuleList(modules) {
+  return [...new Set((modules || []).map((m) => String(m).trim().toLowerCase()))].sort();
+}
+
+function didModuleSetChange(before, after) {
+  const left = normalizeModuleList(before);
+  const right = normalizeModuleList(after);
+  if (left.length !== right.length) return true;
+  for (let i = 0; i < left.length; i += 1) {
+    if (left[i] !== right[i]) return true;
+  }
+  return false;
+}
 
 async function superadminRoutes(fastify, opts) {
   fastify.addHook('preHandler', authenticateJWT);
-  fastify.addHook('preHandler', requireRole('SUPER_ADMIN'));
+  fastify.addHook('preHandler', requirePolicy('SUPER_ADMIN'));
 
   // === Organizations ===
 
@@ -33,8 +52,314 @@ async function superadminRoutes(fastify, opts) {
     });
   });
 
+  // === Module Control Center ===
+
+  fastify.get('/superadmin/modules/catalog', async () => {
+    const [definitions, dependencies, activeCounts] = await Promise.all([
+      prisma.moduleDefinition.findMany({
+        where: { isActive: true },
+        orderBy: [{ sortOrder: 'asc' }, { code: 'asc' }],
+        select: {
+          id: true,
+          code: true,
+          name: true,
+          description: true,
+          isCore: true,
+          isActive: true,
+          sortOrder: true
+        }
+      }),
+      prisma.moduleDependency.findMany({
+        select: {
+          module: { select: { code: true } },
+          dependsOnModule: { select: { code: true } }
+        }
+      }),
+      prisma.orgModuleActivation.groupBy({
+        by: ['moduleId'],
+        where: { isActive: true },
+        _count: { _all: true }
+      })
+    ]);
+
+    const countByModuleId = new Map(activeCounts.map((row) => [row.moduleId, row._count._all]));
+    const depsByCode = new Map();
+    const dependentsByCode = new Map();
+
+    for (const dep of dependencies) {
+      const moduleCode = dep.module.code;
+      const dependsOnCode = dep.dependsOnModule.code;
+
+      if (!depsByCode.has(moduleCode)) depsByCode.set(moduleCode, new Set());
+      depsByCode.get(moduleCode).add(dependsOnCode);
+
+      if (!dependentsByCode.has(dependsOnCode)) dependentsByCode.set(dependsOnCode, new Set());
+      dependentsByCode.get(dependsOnCode).add(moduleCode);
+    }
+
+    return {
+      modules: definitions.map((mod) => ({
+        ...mod,
+        activeOrgCount: countByModuleId.get(mod.id) || 0,
+        dependencies: [...(depsByCode.get(mod.code) || [])].sort(),
+        dependents: [...(dependentsByCode.get(mod.code) || [])].sort()
+      }))
+    };
+  });
+
+  fastify.get('/superadmin/modules/dependencies', async () => {
+    const [definitions, dependencies] = await Promise.all([
+      prisma.moduleDefinition.findMany({
+        where: { isActive: true },
+        orderBy: [{ sortOrder: 'asc' }, { code: 'asc' }],
+        select: { code: true, name: true, isCore: true, sortOrder: true }
+      }),
+      prisma.moduleDependency.findMany({
+        select: {
+          module: { select: { code: true } },
+          dependsOnModule: { select: { code: true } }
+        }
+      })
+    ]);
+
+    return {
+      nodes: definitions,
+      edges: dependencies.map((dep) => ({
+        module: dep.module.code,
+        dependsOn: dep.dependsOnModule.code
+      }))
+    };
+  });
+
+  fastify.get('/superadmin/organizations/:id/module-activations', async (request, reply) => {
+    const { id } = request.params;
+    const org = await prisma.organization.findUnique({
+      where: { id },
+      select: { id: true, name: true, status: true, enabledModules: true }
+    });
+
+    if (!org || org.status === 'DELETED') {
+      return reply.code(404).send({ error: 'Organization not found' });
+    }
+
+    const [definitions, dependencies, activations] = await Promise.all([
+      prisma.moduleDefinition.findMany({
+        where: { isActive: true },
+        orderBy: [{ sortOrder: 'asc' }, { code: 'asc' }],
+        select: { id: true, code: true, name: true, description: true, isCore: true, sortOrder: true }
+      }),
+      prisma.moduleDependency.findMany({
+        select: {
+          module: { select: { code: true } },
+          dependsOnModule: { select: { code: true } }
+        }
+      }),
+      prisma.orgModuleActivation.findMany({
+        where: { orgId: id },
+        include: { module: { select: { code: true } } }
+      })
+    ]);
+
+    const activationByCode = new Map(activations.map((row) => [row.module.code, row]));
+    const depsByCode = new Map();
+    const dependentsByCode = new Map();
+
+    for (const dep of dependencies) {
+      const moduleCode = dep.module.code;
+      const dependsOnCode = dep.dependsOnModule.code;
+
+      if (!depsByCode.has(moduleCode)) depsByCode.set(moduleCode, new Set());
+      depsByCode.get(moduleCode).add(dependsOnCode);
+
+      if (!dependentsByCode.has(dependsOnCode)) dependentsByCode.set(dependsOnCode, new Set());
+      dependentsByCode.get(dependsOnCode).add(moduleCode);
+    }
+
+    return {
+      org: {
+        id: org.id,
+        name: org.name,
+        status: org.status,
+        enabledModules: normalizeModuleList(org.enabledModules)
+      },
+      modules: definitions.map((mod) => {
+        const activation = activationByCode.get(mod.code);
+        return {
+          code: mod.code,
+          name: mod.name,
+          description: mod.description,
+          isCore: mod.isCore,
+          sortOrder: mod.sortOrder,
+          dependencies: [...(depsByCode.get(mod.code) || [])].sort(),
+          dependents: [...(dependentsByCode.get(mod.code) || [])].sort(),
+          activation: activation
+            ? {
+              isActive: activation.isActive,
+              activatedAt: activation.activatedAt,
+              activatedById: activation.activatedById,
+              deactivatedAt: activation.deactivatedAt,
+              deactivatedById: activation.deactivatedById,
+              note: activation.note
+            }
+            : {
+              isActive: false,
+              activatedAt: null,
+              activatedById: null,
+              deactivatedAt: null,
+              deactivatedById: null,
+              note: null
+            }
+        };
+      })
+    };
+  });
+
+  fastify.post('/superadmin/organizations/:id/module-activations/validate', async (request, reply) => {
+    const { id } = request.params;
+    const schema = z.object({
+      targetModules: z.array(z.string()).min(1)
+    });
+
+    const { targetModules } = schema.parse(request.body);
+
+    const org = await prisma.organization.findUnique({
+      where: { id },
+      select: { id: true, status: true, enabledModules: true }
+    });
+    if (!org || org.status === 'DELETED') {
+      return reply.code(404).send({ error: 'Organization not found' });
+    }
+
+    const validation = await validateActivationPlan({
+      currentModules: org.enabledModules,
+      targetModules
+    });
+
+    return {
+      ok: validation.ok,
+      errors: validation.errors,
+      currentModules: normalizeModuleList(org.enabledModules),
+      normalizedTargetModules: validation.normalizedModules
+    };
+  });
+
+  fastify.patch('/superadmin/organizations/:id/module-activations', async (request, reply) => {
+    const { id } = request.params;
+    const schema = z.object({
+      targetModules: z.array(z.string()).min(1),
+      note: z.string().max(500).optional()
+    });
+
+    const { targetModules, note } = schema.parse(request.body);
+
+    const org = await prisma.organization.findUnique({
+      where: { id },
+      select: { id: true, status: true, enabledModules: true }
+    });
+    if (!org || org.status === 'DELETED') {
+      return reply.code(404).send({ error: 'Organization not found' });
+    }
+
+    const validation = await validateActivationPlan({
+      currentModules: org.enabledModules,
+      targetModules
+    });
+    if (!validation.ok) {
+      return reply.code(400).send({
+        error: 'Invalid module activation set',
+        details: validation.errors
+      });
+    }
+
+    const previousModules = normalizeModuleList(org.enabledModules);
+    const nextModules = normalizeModuleList(validation.normalizedModules);
+    const changed = didModuleSetChange(previousModules, nextModules);
+
+    const updated = await prisma.$transaction(async (tx) => {
+      const row = await tx.organization.update({
+        where: { id },
+        data: { enabledModules: nextModules },
+        select: { id: true, name: true, enabledModules: true, updatedAt: true }
+      });
+
+      await syncOrgModuleActivations({
+        orgId: id,
+        targetModules: nextModules,
+        actorId: request.user.id
+      }, tx);
+
+      await tx.auditLog.create({
+        data: {
+          orgId: id,
+          actorType: 'super_admin',
+          actorId: request.user.id,
+          action: 'module_activation_updated',
+          entityType: 'Organization',
+          entityId: id,
+          oldValue: { enabledModules: previousModules },
+          newValue: {
+            enabledModules: nextModules,
+            note: note || null,
+            changed
+          }
+        }
+      });
+
+      return row;
+    });
+
+    return {
+      ...updated,
+      changed
+    };
+  });
+
+  fastify.get('/superadmin/module-activations/audit', async (request) => {
+    const { orgId, limit, offset } = request.query;
+    const where = {
+      action: { startsWith: 'module_activation_' }
+    };
+    if (orgId) where.orgId = orgId;
+
+    const take = Math.min(parseInt(limit) || 50, 200);
+    const skip = parseInt(offset) || 0;
+
+    const [logs, total] = await Promise.all([
+      prisma.auditLog.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        take,
+        skip,
+        include: {
+          org: { select: { name: true } }
+        }
+      }),
+      prisma.auditLog.count({ where })
+    ]);
+
+    const actorIds = [...new Set(logs.filter((l) => l.actorId).map((l) => l.actorId))];
+    const actors = actorIds.length > 0
+      ? await prisma.user.findMany({
+        where: { id: { in: actorIds } },
+        select: { id: true, name: true, email: true, role: true }
+      })
+      : [];
+    const actorMap = new Map(actors.map((a) => [a.id, a]));
+
+    return {
+      logs: logs.map((l) => ({
+        ...l,
+        actorName: l.actorId ? (actorMap.get(l.actorId)?.name || 'Unknown') : l.actorType,
+        actorRole: l.actorId ? (actorMap.get(l.actorId)?.role || null) : null,
+        orgName: l.org?.name || null
+      })),
+      total,
+      limit: take,
+      offset: skip
+    };
+  });
+
   fastify.post('/superadmin/organizations', async (request, reply) => {
-    const VALID_MODULES = ['ele', 'civil', 'asset', 'complaints'];
     const schema = z.object({
       name: z.string().min(1).max(200).trim(),
       slug: z.string().min(1).max(50).regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, 'Slug must be lowercase letters, numbers, and hyphens only').optional(),
@@ -48,6 +373,18 @@ async function superadminRoutes(fastify, opts) {
     const data = schema.parse(request.body);
     if (!data.enabledModules) data.enabledModules = ['ele'];
 
+    const activationCheck = await validateActivationPlan({
+      currentModules: [],
+      targetModules: data.enabledModules
+    });
+    if (!activationCheck.ok) {
+      return reply.code(400).send({
+        error: 'Invalid module activation set',
+        details: activationCheck.errors
+      });
+    }
+    data.enabledModules = activationCheck.normalizedModules;
+
     // Use provided slug or auto-generate from name
     let slug = data.slug || data.name.toLowerCase().replace(/[^a-z0-9\s-]/g, '').replace(/\s+/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '').substring(0, 50);
     if (!slug) slug = 'org-' + Date.now().toString(36).slice(-6);
@@ -56,7 +393,15 @@ async function superadminRoutes(fastify, opts) {
     if (existing) return reply.code(409).send({ error: 'Slug "' + slug + '" is already taken. Choose a different one.' });
     data.slug = slug;
 
-    const org = await prisma.organization.create({ data });
+    const org = await prisma.$transaction(async (tx) => {
+      const created = await tx.organization.create({ data });
+      await syncOrgModuleActivations({
+        orgId: created.id,
+        targetModules: data.enabledModules,
+        actorId: request.user.id
+      }, tx);
+      return created;
+    });
 
     await prisma.auditLog.create({
       data: {
@@ -70,12 +415,28 @@ async function superadminRoutes(fastify, opts) {
       }
     });
 
+    await prisma.auditLog.create({
+      data: {
+        orgId: org.id,
+        actorType: 'super_admin',
+        actorId: request.user.id,
+        action: 'module_activation_updated',
+        entityType: 'Organization',
+        entityId: org.id,
+        oldValue: { enabledModules: [] },
+        newValue: {
+          enabledModules: normalizeModuleList(data.enabledModules),
+          note: 'Initialized during organization creation',
+          changed: true
+        }
+      }
+    });
+
     return org;
   });
 
   fastify.patch('/superadmin/organizations/:id', async (request, reply) => {
     const { id } = request.params;
-    const VALID_MODULES = ['ele', 'civil', 'asset', 'complaints'];
     const schema = z.object({
       name: z.string().min(1).max(200).trim().optional(),
       slug: z.string().min(1).max(50).regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, 'Slug must be lowercase letters, numbers, and hyphens (no leading/trailing hyphens)').optional(),
@@ -95,13 +456,37 @@ async function superadminRoutes(fastify, opts) {
       return reply.code(404).send({ error: 'Organization not found' });
     }
 
+    if (data.enabledModules) {
+      const activationCheck = await validateActivationPlan({
+        currentModules: existing.enabledModules,
+        targetModules: data.enabledModules
+      });
+      if (!activationCheck.ok) {
+        return reply.code(400).send({
+          error: 'Invalid module activation set',
+          details: activationCheck.errors
+        });
+      }
+      data.enabledModules = activationCheck.normalizedModules;
+    }
+
     // If slug is being changed, check uniqueness
     if (data.slug && data.slug !== existing.slug) {
       const slugTaken = await prisma.organization.findUnique({ where: { slug: data.slug } });
       if (slugTaken) return reply.code(409).send({ error: 'Slug "' + data.slug + '" is already taken.' });
     }
 
-    const updated = await prisma.organization.update({ where: { id }, data });
+    const updated = await prisma.$transaction(async (tx) => {
+      const row = await tx.organization.update({ where: { id }, data });
+      if (data.enabledModules) {
+        await syncOrgModuleActivations({
+          orgId: id,
+          targetModules: data.enabledModules,
+          actorId: request.user.id
+        }, tx);
+      }
+      return row;
+    });
 
     await prisma.auditLog.create({
       data: {
@@ -115,6 +500,25 @@ async function superadminRoutes(fastify, opts) {
         newValue: data
       }
     });
+
+    if (data.enabledModules && didModuleSetChange(existing.enabledModules, data.enabledModules)) {
+      await prisma.auditLog.create({
+        data: {
+          orgId: id,
+          actorType: 'super_admin',
+          actorId: request.user.id,
+          action: 'module_activation_updated',
+          entityType: 'Organization',
+          entityId: id,
+          oldValue: { enabledModules: normalizeModuleList(existing.enabledModules) },
+          newValue: {
+            enabledModules: normalizeModuleList(data.enabledModules),
+            note: 'Updated from organization edit flow',
+            changed: true
+          }
+        }
+      });
+    }
 
     return updated;
   });
@@ -522,7 +926,7 @@ async function superadminRoutes(fastify, opts) {
       prisma.electricalInspection.count({ where: { inspectedAt: { gte: todayStart } } }),
       prisma.electricalImage.count(),
       prisma.ticket.count(),
-      prisma.ticket.count({ where: { status: { in: ['OPEN', 'IN_PROGRESS'] } } })
+      prisma.ticket.count({ where: { status: { in: ACTIVE_TICKET_STATUSES } } })
     ]);
 
     // Daily inspection activity for last 7 days
@@ -671,8 +1075,7 @@ async function superadminRoutes(fastify, opts) {
     if (!org) return reply.code(404).send({ error: 'Organization not found' });
     if (!org.slug) return reply.code(400).send({ error: 'Organization has no slug configured' });
 
-    const enabledMods = org.enabledModules || ['ele'];
-    if (enabledMods.indexOf(mod) === -1) {
+    if (!isModuleEnabled(org, mod)) {
       return reply.code(400).send({ error: 'Module "' + mod + '" is not enabled for this organization' });
     }
 
@@ -719,13 +1122,13 @@ async function superadminRoutes(fastify, opts) {
             if (parts.length === 2) {
               result.azureEndpoint = parts[0];
               result.maskedKey = parts[1].length > 8
-                ? parts[1].slice(0, 4) + '••••••••' + parts[1].slice(-4)
-                : '••••••••••••';
+                ? parts[1].slice(0, 4) + '********' + parts[1].slice(-4)
+                : '************';
             }
           } else if (org.aiProvider === 'gemini') {
             result.maskedKey = decrypted.length > 8
-              ? decrypted.slice(0, 4) + '••••••••' + decrypted.slice(-4)
-              : '••••••••••••';
+              ? decrypted.slice(0, 4) + '********' + decrypted.slice(-4)
+              : '************';
           }
         }
       } catch { /* ignore decryption errors */ }

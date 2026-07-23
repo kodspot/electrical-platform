@@ -1,11 +1,11 @@
 'use strict';
 
 const { prisma } = require('../lib/prisma');
-const { authenticateJWT, requireRole } = require('../middleware/auth');
+const { authenticateJWT, requirePolicy } = require('../middleware/auth');
 
 async function auditLogRoutes(fastify, opts) {
   fastify.addHook('preHandler', authenticateJWT);
-  fastify.addHook('preHandler', requireRole('ADMIN'));
+  fastify.addHook('preHandler', requirePolicy('ORG_ADMIN'));
 
   // List audit logs — scoped to admin's own organisation only
   fastify.get('/audit-logs', async (request) => {
@@ -45,7 +45,7 @@ async function auditLogRoutes(fastify, opts) {
     const actorIds = [...new Set(logs.filter(l => l.actorId).map(l => l.actorId))];
     const actors = actorIds.length > 0
       ? await prisma.user.findMany({
-          where: { id: { in: actorIds } },
+          where: { id: { in: actorIds }, orgId },
           select: { id: true, name: true, email: true, role: true }
         })
       : [];
