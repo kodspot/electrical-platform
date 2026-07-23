@@ -8,8 +8,20 @@ const { z } = require('zod');
 const { prisma } = require('../lib/prisma');
 const { BCRYPT_COST, passwordSchema } = require('../lib/security');
 const { strictRateLimit, loginRateLimit } = require('../middleware/rateLimits');
-const { authenticateJWT, requireRole } = require('../middleware/auth');
+const { authenticateJWT, requirePolicy } = require('../middleware/auth');
 const { APP_URL } = require('../config/env');
+const { normalizeEnabledModules, isModuleEnabled } = require('../services/module-policy');
+const { sendEmail, escHtml } = require('../lib/email');
+
+const RESET_TOKEN_TTL_MS = 60 * 60 * 1000; // 1 hour
+
+// Anti-enumeration: a forgot-password request takes the same time whether or
+// not the email/org combination matches an account, so a caller can't infer
+// existence from response latency (matches the jitter already used on
+// invalid-credential paths in /auth/login below).
+async function antiEnumerationDelay() {
+  await new Promise(r => setTimeout(r, 400 + Math.random() * 300));
+}
 
 // Constant-time comparison that doesn't leak input length
 function safeCompareKeys(input, secret) {
@@ -144,7 +156,7 @@ async function authRoutes(fastify, opts) {
     // Check org status for non-superadmin
     let orgSlugValue = null;
     let orgNameValue = null;
-    let enabledModules = ['ele'];
+    let enabledModules = normalizeEnabledModules();
     if (user.orgId) {
       const org = await prisma.organization.findUnique({
         where: { id: user.orgId },
@@ -155,7 +167,7 @@ async function authRoutes(fastify, opts) {
       }
       orgSlugValue = org.slug;
       orgNameValue = org.name;
-      enabledModules = org.enabledModules || ['ele'];
+      enabledModules = normalizeEnabledModules(org.enabledModules);
     }
 
     const token = jwt.sign(
@@ -223,6 +235,129 @@ async function authRoutes(fastify, opts) {
     return { success: true, message: 'Password updated', token: newToken };
   });
 
+  // Request a self-service password reset. Always returns the same generic
+  // response regardless of whether the email/org matches an account, how
+  // many accounts share the email, or which orgs it belongs to — the
+  // response body and timing must never let a caller distinguish these
+  // cases. [WP14]
+  fastify.post('/auth/forgot-password', {
+    config: { rateLimit: strictRateLimit }
+  }, async (request, reply) => {
+    const schema = z.object({
+      email: z.string().email().max(200),
+      orgId: z.string().uuid().optional(),
+      orgSlug: z.string().max(50).optional()
+    });
+
+    const { email, orgId, orgSlug } = schema.parse(request.body);
+    const normalizedEmail = email.toLowerCase().trim();
+
+    const genericResponse = { success: true, message: 'If an account exists for this email, a password reset link has been sent.' };
+
+    let resolvedOrgId = orgId;
+    if (!resolvedOrgId && orgSlug) {
+      const org = await prisma.organization.findUnique({ where: { slug: orgSlug }, select: { id: true } });
+      if (org) resolvedOrgId = org.id;
+    }
+
+    const where = resolvedOrgId
+      ? { email: normalizedEmail, orgId: resolvedOrgId, isActive: true }
+      : { email: normalizedEmail, isActive: true };
+
+    // No orgId/orgSlug filter given and the email is shared across orgs?
+    // Reset all matching accounts rather than asking the caller to
+    // disambiguate — unlike /auth/login, revealing "these are your orgs"
+    // before any credential has been proven is itself an enumeration leak.
+    const users = await prisma.user.findMany({ where, select: { id: true, name: true } });
+
+    for (const user of users) {
+      const token = crypto.randomBytes(32).toString('hex');
+      const resetTokenExpiresAt = new Date(Date.now() + RESET_TOKEN_TTL_MS);
+      await prisma.user.update({
+        where: { id: user.id },
+        data: { resetToken: token, resetTokenExpiresAt }
+      });
+
+      const resetUrl = `${APP_URL}/reset-password?token=${token}`;
+      sendEmail(
+        normalizedEmail,
+        'Reset your password',
+        `<p>Hi ${escHtml(user.name)},</p>
+         <p>We received a request to reset your password. This link is valid for 1 hour and can only be used once.</p>
+         <p><a class="btn" href="${resetUrl}">Reset Password</a></p>
+         <p>If you didn't request this, you can safely ignore this email — your password won't be changed.</p>`
+      ).catch(() => {});
+    }
+
+    await antiEnumerationDelay();
+    return genericResponse;
+  });
+
+  // Complete a self-service password reset. [WP14]
+  fastify.post('/auth/reset-password', {
+    config: { rateLimit: strictRateLimit }
+  }, async (request, reply) => {
+    const schema = z.object({
+      token: z.string().min(1),
+      newPassword: passwordSchema
+    });
+
+    const { token, newPassword } = schema.parse(request.body);
+
+    const user = await prisma.user.findUnique({
+      where: { resetToken: token },
+      select: { id: true, orgId: true, role: true, name: true, email: true, isActive: true, resetTokenExpiresAt: true }
+    });
+
+    if (!user || !user.isActive || !user.resetTokenExpiresAt || user.resetTokenExpiresAt < new Date()) {
+      await antiEnumerationDelay();
+      return reply.code(400).send({ error: 'This reset link is invalid or has expired. Please request a new one.' });
+    }
+
+    let orgSlugValue = null, orgNameValue = null;
+    let enabledModules = normalizeEnabledModules();
+    if (user.orgId) {
+      const org = await prisma.organization.findUnique({
+        where: { id: user.orgId },
+        select: { status: true, slug: true, name: true, enabledModules: true }
+      });
+      if (!org || org.status !== 'ACTIVE') {
+        return reply.code(403).send({ error: 'Organization is not active' });
+      }
+      orgSlugValue = org.slug;
+      orgNameValue = org.name;
+      enabledModules = normalizeEnabledModules(org.enabledModules);
+    }
+
+    const passwordHash = await bcrypt.hash(newPassword, BCRYPT_COST);
+    // Single-use: the token is cleared in the same write that consumes it —
+    // a second request with the same token will find no matching user.
+    // Session invalidation: tokenInvalidBefore rejects every token issued
+    // before this moment, so a leaked pre-reset session can't survive this.
+    await prisma.user.update({
+      where: { id: user.id },
+      data: {
+        passwordHash,
+        tokenInvalidBefore: new Date(),
+        resetToken: null,
+        resetTokenExpiresAt: null
+      }
+    });
+
+    const newToken = jwt.sign(
+      { userId: user.id, orgId: user.orgId, role: user.role },
+      process.env.JWT_SECRET,
+      { expiresIn: '24h' }
+    );
+
+    return {
+      success: true,
+      message: 'Password reset successfully',
+      token: newToken,
+      user: { id: user.id, name: user.name, email: user.email, role: user.role, orgId: user.orgId, orgSlug: orgSlugValue, orgName: orgNameValue, enabledModules }
+    };
+  });
+
   // DPDP Act Sec 6 — Data portability: export all personal data for the current user
   fastify.get('/auth/export', {
     preHandler: [authenticateJWT],
@@ -281,7 +416,7 @@ async function authRoutes(fastify, opts) {
   const VALID_ROLES_QR = ['admin', 'supervisor'];
 
   fastify.get('/auth/login-qr', {
-    preHandler: [authenticateJWT, requireRole('ADMIN')]
+    preHandler: [authenticateJWT, requirePolicy('ORG_ADMIN')]
   }, async (request, reply) => {
     const { mod, role } = request.query;
 
@@ -298,8 +433,7 @@ async function authRoutes(fastify, opts) {
     });
     if (!org || !org.slug) return reply.code(400).send({ error: 'Organization not configured' });
 
-    const enabledMods = org.enabledModules || ['ele'];
-    if (enabledMods.indexOf(mod) === -1) {
+    if (!isModuleEnabled(org, mod)) {
       return reply.code(400).send({ error: 'Module not enabled' });
     }
 

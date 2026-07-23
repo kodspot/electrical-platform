@@ -1,94 +1,20 @@
 'use strict';
 
 const { prisma } = require('../lib/prisma');
-const { authenticateJWT, requireRole } = require('../middleware/auth');
-const { addConnection, removeConnection, pushNotification } = require('../services/sse');
-
-/**
- * Create a notification for a user (called internally by other routes).
- */
-async function createNotification({ orgId, userId, workerId, type, title, body, entityId, isUrgent }) {
-  const notif = await prisma.notification.create({
-    data: {
-      orgId,
-      userId: userId || null,
-      workerId: workerId || null,
-      type,
-      title,
-      body: body || null,
-      entityId: entityId || null,
-      isUrgent: !!isUrgent
-    }
-  });
-  // Push via SSE in real-time
-  try { pushNotification(orgId, notif); } catch { /* silent */ }
-  return notif;
-}
-
-/**
- * Notify all active admins of an org.
- */
-async function notifyAdmins(orgId, { type, title, body, entityId, isUrgent }) {
-  const admins = await prisma.user.findMany({
-    where: { orgId, role: 'ADMIN', isActive: true },
-    select: { id: true }
-  });
-  if (!admins.length) return;
-  const rows = admins.map(a => ({
-    orgId, userId: a.id, type, title, body: body || null, entityId: entityId || null, isUrgent: !!isUrgent
-  }));
-  await prisma.notification.createMany({ data: rows });
-  // Push SSE to each admin
-  for (const a of admins) {
-    try {
-      pushNotification(orgId, { userId: a.id, type, title, body, entityId, isUrgent: !!isUrgent, createdAt: new Date() });
-    } catch { /* silent */ }
-  }
-}
-
-/**
- * Notify all active supervisors of an org.
- */
-async function notifySupervisors(orgId, { type, title, body, entityId, isUrgent }) {
-  const supervisors = await prisma.user.findMany({
-    where: { orgId, role: 'SUPERVISOR', isActive: true },
-    select: { id: true }
-  });
-  if (!supervisors.length) return;
-  const rows = supervisors.map(s => ({
-    orgId, userId: s.id, type, title, body: body || null, entityId: entityId || null, isUrgent: !!isUrgent
-  }));
-  await prisma.notification.createMany({ data: rows });
-  // Push SSE to each supervisor
-  for (const s of supervisors) {
-    try {
-      pushNotification(orgId, { userId: s.id, type, title, body, entityId, isUrgent: !!isUrgent, createdAt: new Date() });
-    } catch { /* silent */ }
-  }
-}
-
-/**
- * Notify specific workers.
- */
-async function notifyWorkers(orgId, workerIds, { type, title, body, entityId, isUrgent }) {
-  if (!workerIds || !workerIds.length) return;
-  const rows = workerIds.map(wid => ({
-    orgId, workerId: wid, type, title, body: body || null, entityId: entityId || null, isUrgent: !!isUrgent
-  }));
-  await prisma.notification.createMany({ data: rows });
-  // Push SSE to each worker
-  for (const wid of workerIds) {
-    try {
-      pushNotification(orgId, { workerId: wid, type, title, body, entityId, isUrgent: !!isUrgent, createdAt: new Date() });
-    } catch { /* silent */ }
-  }
-}
+const { authenticateJWT, requirePolicy } = require('../middleware/auth');
+const { addConnection, removeConnection } = require('../services/sse');
+const {
+  createNotification,
+  notifyAdmins,
+  notifySupervisors,
+  notifyWorkers
+} = require('../services/notification-service');
 
 async function notificationRoutes(fastify) {
 
   // ── SSE stream endpoint (authenticated users: admin/supervisor) ──
   fastify.get('/notifications/stream', {
-    preHandler: [authenticateJWT, requireRole('ADMIN', 'SUPERVISOR')]
+    preHandler: [authenticateJWT, requirePolicy('ORG_STAFF')]
   }, async (request, reply) => {
     const orgId = request.user.orgId;
     const userId = request.user.id;
@@ -168,7 +94,7 @@ async function notificationRoutes(fastify) {
   // ── Authenticated routes for users ──
   fastify.register(async function userNotificationRoutes(sub) {
     sub.addHook('preHandler', authenticateJWT);
-    sub.addHook('preHandler', requireRole('ADMIN', 'SUPERVISOR'));
+    sub.addHook('preHandler', requirePolicy('ORG_STAFF'));
 
     // ── Unread count (lightweight poll/fallback endpoint) ──
     sub.get('/notifications/unread-count', async (request) => {

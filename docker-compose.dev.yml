@@ -1,0 +1,33 @@
+# Local development database ONLY — Postgres, nothing else. [platform-M2, DPS §2, §3]
+#
+# The app runs on the host (`npm run dev`) for a fast inner loop, not in a container.
+# This file exists so a developer can start just the database without building the
+# whole production stack, and with a volume isolated from the production compose.
+#
+#   docker compose -f docker-compose.dev.yml up -d
+#
+# Credentials default to the values in .env.dev.example; override via .env if needed.
+# Bound to 127.0.0.1 only — never exposed off the developer's machine.
+
+services:
+  db:
+    image: postgres:15-alpine
+    container_name: electrical-db-dev
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${DB_USER:-electrical}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-electrical}
+      POSTGRES_DB: ${DB_NAME:-electrical}
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - postgres-data-dev:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-electrical} -d ${DB_NAME:-electrical}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+volumes:
+  postgres-data-dev:

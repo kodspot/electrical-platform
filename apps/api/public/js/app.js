@@ -52,8 +52,24 @@ window.App = (function () {
   }
 
   // ─── Module Gating Helpers ───
+  function normalizeEnabledModules(modules) {
+    if (!Array.isArray(modules) || modules.length === 0) return ['ele'];
+    var out = [];
+    for (var i = 0; i < modules.length; i++) {
+      var mod = String(modules[i] || '').trim().toLowerCase();
+      if (!mod || VALID_MODULES.indexOf(mod) === -1) continue;
+      if (out.indexOf(mod) === -1) out.push(mod);
+    }
+    if (out.length === 0) out.push('ele');
+    return out;
+  }
+
+  function setEnabledModules(modules) {
+    localStorage.setItem('enabledModules', JSON.stringify(normalizeEnabledModules(modules)));
+  }
+
   function getEnabledModules() {
-    try { return JSON.parse(localStorage.getItem('enabledModules')) || ['ele']; }
+    try { return normalizeEnabledModules(JSON.parse(localStorage.getItem('enabledModules'))); }
     catch (e) { return ['ele']; }
   }
 
@@ -354,6 +370,7 @@ window.App = (function () {
     { page: 'admin-supervisors', label: 'Supervisors' },
     { page: 'admin-electrical', label: 'Electrical' },
     { page: 'admin-templates', label: 'Templates' },
+    { page: 'admin-categories', label: 'Categories' },
     { page: 'admin-assets', label: 'Assets', mod: 'asset' },
     { page: 'admin-failures', label: 'Failures', mod: 'asset' },
     { page: 'admin-alerts', label: 'Alerts' },
@@ -362,6 +379,87 @@ window.App = (function () {
     { page: 'admin-attendance', label: 'Attendance' },
     { page: 'admin-audit-logs', label: 'Audit Logs' }
   ];
+
+  function _renderAdminNav(activePage) {
+    var navEl = $('topbar-nav');
+    if (!navEl) return;
+    var enabledMods = getEnabledModules();
+    var html = '';
+    for (var i = 0; i < NAV_ITEMS.length; i++) {
+      var n = NAV_ITEMS[i];
+      if (n.mod && enabledMods.indexOf(n.mod) === -1) continue;
+      var href = orgPath(n.page);
+      var cls = n.page.indexOf(activePage) !== -1 ? ' class="active"' : '';
+      html += '<a href="' + href + '"' + cls + '>' + n.label + '</a>';
+    }
+    navEl.innerHTML = html;
+  }
+
+  function _applyRoleNavScope(navId) {
+    var navEl = $(navId);
+    if (!navEl) return;
+    var enabledMods = getEnabledModules();
+    var links = navEl.querySelectorAll('a[href]');
+    for (var i = 0; i < links.length; i++) {
+      var linkMod = links[i].getAttribute('data-mod');
+      if (linkMod && enabledMods.indexOf(linkMod) === -1) {
+        links[i].style.display = 'none';
+        continue;
+      }
+      links[i].style.display = '';
+      var page = links[i].getAttribute('href').replace(/^\//, '');
+      if (page) links[i].href = orgPath(page);
+    }
+  }
+
+  function _syncEnabledModulesForAdmin(isSA, activePage) {
+    if (isSA) {
+      var orgId = localStorage.getItem('selectedOrgId');
+      if (!orgId) return;
+      saFetch('/superadmin/organizations/' + orgId + '/module-activations').then(function(res) {
+        if (!res || !res.ok) return null;
+        return res.json();
+      }).then(function(data) {
+        if (!data || !data.org || !data.org.enabledModules) return;
+        setEnabledModules(data.org.enabledModules);
+        _renderAdminNav(activePage);
+      }).catch(function() {});
+      return;
+    }
+
+    apiFetch('/auth/me').then(function(res) {
+      if (!res || !res.ok) return null;
+      return res.json();
+    }).then(function(me) {
+      if (!me || !me.org || !me.org.enabledModules) return;
+      setEnabledModules(me.org.enabledModules);
+      _renderAdminNav(activePage);
+    }).catch(function() {});
+  }
+
+  function _syncEnabledModulesForSupervisor() {
+    supFetch('/auth/me').then(function(res) {
+      if (!res || !res.ok) return null;
+      return res.json();
+    }).then(function(me) {
+      if (!me || !me.org || !me.org.enabledModules) return;
+      setEnabledModules(me.org.enabledModules);
+      _applyRoleNavScope('sv-nav');
+      var scanNext = $('scanNextLink');
+      if (scanNext) scanNext.href = orgPath('supervisor-scan');
+    }).catch(function() {});
+  }
+
+  function _syncEnabledModulesForElectrician() {
+    elecFetch('/auth/worker-me').then(function(res) {
+      if (!res || !res.ok) return null;
+      return res.json();
+    }).then(function(me) {
+      if (!me || !me.org || !me.org.enabledModules) return;
+      setEnabledModules(me.org.enabledModules);
+      _applyRoleNavScope('sv-nav');
+    }).catch(function() {});
+  }
 
   // AI nav item — injected dynamically when AI is enabled for org
   function _maybeAddAiNav(activePage) {
@@ -404,20 +502,8 @@ window.App = (function () {
     _applyOrgBrand();
 
     // Build nav
-    var navEl = $('topbar-nav');
-    if (navEl) {
-      var enabledMods = getEnabledModules();
-      var html = '';
-      for (var i = 0; i < NAV_ITEMS.length; i++) {
-        var n = NAV_ITEMS[i];
-        // Skip module-specific nav items if module is not enabled
-        if (n.mod && enabledMods.indexOf(n.mod) === -1) continue;
-        var href = orgPath(n.page);
-        var cls = n.page.indexOf(activePage) !== -1 ? ' class="active"' : '';
-        html += '<a href="' + href + '"' + cls + '>' + n.label + '</a>';
-      }
-      navEl.innerHTML = html;
-    }
+    _renderAdminNav(activePage);
+    _syncEnabledModulesForAdmin(isSA, activePage);
 
     // Build user menu
     _buildUserMenu(user, 'admin');
@@ -455,20 +541,8 @@ window.App = (function () {
     _applyOrgBrand();
 
     // Rewrite supervisor nav links to module-scoped paths + hide disabled modules
-    var svNav = $('sv-nav');
-    if (svNav) {
-      var enabledMods = getEnabledModules();
-      var links = svNav.querySelectorAll('a[href]');
-      for (var i = 0; i < links.length; i++) {
-        var linkMod = links[i].getAttribute('data-mod');
-        if (linkMod && enabledMods.indexOf(linkMod) === -1) {
-          links[i].style.display = 'none';
-          continue;
-        }
-        var page = links[i].getAttribute('href').replace(/^\//, '');
-        if (page) links[i].href = orgPath(page);
-      }
-    }
+    _applyRoleNavScope('sv-nav');
+    _syncEnabledModulesForSupervisor();
     // Also fix standalone links like "Scan Next Location"
     var scanNext = $('scanNextLink');
     if (scanNext) scanNext.href = orgPath('supervisor-scan');
@@ -486,15 +560,9 @@ window.App = (function () {
     initModulePWA();
     _applyOrgBrand();
 
-    // Rewrite electrician nav links to module-scoped paths
-    var svNav = $('sv-nav');
-    if (svNav) {
-      var links = svNav.querySelectorAll('a[href]');
-      for (var i = 0; i < links.length; i++) {
-        var page = links[i].getAttribute('href').replace(/^\//, '');
-        if (page) links[i].href = orgPath(page);
-      }
-    }
+    // Rewrite electrician nav links to module-scoped paths + hide disabled modules
+    _applyRoleNavScope('sv-nav');
+    _syncEnabledModulesForElectrician();
 
     _buildUserMenu(user, 'electrician');
     return true;

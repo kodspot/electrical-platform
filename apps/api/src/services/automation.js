@@ -1,10 +1,19 @@
 'use strict';
 
 const { prisma } = require('../lib/prisma');
-const { decryptField } = require('../lib/crypto');
-const { notifyAdmins, notifySupervisors, notifyWorkers } = require('../routes/notifications');
+const { runExclusive, LOCK_KEYS } = require('../lib/scheduler-lock');
+const { resolveAiCredentials, callAiProvider } = require('../lib/ai-provider');
+const { getShiftConfigs } = require('./shift-config');
+const {
+  notifyAdmins,
+  notifySupervisors,
+  notifySupervisorIds,
+  notifyWorkers
+} = require('./notification-service');
 const { pushAlert } = require('./sse');
 const { getAssignedWorkerIds, getAssignedSupervisorIds, getLocationBreadcrumb } = require('./assignment-resolver');
+const { normalizeEnabledModules, isModuleEnabled } = require('./module-policy');
+const { ACTIVE_TICKET_STATUSES } = require('./ticket-status');
 
 // ── Severity ordinals ──
 const SEV_ORDER = ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'];
@@ -216,16 +225,14 @@ async function executeAction(action, alert, orgId, data, logger) {
       const supervisorIds = await getAssignedSupervisorIds(supLocId, orgId);
       if (supervisorIds.length) {
         const breadcrumb = await getLocationBreadcrumb(supLocId);
-        for (const supId of supervisorIds) {
-          await require('../routes/notifications').createNotification({
-            orgId,
-            userId: supId,
-            type: 'alert_' + alert.trigger.toLowerCase(),
-            title: alert.title,
-            body: (alert.body || '') + (breadcrumb ? ` [${breadcrumb}]` : ''),
-            entityId: alert.id
-          });
-        }
+        // Batched (single createMany) instead of one insert per supervisor,
+        // matching the NOTIFY_ASSIGNED_WORKERS case just above. [WP11]
+        await notifySupervisorIds(orgId, supervisorIds, {
+          type: 'alert_' + alert.trigger.toLowerCase(),
+          title: alert.title,
+          body: (alert.body || '') + (breadcrumb ? ` [${breadcrumb}]` : ''),
+          entityId: alert.id
+        });
       }
       break;
     }
@@ -266,15 +273,15 @@ async function runScheduledChecks(logger) {
 
   for (const org of orgs) {
     try {
-      const enabledMods = org.enabledModules || ['ele'];
+      const enabledMods = normalizeEnabledModules(org.enabledModules);
 
       // Always check inspection-based alerts
-      if (enabledMods.includes('ele')) {
+      if (isModuleEnabled(enabledMods, 'ele')) {
         await checkMissedInspections(org.id, logger);
       }
 
       // Asset module checks
-      if (enabledMods.includes('asset')) {
+      if (isModuleEnabled(enabledMods, 'asset')) {
         await checkUnresolvedFailures(org.id, logger);
         await checkOverdueMaintenance(org.id, logger);
       }
@@ -311,12 +318,20 @@ async function checkMissedInspections(orgId, logger) {
 
   const inspectedSet = new Set(inspections.map(i => `${i.locationId}:${i.shift}`));
 
-  // Check each shift that should be complete by now
-  const SHIFT_DEADLINES = { MORNING: 14, AFTERNOON: 22, NIGHT: 6 };
+  // Check each shift that should be complete by now — deadlines follow this
+  // org's configured ShiftConfig (falling back to the same defaults used
+  // here previously) instead of a hardcoded table, so orgs with custom
+  // shift windows get correctly-timed missed-inspection alerts. [WP10]
+  const shiftConfigs = await getShiftConfigs(orgId);
+  const SHIFT_DEADLINES = {
+    MORNING: shiftConfigs.MORNING.endHour,
+    AFTERNOON: shiftConfigs.AFTERNOON.endHour,
+    NIGHT: shiftConfigs.NIGHT.endHour
+  };
 
   for (const [shift, deadline] of Object.entries(SHIFT_DEADLINES)) {
     if (currentHour < deadline && shift !== 'NIGHT') continue;
-    if (shift === 'NIGHT' && currentHour >= 6 && currentHour < 22) continue;
+    if (shift === 'NIGHT' && currentHour >= shiftConfigs.NIGHT.endHour && currentHour < shiftConfigs.NIGHT.startHour) continue;
 
     for (const loc of locations) {
       if (inspectedSet.has(`${loc.id}:${shift}`)) continue;
@@ -505,7 +520,7 @@ RULES:
   const userMessage = `Generate today's daily operations summary for ${today}.\n\nDATA:\n${context}`;
 
   const start = Date.now();
-  const result = await callAiProvider(creds, systemPrompt, userMessage, 1024);
+  const result = await callAiProvider(creds, systemPrompt, userMessage, 1024, 60000);
   const latencyMs = Date.now() - start;
 
   await prisma.aiInsight.create({
@@ -562,7 +577,7 @@ async function buildInsightContext(orgId) {
       by: ['shift'], where: { orgId, inspectedAt: { gte: weekAgo } }, _count: true
     }), []),
     safe(prisma.ticket.findMany({
-      where: { orgId, status: { in: ['OPEN', 'IN_PROGRESS'] } },
+      where: { orgId, status: { in: ACTIVE_TICKET_STATUSES } },
       select: { title: true, priority: true, status: true, location: { select: { name: true } } },
       take: 15, orderBy: { createdAt: 'desc' }
     }), []),
@@ -626,87 +641,12 @@ ${recentAlerts.map(a => '- [' + a.severity + '] ' + a.title).join('\n') || '- No
 }
 
 // ── AI Provider Calling ──
-
-function getGlobalAiConfig() {
-  const key = process.env.GLOBAL_AI_API_KEY;
-  if (!key) return null;
-  return { apiKey: key, provider: process.env.GLOBAL_AI_PROVIDER || 'gemini', model: process.env.GLOBAL_AI_MODEL || 'gemini-2.0-flash' };
-}
-
-function resolveAiCredentials(org) {
-  if (org.aiApiKey) {
-    const decrypted = decryptField(org.aiApiKey);
-    if (decrypted) return { apiKey: decrypted, provider: org.aiProvider, model: org.aiModel, keySource: 'org' };
-  }
-  const global = getGlobalAiConfig();
-  if (global) return { apiKey: global.apiKey, provider: org.aiProvider || global.provider, model: org.aiModel || global.model, keySource: 'global' };
-  return null;
-}
-
-async function callAiProvider(creds, systemPrompt, userMessage, maxTokens) {
-  const provider = creds.provider || 'gemini';
-
-  if (provider === 'azure-openai') {
-    return callAzureOpenAI(creds.apiKey, creds.model, systemPrompt, userMessage, maxTokens);
-  }
-  return callGemini(creds.apiKey, creds.model, systemPrompt, userMessage, maxTokens);
-}
-
-async function callAzureOpenAI(apiKey, model, systemPrompt, userMessage, maxTokens) {
-  const parts = apiKey.split('|');
-  let endpoint, key;
-  if (parts.length === 2) {
-    endpoint = parts[0].replace(/\/$/, '') + '/openai/deployments/' + encodeURIComponent(model || 'gpt-4o') + '/chat/completions?api-version=2025-01-01-preview';
-    key = parts[1];
-  } else {
-    endpoint = 'https://api.openai.com/v1/chat/completions';
-    key = apiKey;
-  }
-  const isAzure = endpoint.includes('openai.azure.com');
-  const res = await fetch(endpoint, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...(isAzure ? { 'api-key': key } : { 'Authorization': `Bearer ${key}` }) },
-    body: JSON.stringify({
-      ...(isAzure ? {} : { model: model || 'gpt-4o' }),
-      messages: [{ role: 'system', content: systemPrompt }, { role: 'user', content: userMessage }],
-      max_tokens: maxTokens || 1024, temperature: 0.3
-    }),
-    signal: AbortSignal.timeout(60000)
-  });
-  if (!res.ok) throw new Error(`Azure/OpenAI error (${res.status})`);
-  const data = await res.json();
-  const usage = data.usage || {};
-  return { content: data.choices?.[0]?.message?.content || '', inputTokens: usage.prompt_tokens, outputTokens: usage.completion_tokens, totalTokens: usage.total_tokens };
-}
-
-async function callGemini(apiKey, model, systemPrompt, userMessage, maxTokens) {
-  const modelName = encodeURIComponent(model || 'gemini-2.0-flash');
-  const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent`;
-  const isThinkingModel = /gemini-2\.[5-9]|gemini-[3-9]/.test(model || '');
-  const generationConfig = { maxOutputTokens: maxTokens || 1024, temperature: isThinkingModel ? undefined : 0.3 };
-  if (isThinkingModel) generationConfig.thinkingConfig = { thinkingBudget: 0 };
-
-  const res = await fetch(endpoint, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
-    body: JSON.stringify({
-      system_instruction: { parts: [{ text: systemPrompt }] },
-      contents: [{ parts: [{ text: userMessage }] }],
-      generationConfig
-    }),
-    signal: AbortSignal.timeout(60000)
-  });
-  if (!res.ok) throw new Error(`Gemini error (${res.status})`);
-  const data = await res.json();
-  const parts = data.candidates?.[0]?.content?.parts;
-  let content = '';
-  if (Array.isArray(parts)) {
-    const textParts = parts.filter(p => p.text && !p.thought).map(p => p.text);
-    content = textParts.length ? textParts.join('\n') : (parts.filter(p => p.text).map(p => p.text).pop() || '');
-  }
-  const usage = data.usageMetadata || {};
-  return { content, inputTokens: usage.promptTokenCount, outputTokens: usage.candidatesTokenCount, totalTokens: usage.totalTokenCount };
-}
+// Consolidated into lib/ai-provider.js — resolveAiCredentials/callAiProvider
+// are re-exported below (see module.exports) for predictions.js, which
+// consumes them from this module rather than requiring the shared module
+// directly, for backward compatibility. callAiProvider now carries circuit
+// breaker protection internally, closing the gap where generateDailyInsight
+// (below) previously called the provider with no breaker at all. [WP10]
 
 // ─────────────────────────────────────────────
 // ESCALATION ENGINE
@@ -809,32 +749,41 @@ async function runEscalationChecks(logger) {
 
 let _lastInsightHour = -1;
 
+// Wraps each job with an advisory-lock gate (src/lib/scheduler-lock.js) — see
+// services/cleanup.js's runJob for the same pattern and its rationale. A skipped
+// tick here is caught by the next one; nothing is lost, since evaluateEvent's own
+// per-day dedupKey already tolerates being (re-)checked more than once.
+function runJob(lockKey, jobFn, logger, errMsg) {
+  return runExclusive(prisma, lockKey, jobFn, logger).catch(err => logger.error({ err }, errMsg));
+}
+
 function startAutomationScheduler(logger) {
   logger.info('Automation scheduler starting...');
 
   // Run scheduled checks 60 seconds after boot, then every 30 minutes
-  setTimeout(() => {
-    runScheduledChecks(logger).catch(err => logger.error({ err }, 'Initial scheduled check failed'));
-    runEscalationChecks(logger).catch(err => logger.error({ err }, 'Initial escalation check failed'));
+  const startupTimeout = setTimeout(() => {
+    runJob(LOCK_KEYS.SCHEDULED_CHECKS, () => runScheduledChecks(logger), logger, 'Initial scheduled check failed');
+    runJob(LOCK_KEYS.ESCALATION_CHECKS, () => runEscalationChecks(logger), logger, 'Initial escalation check failed');
   }, 60000);
 
   // Escalation checks every 5 minutes (time-sensitive)
-  setInterval(() => {
-    runEscalationChecks(logger).catch(err => logger.error({ err }, 'Escalation check failed'));
+  const escalationInterval = setInterval(() => {
+    runJob(LOCK_KEYS.ESCALATION_CHECKS, () => runEscalationChecks(logger), logger, 'Escalation check failed');
   }, 5 * 60 * 1000);
 
   const checkInterval = setInterval(() => {
-    runScheduledChecks(logger).catch(err => logger.error({ err }, 'Scheduled check failed'));
+    runJob(LOCK_KEYS.SCHEDULED_CHECKS, () => runScheduledChecks(logger), logger, 'Scheduled check failed');
 
     // Generate AI insights once per day (around 6 AM or first run after)
     const hour = new Date().getHours();
     if ((hour >= 6 && hour <= 8) && _lastInsightHour !== hour) {
       _lastInsightHour = hour;
-      generateAiInsights(logger).catch(err => logger.error({ err }, 'AI insight generation failed'));
+      runJob(LOCK_KEYS.AI_DAILY_INSIGHTS, () => generateAiInsights(logger), logger, 'AI insight generation failed');
     }
   }, 30 * 60 * 1000); // 30 minutes
 
-  return checkInterval;
+  // Returned so index.js can clear every timer on graceful shutdown.
+  return { startupTimeout, escalationInterval, checkInterval };
 }
 
 // ─────────────────────────────────────────────

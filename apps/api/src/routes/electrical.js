@@ -4,8 +4,9 @@ const { z } = require('zod');
 const { prisma } = require('../lib/prisma');
 const { uploadToR2 } = require('../lib/r2');
 const { validateImageBuffer } = require('../errors');
-const { authenticateJWT, requireRole, requireModule } = require('../middleware/auth');
+const { authenticateJWT, requirePolicy, requireModule } = require('../middleware/auth');
 const { evaluateEvent } = require('../services/automation');
+const { getShiftConfigs, getExpectedShiftFromConfig, isWithinShiftWindowConfig, hasShiftStarted } = require('../services/shift-config');
 
 const VALID_CHECK_TYPES = [
   'LIGHTING', 'FAN', 'AC', 'SWITCH_BOARD', 'SOCKET',
@@ -27,68 +28,9 @@ async function electricalRoutes(fastify, opts) {
   fastify.addHook('preHandler', authenticateJWT);
   fastify.addHook('preHandler', requireModule('ele'));
 
-  // Default shift windows (shared config)
-  const DEFAULT_SHIFTS = {
-    MORNING:   { startHour: 6, startMin: 0, endHour: 14, endMin: 0 },
-    AFTERNOON: { startHour: 14, startMin: 0, endHour: 22, endMin: 0 },
-    NIGHT:     { startHour: 22, startMin: 0, endHour: 6, endMin: 0 },
-    GENERAL:   { startHour: 0, startMin: 0, endHour: 0, endMin: 0 }
-  };
-
-  const _shiftCache = {};
-  async function getShiftConfigs(orgId) {
-    const cached = _shiftCache[orgId];
-    if (cached && Date.now() - cached.ts < 300000) return cached.data;
-    const rows = await prisma.shiftConfig.findMany({ where: { orgId } });
-    const configs = { ...DEFAULT_SHIFTS };
-    for (const r of rows) {
-      configs[r.shift] = { startHour: r.startHour, startMin: r.startMin, endHour: r.endHour, endMin: r.endMin };
-    }
-    _shiftCache[orgId] = { data: configs, ts: Date.now() };
-    return configs;
-  }
-
-  function timeInMinutes(h, m) { return h * 60 + m; }
-
-  function getExpectedShiftFromConfig(configs) {
-    const now = new Date();
-    const nowMins = timeInMinutes(now.getHours(), now.getMinutes());
-    for (const shift of ['MORNING', 'AFTERNOON', 'NIGHT']) {
-      const c = configs[shift];
-      const start = timeInMinutes(c.startHour, c.startMin);
-      const end = timeInMinutes(c.endHour, c.endMin);
-      if (end > start) {
-        if (nowMins >= start && nowMins < end) return shift;
-      } else if (end < start) {
-        if (nowMins >= start || nowMins < end) return shift;
-      }
-    }
-    return 'GENERAL';
-  }
-
-  function isWithinShiftWindowConfig(shift, configs) {
-    if (shift === 'GENERAL') return true;
-    return shift === getExpectedShiftFromConfig(configs);
-  }
-
-  function hasShiftStarted(shift, configs) {
-    if (shift === 'GENERAL') return true;
-    const c = configs[shift];
-    if (!c) return true;
-    const now = new Date();
-    const nowMins = timeInMinutes(now.getHours(), now.getMinutes());
-    const startMins = timeInMinutes(c.startHour, c.startMin);
-    const endMins = timeInMinutes(c.endHour, c.endMin);
-    if (endMins > startMins) {
-      return nowMins >= startMins;
-    } else {
-      return nowMins >= startMins || nowMins < endMins;
-    }
-  }
-
   // ── Submit electrical inspection (Supervisor) — multipart form ──
   fastify.post('/electrical-inspections', {
-    preHandler: [requireRole('SUPERVISOR')]
+    preHandler: [requirePolicy('SUPERVISOR')]
   }, async (request, reply) => {
     const orgId = request.user.orgId;
 
@@ -313,7 +255,7 @@ async function electricalRoutes(fastify, opts) {
 
   // ── List electrical inspections ──
   fastify.get('/electrical-inspections', {
-    preHandler: [requireRole('ADMIN', 'SUPERVISOR')]
+    preHandler: [requirePolicy('ORG_STAFF')]
   }, async (request) => {
     const orgId = request.user.orgId;
     const { locationId, workerId, supervisorId, shift, from, to, status, page, limit, search, isLate, hasFaults, sort } = request.query;
@@ -374,7 +316,7 @@ async function electricalRoutes(fastify, opts) {
 
   // ── Get single inspection ──
   fastify.get('/electrical-inspections/:id', {
-    preHandler: [requireRole('ADMIN', 'SUPERVISOR')]
+    preHandler: [requirePolicy('ORG_STAFF')]
   }, async (request, reply) => {
     const orgId = request.user.orgId;
     const record = await prisma.electricalInspection.findFirst({
@@ -390,7 +332,7 @@ async function electricalRoutes(fastify, opts) {
 
   // ── Flag / unflag inspection (Admin only) ──
   fastify.patch('/electrical-inspections/:id/flag', {
-    preHandler: [requireRole('ADMIN')]
+    preHandler: [requirePolicy('ORG_ADMIN')]
   }, async (request, reply) => {
     const orgId = request.user.orgId;
     const record = await prisma.electricalInspection.findFirst({
@@ -428,7 +370,7 @@ async function electricalRoutes(fastify, opts) {
 
   // ── Export CSV (Admin only) ──
   fastify.get('/electrical-inspections/export', {
-    preHandler: [requireRole('ADMIN')]
+    preHandler: [requirePolicy('ORG_ADMIN')]
   }, async (request, reply) => {
     const orgId = request.user.orgId;
     const { locationId, shift, from, to, status, isLate } = request.query;

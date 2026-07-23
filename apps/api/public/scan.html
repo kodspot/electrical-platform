@@ -29,6 +29,12 @@ body{background:var(--bg);min-height:100dvh}
 .role-icon{font-size:1.6rem;margin-bottom:.35rem;display:block}
 .role-label{font-size:.85rem;font-weight:600;color:var(--text)}
 .role-desc{font-size:.68rem;color:var(--text-muted);margin-top:.15rem}
+.loc-picker-grid{display:grid;grid-template-columns:1fr;gap:.5rem;margin-bottom:1rem}
+.loc-picker-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:.75rem .85rem;text-align:left;cursor:pointer;transition:all .15s}
+.loc-picker-card:hover{border-color:var(--primary);box-shadow:0 2px 8px rgba(30,64,175,.08)}
+.loc-picker-name{font-size:.86rem;font-weight:600;color:var(--text);display:flex;align-items:center;gap:.45rem}
+.loc-picker-meta{font-size:.72rem;color:var(--text-muted);margin-top:.2rem}
+.loc-picker-actions{display:flex;justify-content:flex-end;margin-top:.5rem}
 
 /* Complaint form */
 .complaint-form{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:1.25rem}
@@ -174,7 +180,7 @@ body{background:var(--bg);min-height:100dvh}
         showModulePicker(loc, code, modules);
       } else {
         localStorage.setItem('activeModule', modules[0]);
-        showComplaintForm(loc, code, modules[0]);
+        await startComplaintFlow(loc, code, modules[0]);
       }
     } catch(e) {
       showError('Connection Error', 'Could not connect to the server. Please check your internet and try again.');
@@ -210,7 +216,9 @@ body{background:var(--bg);min-height:100dvh}
 
     window._pickModule = function(mod) {
       localStorage.setItem('activeModule', mod);
-      showComplaintForm(loc, code, mod);
+      startComplaintFlow(loc, code, mod).catch(function() {
+        showError('Error', 'Unable to load complaint form. Please try again.');
+      });
     };
   }
 
@@ -222,13 +230,139 @@ body{background:var(--bg);min-height:100dvh}
       '<div class="scan-error-sub">' + esc(sub) + '</div></div>';
   }
 
-  function showComplaintForm(loc, code, mod) {
+  function needsChildSelection(loc) {
+    return !!loc && loc.type === 'FLOOR';
+  }
+
+  async function loadChildLocations(parentLocationId) {
+    try {
+      var res = await fetch('/api/public/location-children/' + encodeURIComponent(parentLocationId));
+      if (!res.ok) return [];
+      var data = await res.json();
+      if (!data || !Array.isArray(data.children)) return [];
+      return data.children;
+    } catch (_) {
+      return [];
+    }
+  }
+
+  function getLocationIcon(type) {
+    if (type === 'ROOM') return '🚪';
+    if (type === 'FLOOR') return '🏢';
+    if (type === 'HOSTEL') return '🏨';
+    if (type === 'BLOCK') return '🏛️';
+    return '📍';
+  }
+
+  function showChildLocationPicker(parentLoc, code, mod, children) {
+    var parentInfo = parentLoc.parentName ? esc(parentLoc.parentName) + ' → ' + esc(parentLoc.name) : esc(parentLoc.name);
+    var modMeta = MODULE_META[mod] || MODULE_META.ele;
+
+    root.innerHTML =
+      '<div class="scan-header">' +
+        '<div class="scan-logo">🏥 Kodspot</div>' +
+        '<div class="scan-loc">' +
+          '<div class="scan-loc-name">' + parentInfo + '</div>' +
+          '<div class="scan-loc-meta">' + esc(parentLoc.type.replace(/_/g, ' ')) + '</div>' +
+          '<div class="scan-loc-org">' + esc(parentLoc.orgName) + '</div>' +
+        '</div>' +
+      '</div>' +
+      '<div style="text-align:center;margin-bottom:.8rem">' +
+        '<p style="font-size:.86rem;font-weight:600;color:var(--text)">' + modMeta.icon + ' Select Room / Area</p>' +
+        '<p style="font-size:.78rem;color:var(--text-muted)">Choose where the issue is located for accurate routing.</p>' +
+      '</div>' +
+      '<div class="loc-picker-grid">' +
+        children.map(function(child) {
+          var typeLabel = String(child.type || '').replace(/_/g, ' ');
+          return '<button type="button" class="loc-picker-card" onclick="window._pickChildLocation(\'' + child.id + '\')">' +
+            '<div class="loc-picker-name"><span>' + getLocationIcon(child.type) + '</span><span>' + esc(child.name) + '</span></div>' +
+            '<div class="loc-picker-meta">' + esc(typeLabel) + '</div>' +
+          '</button>';
+        }).join('') +
+      '</div>' +
+      '<div class="loc-picker-actions">' +
+        '<button class="btn btn-sm btn-outline" onclick="window._reportParentLocation()">Report for Entire Floor</button>' +
+      '</div>';
+
+    window._pickChildLocation = function(childId) {
+      var child = null;
+      for (var i = 0; i < children.length; i++) {
+        if (children[i].id === childId) {
+          child = children[i];
+          break;
+        }
+      }
+      if (!child) return;
+
+      showComplaintForm({
+        id: child.id,
+        name: child.name,
+        type: child.type,
+        parentName: parentLoc.name,
+        orgName: parentLoc.orgName,
+        orgSlug: parentLoc.orgSlug,
+        enabledModules: parentLoc.enabledModules
+      }, code, mod).catch(function() {
+        showError('Error', 'Unable to load complaint form. Please try again.');
+      });
+    };
+
+    window._reportParentLocation = function() {
+      showComplaintForm(parentLoc, code, mod).catch(function() {
+        showError('Error', 'Unable to load complaint form. Please try again.');
+      });
+    };
+  }
+
+  async function startComplaintFlow(loc, code, mod) {
+    if (!needsChildSelection(loc)) {
+      await showComplaintForm(loc, code, mod);
+      return;
+    }
+
+    var children = await loadChildLocations(loc.id);
+    if (!children.length) {
+      await showComplaintForm(loc, code, mod);
+      return;
+    }
+
+    showChildLocationPicker(loc, code, mod, children);
+  }
+
+  function getIssueIcon(moduleCode, issueKey) {
+    var defaults = MODULE_ISSUES[moduleCode] || MODULE_ISSUES.ele;
+    for (var i = 0; i < defaults.length; i++) {
+      if (defaults[i].key === issueKey) return defaults[i].icon;
+    }
+    return (MODULE_META[moduleCode] && MODULE_META[moduleCode].icon) || '📋';
+  }
+
+  async function loadDynamicIssues(loc, mod) {
+    try {
+      var res = await fetch('/api/public/complaint-categories/' + encodeURIComponent(loc.id) + '?module=' + encodeURIComponent(mod));
+      if (!res.ok) return null;
+      var data = await res.json();
+      if (!data || !Array.isArray(data.categories) || data.categories.length === 0) return null;
+
+      return data.categories.map(function(cat) {
+        return {
+          key: cat.key,
+          icon: getIssueIcon(mod, cat.key),
+          label: cat.label || cat.key
+        };
+      });
+    } catch (_) {
+      return null;
+    }
+  }
+
+  async function showComplaintForm(loc, code, mod) {
     mod = mod || 'ele';
     var parentInfo = loc.parentName ? esc(loc.parentName) + ' \u2192 ' + esc(loc.name) : esc(loc.name);
     var typeLabel = loc.type.replace(/_/g, ' ');
     var modMeta = MODULE_META[mod] || MODULE_META.ele;
 
-    var ISSUES = MODULE_ISSUES[mod] || MODULE_ISSUES.ele;
+    var ISSUES = await loadDynamicIssues(loc, mod) || (MODULE_ISSUES[mod] || MODULE_ISSUES.ele);
 
     root.innerHTML =
       '<div class="scan-header">' +

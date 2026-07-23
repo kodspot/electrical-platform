@@ -3,10 +3,16 @@
 const { z } = require('zod');
 const PDFDocument = require('pdfkit');
 const { prisma } = require('../lib/prisma');
-const { authenticateJWT, requireRole } = require('../middleware/auth');
+const { authenticateJWT, requirePolicy } = require('../middleware/auth');
 
 const VALID_STATUSES = ['PRESENT', 'ABSENT', 'LEAVE', 'HALF_DAY'];
 const VALID_SHIFTS = ['MORNING', 'AFTERNOON', 'NIGHT', 'GENERAL'];
+const DEFAULT_SHIFT_CONFIG = {
+  MORNING: { startHour: 6, startMin: 0, endHour: 14, endMin: 0 },
+  AFTERNOON: { startHour: 14, startMin: 0, endHour: 22, endMin: 0 },
+  NIGHT: { startHour: 22, startMin: 0, endHour: 6, endMin: 0 },
+  GENERAL: { startHour: 0, startMin: 0, endHour: 0, endMin: 0 }
+};
 
 function isValidDateStr(s) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return false;
@@ -16,7 +22,32 @@ function isValidDateStr(s) {
 
 async function attendanceRoutes(fastify, opts) {
   fastify.addHook('preHandler', authenticateJWT);
-  fastify.addHook('preHandler', requireRole('ADMIN', 'SUPERVISOR'));
+  fastify.addHook('preHandler', requirePolicy('ORG_STAFF'));
+
+  // ── Shift config (defaults merged with org overrides) ──
+  fastify.get('/shift-config', async (request) => {
+    const orgId = request.user.orgId;
+    const rows = await prisma.shiftConfig.findMany({ where: { orgId, isActive: true } });
+
+    const merged = { ...DEFAULT_SHIFT_CONFIG };
+    for (const r of rows) {
+      if (!VALID_SHIFTS.includes(r.shift)) continue;
+      merged[r.shift] = {
+        startHour: r.startHour,
+        startMin: r.startMin,
+        endHour: r.endHour,
+        endMin: r.endMin
+      };
+    }
+
+    return VALID_SHIFTS.map((shift) => ({
+      shift,
+      startHour: merged[shift].startHour,
+      startMin: merged[shift].startMin,
+      endHour: merged[shift].endHour,
+      endMin: merged[shift].endMin
+    }));
+  });
 
   // ── Get attendance for a date/shift/location ──
   // Workers come from DutyRoster (if rosterId or locationId provided)
@@ -238,7 +269,10 @@ async function attendanceRoutes(fastify, opts) {
     await prisma.auditLog.create({
       data: {
         orgId,
-        actorType: request.user.role === 'ADMIN' ? 'admin' : 'supervisor',
+        // Distinguish a SuperAdmin acting via X-Org-Id org-entry from a genuine
+        // org ADMIN/SUPERVISOR — otherwise a SuperAdmin's write is silently
+        // mislabeled as 'supervisor'. [WP8]
+        actorType: request.user.role === 'ADMIN' ? 'admin' : request.user.role === 'SUPER_ADMIN' ? 'super_admin' : 'supervisor',
         actorId: request.user.id,
         action: 'attendance_marked',
         entityType: 'Attendance',
@@ -288,7 +322,7 @@ async function attendanceRoutes(fastify, opts) {
 
   // ── Attendance report (aggregated stats) ──
   fastify.get('/attendance/report', {
-    preHandler: [requireRole('ADMIN')]
+    preHandler: [requirePolicy('ORG_ADMIN')]
   }, async (request, reply) => {
     const orgId = request.user.orgId;
     const { from, to, workerId, locationId, shift } = request.query;
@@ -411,7 +445,7 @@ async function attendanceRoutes(fastify, opts) {
 
   // ── Download attendance report as CSV ──
   fastify.get('/attendance/report/csv', {
-    preHandler: [requireRole('ADMIN')]
+    preHandler: [requirePolicy('ORG_ADMIN')]
   }, async (request, reply) => {
     const orgId = request.user.orgId;
     const { from, to, workerId, locationId, shift } = request.query;
@@ -490,7 +524,7 @@ async function attendanceRoutes(fastify, opts) {
 
   // ── Download attendance report as PDF ──
   fastify.get('/attendance/report/pdf', {
-    preHandler: [requireRole('ADMIN')]
+    preHandler: [requirePolicy('ORG_ADMIN')]
   }, async (request, reply) => {
     const orgId = request.user.orgId;
     const { from, to, workerId, locationId, shift } = request.query;

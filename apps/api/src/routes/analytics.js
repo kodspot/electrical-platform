@@ -1,11 +1,12 @@
 'use strict';
 
 const { prisma } = require('../lib/prisma');
-const { authenticateJWT, requireRole } = require('../middleware/auth');
+const { authenticateJWT, requirePolicy } = require('../middleware/auth');
+const { ACTIVE_TICKET_STATUSES } = require('../services/ticket-status');
 
 async function analyticsRoutes(fastify, opts) {
   fastify.addHook('preHandler', authenticateJWT);
-  fastify.addHook('preHandler', requireRole('ADMIN'));
+  fastify.addHook('preHandler', requirePolicy('ORG_ADMIN'));
 
   // Dashboard overview — electrical-focused
   fastify.get('/analytics/dashboard', async (request) => {
@@ -39,7 +40,7 @@ async function analyticsRoutes(fastify, opts) {
       prisma.electricalInspection.count({ where: { orgId, inspectedAt: { gte: todayStart } } }),
       prisma.electricalInspection.count({ where: { orgId, inspectedAt: { gte: yesterdayStart, lt: todayStart } } }),
       prisma.electricalInspection.count({ where: { orgId, inspectedAt: { gte: weekAgo } } }),
-      prisma.ticket.count({ where: { orgId, status: { in: ['OPEN', 'IN_PROGRESS'] } } }),
+      prisma.ticket.count({ where: { orgId, status: { in: ACTIVE_TICKET_STATUSES } } }),
       prisma.electricalInspection.count({ where: { orgId } }),
       prisma.electricalInspection.count({ where: { orgId, inspectedAt: { gte: todayStart }, faultyCount: { gt: 0 } } }),
       prisma.electricalInspection.count({ where: { orgId, faultyCount: { gt: 0 }, status: 'SUBMITTED' } }),
@@ -314,7 +315,7 @@ async function analyticsRoutes(fastify, opts) {
         select: { locationId: true, faultyCount: true, status: true }
       }),
       prisma.ticket.findMany({
-        where: { orgId, status: { in: ['OPEN', 'IN_PROGRESS'] }, createdAt: { gte: since } },
+        where: { orgId, status: { in: ACTIVE_TICKET_STATUSES }, createdAt: { gte: since } },
         select: { locationId: true, priority: true }
       })
     ]);
@@ -347,7 +348,7 @@ async function analyticsRoutes(fastify, opts) {
     if (problemIds.length === 0) return { locations: [], lookbackDays };
 
     const locations = await prisma.location.findMany({
-      where: { id: { in: problemIds } },
+      where: { id: { in: problemIds }, orgId },
       select: {
         id: true, name: true, type: true, qrCode: true,
         parent: { select: { id: true, name: true, type: true } }
@@ -792,7 +793,7 @@ async function analyticsRoutes(fastify, opts) {
     });
 
     const activeTickets = await prisma.ticket.findMany({
-      where: { locationId: id, orgId, status: { in: ['OPEN', 'IN_PROGRESS'] } },
+      where: { locationId: id, orgId, status: { in: ACTIVE_TICKET_STATUSES } },
       select: { id: true, title: true, priority: true, status: true, createdAt: true },
       orderBy: { createdAt: 'desc' },
       take: 5

@@ -4,9 +4,85 @@ on:
   push:
     branches:
       - main
+  pull_request:
+    branches:
+      - main
 
 jobs:
+  # Test gate: every push and every PR against main must pass lint + the full test
+  # suite (including the database-backed integration tests, run here against a real
+  # disposable Postgres service container) before a production deploy is even
+  # considered. The deploy job below depends on this one.
+  test:
+    name: Lint & Test
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_USER: ci
+          POSTGRES_PASSWORD: ci
+          POSTGRES_DB: electrical_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U ci -d electrical_ci"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      NODE_ENV: test
+      DATABASE_URL: postgresql://ci:ci@localhost:5432/electrical_ci
+      # CI-only placeholder secrets — deliberately not the real production secrets
+      # (least-privilege: a test run has no business holding production credentials).
+      # DATA_ENCRYPTION_KEY must be valid-format (64 hex chars) for the app to boot;
+      # it's never used to protect real data here.
+      # Must meet the boot-time minimum length (JWT/COOKIE >= 32, ADMIN >= 16; see
+      # src/config/env.js). The previous JWT placeholder was 30 chars and failed the
+      # app's own startup validation.
+      JWT_SECRET: ci-only-placeholder-jwt-secret-000000
+      COOKIE_SECRET: ci-only-placeholder-cookie-secret
+      ADMIN_KEY: ci-only-placeholder-admin-key
+      DATA_ENCRYPTION_KEY: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+      R2_ACCOUNT_ID: ci-placeholder
+      R2_ACCESS_KEY_ID: ci-placeholder
+      R2_SECRET_ACCESS_KEY: ci-placeholder
+      R2_BUCKET_NAME: ci-placeholder
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: apps/api/package-lock.json
+
+      - name: Install dependencies
+        working-directory: apps/api
+        run: npm ci
+
+      - name: Apply database migrations
+        working-directory: apps/api
+        run: npx prisma migrate deploy
+
+      # The single, comprehensive validation gate (npm run ci): lint + the full test
+      # suite (which includes the scenario platform and the bug regression library) +
+      # repository/package/environment/migration/generated-doc safety checks. The deploy
+      # job below only runs if this passes. See docs — this is the same `npm run ci` a
+      # developer runs locally, so CI and local validation can never diverge.
+      - name: CI validation
+        working-directory: apps/api
+        run: npm run ci
+
   deploy:
+    name: Deploy to Production
+    needs: test
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
 
     steps:
@@ -117,7 +193,7 @@ jobs:
 
             echo "=== WAITING FOR API TO BECOME HEALTHY ==="
             for i in $(seq 1 24); do
-              if docker compose exec -T api wget -qO- http://127.0.0.1:3000/health > /dev/null 2>&1; then
+              if docker compose exec -T api wget -qO- http://127.0.0.1:3000/health/ready > /dev/null 2>&1; then
                 echo "✅ API is healthy (after ~${i}0s)"
                 break
               fi

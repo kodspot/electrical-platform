@@ -2,139 +2,15 @@
 
 const { z } = require('zod');
 const { prisma } = require('../lib/prisma');
-const { decryptField } = require('../lib/crypto');
-const { authenticateJWT, requireRole } = require('../middleware/auth');
+const { authenticateJWT, requirePolicy } = require('../middleware/auth');
+const { normalizeEnabledModules } = require('../services/module-policy');
+const { ACTIVE_TICKET_STATUSES } = require('../services/ticket-status');
+const { getGlobalAiConfig, resolveAiCredentials, callAiProvider } = require('../lib/ai-provider');
 
-// ── Global AI Key Config ──
-
-function getGlobalAiConfig() {
-  const key = process.env.GLOBAL_AI_API_KEY;
-  if (!key) return null;
-  return {
-    apiKey: key,
-    provider: process.env.GLOBAL_AI_PROVIDER || 'gemini',
-    model: process.env.GLOBAL_AI_MODEL || 'gemini-2.0-flash'
-  };
-}
-
-// ── Provider Adapters ──
-
-async function callAzureOpenAI(apiKey, model, systemPrompt, userMessage, maxTokens) {
-  const parts = apiKey.split('|');
-  let endpoint, key;
-
-  if (parts.length === 2) {
-    endpoint = parts[0].replace(/\/$/, '') + '/openai/deployments/' + encodeURIComponent(model || 'gpt-4o') + '/chat/completions?api-version=2025-01-01-preview';
-    key = parts[1];
-  } else {
-    endpoint = 'https://api.openai.com/v1/chat/completions';
-    key = apiKey;
-  }
-
-  const isAzure = endpoint.includes('openai.azure.com');
-
-  const res = await fetch(endpoint, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      ...(isAzure ? { 'api-key': key } : { 'Authorization': `Bearer ${key}` })
-    },
-    body: JSON.stringify({
-      ...(isAzure ? {} : { model: model || 'gpt-4o' }),
-      messages: [
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: userMessage }
-      ],
-      max_tokens: maxTokens || 2048,
-      temperature: 0.3
-    }),
-    signal: AbortSignal.timeout(45000)
-  });
-
-  if (!res.ok) {
-    const err = await res.text().catch(() => 'Unknown error');
-    const status = res.status;
-    if (status === 401 || status === 403) throw new Error(`AZURE_AUTH_ERROR: Invalid API key or endpoint. Please check your Azure OpenAI configuration.`);
-    if (status === 404) throw new Error(`AZURE_MODEL_NOT_FOUND: Deployment "${model}" not found. Check the deployment name.`);
-    if (status === 429) throw new Error(`AZURE_RATE_LIMIT: API rate limit exceeded. Please wait and try again.`);
-    throw new Error(`Azure/OpenAI error (${status}): ${err.slice(0, 300)}`);
-  }
-
-  const data = await res.json();
-  const content = data.choices?.[0]?.message?.content || 'No response generated.';
-  const usage = data.usage || {};
-  return {
-    content,
-    inputTokens: usage.prompt_tokens || null,
-    outputTokens: usage.completion_tokens || null,
-    totalTokens: usage.total_tokens || null
-  };
-}
-
-async function callGemini(apiKey, model, systemPrompt, userMessage, maxTokens) {
-  const modelName = encodeURIComponent(model || 'gemini-2.0-flash');
-  const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent`;
-
-  // Gemini 2.5+ models support "thinking" — configure appropriately
-  const isThinkingModel = /gemini-2\.[5-9]|gemini-[3-9]/.test(model || '');
-  const generationConfig = {
-    maxOutputTokens: maxTokens || 2048,
-    temperature: isThinkingModel ? undefined : 0.3  // thinking models manage temperature internally
-  };
-  if (isThinkingModel) {
-    generationConfig.thinkingConfig = { thinkingBudget: 0 }; // disable thinking for faster responses
-  }
-
-  const res = await fetch(endpoint, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
-    body: JSON.stringify({
-      system_instruction: { parts: [{ text: systemPrompt }] },
-      contents: [{ parts: [{ text: userMessage }] }],
-      generationConfig
-    }),
-    signal: AbortSignal.timeout(45000)
-  });
-
-  if (!res.ok) {
-    const err = await res.text().catch(() => 'Unknown error');
-    const status = res.status;
-    // Provide specific error classification
-    if (status === 400) throw new Error(`GEMINI_BAD_REQUEST: ${err.slice(0, 300)}`);
-    if (status === 401 || status === 403) throw new Error(`GEMINI_AUTH_ERROR: Invalid API key. Please check your Gemini API key in AI settings.`);
-    if (status === 404) throw new Error(`GEMINI_MODEL_NOT_FOUND: Model "${model}" not found. Check the model name.`);
-    if (status === 429) throw new Error(`GEMINI_RATE_LIMIT: API rate limit exceeded. Please wait and try again.`);
-    throw new Error(`Gemini error (${status}): ${err.slice(0, 300)}`);
-  }
-
-  const data = await res.json();
-
-  // Gemini 2.x models may include "thinking" parts — filter them out
-  const parts = data.candidates?.[0]?.content?.parts;
-  let content = 'No response generated.';
-  if (Array.isArray(parts)) {
-    const textParts = parts.filter(p => p.text && !p.thought).map(p => p.text);
-    if (textParts.length) content = textParts.join('\n');
-    else {
-      const anyText = parts.filter(p => p.text).map(p => p.text);
-      if (anyText.length) content = anyText[anyText.length - 1];
-    }
-  }
-
-  // Extract token usage from Gemini response
-  const usage = data.usageMetadata || {};
-  return {
-    content,
-    inputTokens: usage.promptTokenCount || null,
-    outputTokens: usage.candidatesTokenCount || null,
-    totalTokens: usage.totalTokenCount || null
-  };
-}
-
-const PROVIDERS = {
-  'azure-openai': callAzureOpenAI,
-  'gemini': callGemini
-};
+// Recognized providers — validated before calling the shared dispatcher so
+// an unsupported value still gets this endpoint's own 400 response instead
+// of silently falling through to the dispatcher's Gemini default. [WP10]
+const KNOWN_PROVIDERS = new Set(['azure-openai', 'gemini']);
 
 // ── Data Context Builder ──
 
@@ -172,7 +48,7 @@ async function buildOrgDataContext(orgId) {
       _count: true
     }), []),
     safe(prisma.ticket.findMany({
-      where: { orgId, status: { in: ['OPEN', 'IN_PROGRESS'] } },
+      where: { orgId, status: { in: ACTIVE_TICKET_STATUSES } },
       select: { title: true, priority: true, status: true, location: { select: { name: true } } },
       take: 10,
       orderBy: { createdAt: 'desc' }
@@ -239,7 +115,7 @@ ATTENDANCE (last 7 days):
 // ── System Prompt ──
 
 function buildSystemPrompt(orgDataContext, enabledModules) {
-  const modules = enabledModules || ['ele'];
+  const modules = normalizeEnabledModules(enabledModules);
   const moduleNames = {
     ele: 'Electrical', civil: 'Civil',
     asset: 'Asset Management', complaints: 'Complaints'
@@ -351,34 +227,6 @@ async function logAiUsage({ orgId, userId, action, prompt, provider, model, inpu
   }
 }
 
-// ── Resolve AI credentials (org key > global key) ──
-
-function resolveAiCredentials(org) {
-  // 1. Try org-level key
-  if (org.aiApiKey) {
-    const decrypted = decryptField(org.aiApiKey);
-    if (decrypted) {
-      return {
-        apiKey: decrypted,
-        provider: org.aiProvider,
-        model: org.aiModel,
-        keySource: 'org'
-      };
-    }
-  }
-  // 2. Fall back to global key
-  const global = getGlobalAiConfig();
-  if (global) {
-    return {
-      apiKey: global.apiKey,
-      provider: org.aiProvider || global.provider,
-      model: org.aiModel || global.model,
-      keySource: 'global'
-    };
-  }
-  return null;
-}
-
 // ── Routes ──
 
 async function aiRoutes(fastify, opts) {
@@ -386,7 +234,7 @@ async function aiRoutes(fastify, opts) {
 
   // Check if AI is enabled for this org
   fastify.get('/ai/status', {
-    preHandler: [requireRole('ADMIN')]
+    preHandler: [requirePolicy('ORG_ADMIN')]
   }, async (request) => {
     const org = await prisma.organization.findUnique({
       where: { id: request.user.orgId },
@@ -407,7 +255,7 @@ async function aiRoutes(fastify, opts) {
 
   // Get suggestion chips
   fastify.get('/ai/suggestions', {
-    preHandler: [requireRole('ADMIN')]
+    preHandler: [requirePolicy('ORG_ADMIN')]
   }, async (request) => {
     const org = await prisma.organization.findUnique({
       where: { id: request.user.orgId },
@@ -427,7 +275,7 @@ async function aiRoutes(fastify, opts) {
 
   // Chat endpoint
   fastify.post('/ai/chat', {
-    preHandler: [requireRole('ADMIN')]
+    preHandler: [requirePolicy('ORG_ADMIN')]
   }, async (request, reply) => {
     const schema = z.object({
       message: z.string().min(1).max(500).trim()
@@ -473,8 +321,7 @@ async function aiRoutes(fastify, opts) {
       });
     }
 
-    const providerFn = PROVIDERS[creds.provider];
-    if (!providerFn) {
+    if (!KNOWN_PROVIDERS.has(creds.provider)) {
       return reply.code(400).send({
         error: 'Unsupported AI provider configured.',
         code: 'AI_INVALID_PROVIDER'
@@ -500,7 +347,9 @@ async function aiRoutes(fastify, opts) {
 
     const startTime = Date.now();
     try {
-      const result = await providerFn(creds.apiKey, creds.model, systemPrompt, dateTag + message);
+      // Circuit-breaker wrapping now happens inside callAiProvider itself,
+      // shared by every AI caller in the codebase. [WP10]
+      const result = await callAiProvider(creds, systemPrompt, dateTag + message, undefined, 45000);
       const latencyMs = Date.now() - startTime;
 
       // Log AI usage with token tracking
@@ -553,7 +402,7 @@ async function aiRoutes(fastify, opts) {
 
   // ── Pre-built AI Analysis ──
   fastify.post('/ai/analyze', {
-    preHandler: [requireRole('ADMIN')]
+    preHandler: [requirePolicy('ORG_ADMIN')]
   }, async (request, reply) => {
     const schema = z.object({
       type: z.enum([
@@ -585,8 +434,9 @@ async function aiRoutes(fastify, opts) {
     const creds = resolveAiCredentials(org);
     if (!creds) return reply.code(400).send({ error: 'AI not configured', code: 'AI_NOT_CONFIGURED' });
 
-    const providerFn = PROVIDERS[creds.provider];
-    if (!providerFn) return reply.code(400).send({ error: 'Invalid provider', code: 'AI_INVALID_PROVIDER' });
+    if (!KNOWN_PROVIDERS.has(creds.provider)) {
+      return reply.code(400).send({ error: 'Invalid provider', code: 'AI_INVALID_PROVIDER' });
+    }
 
     let orgDataContext;
     try {
@@ -611,7 +461,9 @@ async function aiRoutes(fastify, opts) {
 
     const startTime = Date.now();
     try {
-      const result = await providerFn(creds.apiKey, creds.model, systemPrompt, PROMPTS[type], 4096);
+      // See the /ai/chat handler above — circuit-breaker wrapping happens
+      // inside callAiProvider itself. [WP10]
+      const result = await callAiProvider(creds, systemPrompt, PROMPTS[type], 4096, 45000);
       const latencyMs = Date.now() - startTime;
 
       // Log AI usage with token tracking

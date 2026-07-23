@@ -4,7 +4,7 @@ const { z } = require('zod');
 const { prisma } = require('../lib/prisma');
 const { uploadToR2 } = require('../lib/r2');
 const { validateImageBuffer } = require('../errors');
-const { authenticateJWT, requireRole, requireModule } = require('../middleware/auth');
+const { authenticateJWT, requirePolicy, requireModule } = require('../middleware/auth');
 
 const EVENT_INCLUDE = {
   asset: { select: { id: true, assetCode: true, name: true } },
@@ -28,7 +28,7 @@ async function assetEventRoutes(fastify, opts) {
 
   // ─── LIST EVENTS ──────────────────────────────────────────
   fastify.get('/asset-events', {
-    preHandler: [requireRole('ADMIN', 'SUPERVISOR')]
+    preHandler: [requirePolicy('ORG_STAFF')]
   }, async (request) => {
     const orgId = request.user.orgId;
     const { assetId, type, page, limit, from, to } = request.query;
@@ -63,7 +63,7 @@ async function assetEventRoutes(fastify, opts) {
 
   // ─── GET SINGLE EVENT ─────────────────────────────────────
   fastify.get('/asset-events/:id', {
-    preHandler: [requireRole('ADMIN', 'SUPERVISOR')]
+    preHandler: [requirePolicy('ORG_STAFF')]
   }, async (request, reply) => {
     const event = await prisma.assetEvent.findFirst({
       where: { id: request.params.id, orgId: request.user.orgId },
@@ -75,7 +75,7 @@ async function assetEventRoutes(fastify, opts) {
 
   // ─── LOG EVENT ────────────────────────────────────────────
   fastify.post('/asset-events', {
-    preHandler: [requireRole('ADMIN', 'SUPERVISOR')]
+    preHandler: [requirePolicy('ORG_STAFF')]
   }, async (request, reply) => {
     const data = createEventSchema.parse(request.body);
     const orgId = request.user.orgId;
@@ -88,25 +88,6 @@ async function assetEventRoutes(fastify, opts) {
     // Capture before-state
     const statusBefore = asset.status;
     const conditionBefore = asset.condition;
-
-    // Create event
-    const event = await prisma.assetEvent.create({
-      data: {
-        orgId,
-        assetId: asset.id,
-        loggedById: request.user.id,
-        type: data.type,
-        summary: data.summary,
-        details: data.details || null,
-        cost: data.cost || null,
-        statusBefore,
-        statusAfter: data.statusAfter || null,
-        conditionBefore,
-        conditionAfter: data.conditionAfter || null,
-        eventDate: data.eventDate ? new Date(data.eventDate) : new Date()
-      },
-      include: EVENT_INCLUDE
-    });
 
     // Update asset status/condition if specified
     const assetUpdate = {};
@@ -122,23 +103,48 @@ async function assetEventRoutes(fastify, opts) {
       }
     }
 
-    if (Object.keys(assetUpdate).length > 0) {
-      await prisma.asset.update({
-        where: { id: asset.id },
-        data: assetUpdate
+    // The event, the asset it describes, and the audit-log entry must all
+    // commit together — a partial write would leave the asset's current
+    // status/condition inconsistent with its own event history. [WP9]
+    const event = await prisma.$transaction(async (tx) => {
+      const created = await tx.assetEvent.create({
+        data: {
+          orgId,
+          assetId: asset.id,
+          loggedById: request.user.id,
+          type: data.type,
+          summary: data.summary,
+          details: data.details || null,
+          cost: data.cost || null,
+          statusBefore,
+          statusAfter: data.statusAfter || null,
+          conditionBefore,
+          conditionAfter: data.conditionAfter || null,
+          eventDate: data.eventDate ? new Date(data.eventDate) : new Date()
+        },
+        include: EVENT_INCLUDE
       });
-    }
 
-    await prisma.auditLog.create({
-      data: {
-        orgId,
-        actorType: 'user',
-        actorId: request.user.id,
-        action: 'asset_event_logged',
-        entityType: 'AssetEvent',
-        entityId: event.id,
-        newValue: { assetCode: asset.assetCode, type: data.type, summary: data.summary }
+      if (Object.keys(assetUpdate).length > 0) {
+        await tx.asset.update({
+          where: { id: asset.id },
+          data: assetUpdate
+        });
       }
+
+      await tx.auditLog.create({
+        data: {
+          orgId,
+          actorType: 'user',
+          actorId: request.user.id,
+          action: 'asset_event_logged',
+          entityType: 'AssetEvent',
+          entityId: created.id,
+          newValue: { assetCode: asset.assetCode, type: data.type, summary: data.summary }
+        }
+      });
+
+      return created;
     });
 
     return reply.code(201).send(event);
@@ -146,7 +152,7 @@ async function assetEventRoutes(fastify, opts) {
 
   // ─── TIMELINE FOR AN ASSET ───────────────────────────────
   fastify.get('/assets/:assetId/timeline', {
-    preHandler: [requireRole('ADMIN', 'SUPERVISOR')]
+    preHandler: [requirePolicy('ORG_STAFF')]
   }, async (request, reply) => {
     const orgId = request.user.orgId;
     const asset = await prisma.asset.findFirst({

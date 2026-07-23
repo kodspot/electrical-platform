@@ -3,13 +3,27 @@
   "version": "1.0.0",
   "scripts": {
     "start": "node index.js",
+    "dev": "node --watch index.js",
     "security:audit": "npm audit --omit=dev",
     "security:audit:fix": "npm audit fix --omit=dev",
     "prestart": "npm audit --omit=dev --audit-level=critical || echo 'WARNING: Critical vulnerabilities found — run npm audit fix'",
+    "test": "node --test",
+    "test:phase1": "node --test test/phase1-acceptance.test.js",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "docs:routes:check": "node scripts/check-routes-drift.js",
+    "docs:bugs": "node scripts/gen-bug-registry.js",
+    "bug:test": "node --test test/integration/bug-regressions.test.js",
+    "verify": "npm run lint && npm test && npm run docs:routes:check",
+    "ci": "npm run lint && npm test && node scripts/ci-validate.js",
+    "release:check": "node scripts/ci-validate.js --release",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
     "db:deploy": "prisma migrate deploy",
-    "db:studio": "prisma studio"
+    "db:studio": "prisma studio",
+    "docs:routes": "node scripts/gen-route-index.js"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.726.1",
@@ -33,6 +47,11 @@
     "zod": "^3.22.4"
   },
   "devDependencies": {
-    "pino-pretty": "^10.3.1"
+    "@eslint/js": "^9.39.5",
+    "eslint": "^9.39.5",
+    "eslint-config-prettier": "^10.1.8",
+    "globals": "^17.7.0",
+    "pino-pretty": "^10.3.1",
+    "prettier": "^3.9.5"
   }
 }

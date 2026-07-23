@@ -61,7 +61,7 @@ async function sendErrorAlert(error, request) {
 
     const timestamp = new Date().toISOString();
     const statusCode = error.statusCode || 500;
-    const errMsg = (error.message || 'Unknown error').slice(0, 200).replace(/[_*`\[\]]/g, '\\$&');
+    const errMsg = (error.message || 'Unknown error').slice(0, 200).replace(/[_*`[\]]/g, '\\$&');
     const message = [
       `🚨 *Server Error ${statusCode}*`,
       `Route: \`${request.method} ${request.url}\``,
@@ -108,14 +108,18 @@ function validateImageBuffer(buffer, mimetype) {
 
 function registerErrorHandlers(fastify) {
   fastify.setErrorHandler(async (error, request, reply) => {
-    fastify.log.error(error);
+    // request.log (not fastify.log) is the request-scoped child logger — it
+    // automatically tags this line with request.id, so an error can be correlated
+    // with its request in the logs the same way it's correlated in the response body.
+    request.log.error(error);
     await logError(error);
 
     if (error.statusCode === 429) {
       return reply.status(429).send({
         error: 'Too many requests',
         retryAfter: error.after,
-        message: `Rate limit exceeded. Retry after ${error.after}`
+        message: `Rate limit exceeded. Retry after ${error.after}`,
+        requestId: request.id
       });
     }
 
@@ -124,21 +128,24 @@ function registerErrorHandlers(fastify) {
       return reply.status(503).send({
         error: 'Service temporarily unavailable',
         message: 'The system is experiencing issues. Please try again shortly.',
-        retryAfter: 30
+        retryAfter: 30,
+        requestId: request.id
       });
     }
 
     if (error.name === 'ZodError') {
       return reply.status(400).send({
         error: 'Validation failed',
-        details: error.errors.map(e => `${e.path.join('.')}: ${e.message}`)
+        details: error.errors.map(e => `${e.path.join('.')}: ${e.message}`),
+        requestId: request.id
       });
     }
 
     if (error.code === 'P2002') {
       return reply.status(409).send({
         error: 'Duplicate entry',
-        message: 'A record with this value already exists'
+        message: 'A record with this value already exists',
+        requestId: request.id
       });
     }
 
@@ -146,7 +153,8 @@ function registerErrorHandlers(fastify) {
       sendErrorAlert(error, request); // non-blocking alert
       return reply.status(500).send({
         error: 'Database error',
-        message: isProduction ? 'Internal server error' : error.message
+        message: isProduction ? 'Internal server error' : error.message,
+        requestId: request.id
       });
     }
 
@@ -157,7 +165,8 @@ function registerErrorHandlers(fastify) {
 
     reply.status(statusCode).send({
       error: statusCode >= 500 ? 'Internal server error' : (error.code || 'Error'),
-      message: (isProduction && statusCode >= 500) ? 'Something went wrong' : error.message
+      message: (isProduction && statusCode >= 500) ? 'Something went wrong' : error.message,
+      requestId: request.id
     });
   });
 
@@ -179,7 +188,7 @@ function registerErrorHandlers(fastify) {
         return reply.sendFile(cleanPath + '.html');
       }
     }
-    reply.status(404).send({ error: 'Not found', message: `Route ${request.method} ${request.url} not found` });
+    reply.status(404).send({ error: 'Not found', message: `Route ${request.method} ${request.url} not found`, requestId: request.id });
   });
 }
 

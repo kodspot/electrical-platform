@@ -2,7 +2,7 @@
 
 const { z } = require('zod');
 const { prisma } = require('../lib/prisma');
-const { authenticateJWT, requireRole } = require('../middleware/auth');
+const { authenticateJWT, requirePolicy } = require('../middleware/auth');
 
 const VALID_SHIFTS = ['MORNING', 'AFTERNOON', 'NIGHT', 'GENERAL'];
 
@@ -14,7 +14,7 @@ function isValidDateStr(s) {
 
 async function dutyRosterRoutes(fastify) {
   fastify.addHook('preHandler', authenticateJWT);
-  fastify.addHook('preHandler', requireRole('ADMIN', 'SUPERVISOR'));
+  fastify.addHook('preHandler', requirePolicy('ORG_STAFF'));
 
   // ── Get my roster for a date/shift (Supervisor) ──
   fastify.get('/duty-roster/mine', async (request, reply) => {
@@ -221,7 +221,7 @@ async function dutyRosterRoutes(fastify) {
 
     // Return updated roster
     const updated = await prisma.dutyRoster.findFirst({
-      where: { id },
+      where: { id, orgId },
       include: {
         location: {
           select: { id: true, name: true, type: true, parent: { select: { id: true, name: true } } }

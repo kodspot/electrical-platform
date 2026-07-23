@@ -1,6 +1,7 @@
 'use strict';
 
 const { prisma } = require('../lib/prisma');
+const { isModuleEnabled } = require('../services/module-policy');
 
 // Valid module codes (keep in sync with superadmin.js VALID_MODULES)
 const VALID_MODULES = ['ele', 'civil', 'asset', 'complaints'];
@@ -10,7 +11,7 @@ const MODULE_PAGES = [
   'admin-login', 'admin-dashboard', 'admin-analytics', 'admin-locations',
   'admin-workers', 'admin-supervisors', 'admin-tickets',
   'admin-audit-logs', 'admin-qr-print', 'admin-attendance', 'admin-ai',
-  'admin-electrical', 'admin-templates',
+  'admin-electrical', 'admin-templates', 'admin-categories',
   'admin-assets', 'admin-failures', 'admin-alerts',
   'admin-predictions',
   'supervisor-login', 'supervisor-scan', 'supervisor-tickets',
@@ -36,7 +37,10 @@ async function pageRoutes(fastify) {
       where: { slug },
       select: { id: true, status: true, enabledModules: true }
     });
-    if (!org || org.status === 'DELETED') return null;
+    // Matches the ACTIVE-only gate used everywhere else an org's own pages/API
+    // are served (middleware/auth.js, auth.js, worker-auth.js, public.js) — a
+    // suspended org must stop being reachable, not just a deleted one.
+    if (!org || org.status !== 'ACTIVE') return null;
     return org;
   }
 
@@ -80,7 +84,7 @@ async function pageRoutes(fastify) {
     if (!VALID_MODULES.includes(mod)) return reply.callNotFound();
     const org = await validateOrg(orgSlug);
     if (!org) return reply.code(404).send({ error: 'Organization not found' });
-    if (!(org.enabledModules || ['ele']).includes(mod)) {
+    if (!isModuleEnabled(org, mod)) {
       return reply.code(404).send({ error: 'Module not enabled for this organization' });
     }
     return reply.sendFile('module-home.html');
@@ -90,11 +94,9 @@ async function pageRoutes(fastify) {
   fastify.get('/:orgSlug/:mod/manifest.json', async (request, reply) => {
     const { orgSlug, mod } = request.params;
     if (!VALID_MODULES.includes(mod)) return reply.callNotFound();
-    const org = await prisma.organization.findUnique({
-      where: { slug: orgSlug },
-      select: { name: true, status: true }
-    });
-    if (!org || org.status === 'DELETED') return reply.callNotFound();
+    const org = await validateOrg(orgSlug);
+    if (!org) return reply.callNotFound();
+    if (!isModuleEnabled(org, mod)) return reply.callNotFound();
 
     const meta = MODULE_META[mod] || MODULE_META.ele;
     const scope = `/${orgSlug}/${mod}/`;
@@ -128,6 +130,7 @@ async function pageRoutes(fastify) {
     if (!VALID_MODULES.includes(mod)) return reply.callNotFound();
     const org = await validateOrg(orgSlug);
     if (!org) return reply.callNotFound();
+    if (!isModuleEnabled(org, mod)) return reply.callNotFound();
     const meta = MODULE_META[mod] || MODULE_META.ele;
     const scope = `/${orgSlug}/${mod}/`;
 
@@ -188,6 +191,9 @@ self.addEventListener('fetch', (event) => {
       if (!VALID_MODULES.includes(mod)) return reply.callNotFound();
       const org = await validateOrg(orgSlug);
       if (!org) return reply.code(404).send({ error: 'Organization not found' });
+      if (!isModuleEnabled(org, mod)) {
+        return reply.code(404).send({ error: 'Module not enabled for this organization' });
+      }
       return reply.sendFile(`${page}.html`);
     });
   }
@@ -212,7 +218,7 @@ self.addEventListener('fetch', (event) => {
       where: { slug },
       select: { id: true, name: true, slug: true, status: true, logoUrl: true, enabledModules: true }
     });
-    if (!org || org.status === 'DELETED') {
+    if (!org || org.status !== 'ACTIVE') {
       return reply.code(404).send({ error: 'Organization not found' });
     }
     return org;

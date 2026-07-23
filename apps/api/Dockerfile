@@ -36,9 +36,11 @@ USER nodejs
 
 EXPOSE 3000
 
-# Health check
+# Health check — /health/ready reflects true readiness (DB connectivity) via HTTP
+# status code (200/503), unlike the always-200 /health endpoint kept for backward
+# compatibility with existing external consumers.
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
-    CMD wget --quiet --tries=1 --spider http://localhost:3000/health || exit 1
+    CMD wget --quiet --tries=1 --spider http://localhost:3000/health/ready || exit 1
 
 # Wait for PostgreSQL before running Prisma migrations
 CMD ["sh", "-c", "echo 'Waiting for PostgreSQL...' && until pg_isready -h db -p 5432; do echo 'DB not ready, retrying in 3s...'; sleep 3; done && echo 'DB is ready. Running migrations...' && npx prisma migrate deploy && exec node index.js"]

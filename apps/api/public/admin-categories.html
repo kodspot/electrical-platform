@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
+<link rel="manifest" href="/site.webmanifest">
+<meta name="theme-color" content="#1E40AF">
+<title>Complaint Categories - Kodspot</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/css/design-system.css?v=10">
+<style>
+.cg-toolbar { display:flex; justify-content:space-between; gap:.75rem; flex-wrap:wrap; margin-bottom:.75rem; }
+.cg-toolbar-left { display:flex; gap:.5rem; flex-wrap:wrap; align-items:center; }
+.cg-summary { display:flex; gap:.9rem; flex-wrap:wrap; font-size:.78rem; color:var(--text-muted); margin:.2rem 0 .8rem; }
+.cg-summary b { color:var(--text); }
+.cg-table td, .cg-table th { vertical-align:top; }
+.cg-key { font-family:var(--font-mono); font-size:.74rem; background:var(--bg); border:1px solid var(--border); border-radius:var(--radius-sm); padding:.1rem .35rem; color:var(--text-muted); }
+.cg-scope { font-size:.72rem; color:var(--text-muted); }
+.cg-actions { display:flex; gap:.35rem; flex-wrap:wrap; }
+.cg-empty { text-align:center; padding:2rem 1rem; color:var(--text-muted); }
+@media (max-width:700px) {
+  .cg-table th:nth-child(4), .cg-table td:nth-child(4) { display:none; }
+}
+</style>
+</head>
+<body>
+<nav class="topbar">
+  <div class="topbar-left">
+    <button class="nav-toggle" id="nav-toggle"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"/></svg></button>
+    <span class="topbar-brand">Kodspot</span>
+    <div class="topbar-nav" id="topbar-nav"></div>
+  </div>
+  <div class="topbar-right">
+    <span class="topbar-user" id="userName"></span>
+    <button class="btn btn-sm btn-ghost" onclick="App.logout()">Logout</button>
+  </div>
+</nav>
+<div class="sa-banner" id="sa-banner"></div>
+
+<main class="container">
+  <div class="toolbar">
+    <h2 class="toolbar-title">Complaint Categories</h2>
+    <button class="btn btn-primary" onclick="openCreateModal()">+ Add Category</button>
+  </div>
+
+  <div class="cg-toolbar">
+    <div class="cg-toolbar-left">
+      <select class="form-select" id="filterModule" onchange="loadCategories()">
+        <option value="">All Modules</option>
+        <option value="ele">Electrical</option>
+        <option value="civil">Civil</option>
+        <option value="asset">Asset</option>
+        <option value="complaints">Complaints</option>
+      </select>
+      <select class="form-select" id="filterScope" onchange="loadCategories()">
+        <option value="">All Scopes</option>
+        <option value="global">Org-wide</option>
+      </select>
+      <label class="form-check" style="margin:0 .3rem 0 .2rem"><input type="checkbox" id="showInactive" onchange="loadCategories()"> Show inactive</label>
+      <button class="btn btn-sm btn-outline" onclick="resetFilters()">Reset</button>
+    </div>
+  </div>
+
+  <div id="summary" class="cg-summary"></div>
+
+  <div class="card">
+    <div class="table-wrap">
+      <table class="table cg-table">
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Key</th>
+            <th>Module</th>
+            <th>Scope</th>
+            <th>Status</th>
+            <th>Sort</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody id="rows"></tbody>
+      </table>
+    </div>
+  </div>
+</main>
+
+<div class="modal-overlay" id="catModal">
+  <div class="modal" style="max-width:560px">
+    <h3 class="modal-title" id="modalTitle">Create Complaint Category</h3>
+    <div id="modalError" class="error-msg"></div>
+
+    <div class="form-group">
+      <label class="form-label">Category Name *</label>
+      <input class="form-input" id="catName" type="text" maxlength="120" placeholder="e.g. Tube Light Flickering">
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">Key <span class="optional">(optional, auto-generated)</span></label>
+      <input class="form-input" id="catKey" type="text" maxlength="80" placeholder="e.g. TUBE_LIGHT_FLICKERING">
+    </div>
+
+    <div class="form-grid" style="grid-template-columns:1fr 1fr">
+      <div class="form-group">
+        <label class="form-label">Module *</label>
+        <select class="form-select" id="catModule">
+          <option value="ele">Electrical</option>
+          <option value="civil">Civil</option>
+          <option value="asset">Asset</option>
+          <option value="complaints">Complaints</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Sort Order</label>
+        <input class="form-input" id="catSort" type="number" min="0" max="999" value="0">
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">Scope</label>
+      <select class="form-select" id="catScope">
+        <option value="global">Org-wide</option>
+      </select>
+      <div class="form-hint">Select a hostel to make this category hostel-specific.</div>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">Description <span class="optional">(optional)</span></label>
+      <textarea class="form-input" id="catDesc" maxlength="500" rows="2" placeholder="Optional guidance for this category"></textarea>
+    </div>
+
+    <div class="form-group" style="margin-bottom:.2rem">
+      <label class="form-check"><input type="checkbox" id="catActive" checked> Active</label>
+    </div>
+
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="App.closeModal('catModal')">Cancel</button>
+      <button class="btn btn-primary" id="saveBtn" onclick="saveCategory()">Save</button>
+    </div>
+  </div>
+</div>
+
+<script src="/js/offline-sync.js?v=1"></script>
+<script src="/js/app.js?v=14"></script>
+<script>
+if (!App.initAdmin('categories')) throw '';
+App.initNotifications(App.apiFetch);
+
+var $ = App.$;
+var esc = App.esc;
+var categories = [];
+var hostels = [];
+var editingId = null;
+
+function modLabel(mod) {
+  if (mod === 'ele') return 'Electrical';
+  if (mod === 'civil') return 'Civil';
+  if (mod === 'asset') return 'Asset';
+  if (mod === 'complaints') return 'Complaints';
+  return mod || '-';
+}
+
+function keyFromName(name) {
+  return (name || '').trim().toUpperCase().replace(/[^A-Z0-9]+/g, '_').replace(/^_+|_+$/g, '').substring(0, 80);
+}
+
+function parseScopeValue(val) {
+  if (!val || val === 'global') return null;
+  return val;
+}
+
+function scopeLabel(cat) {
+  if (!cat.hostelLocationId) return 'Org-wide';
+  return cat.hostelLocation && cat.hostelLocation.name
+    ? ('Hostel: ' + cat.hostelLocation.name)
+    : ('Hostel: ' + cat.hostelLocationId);
+}
+
+function buildScopeOptions(selectId, selectedValue) {
+  var opts = '<option value="global">Org-wide</option>';
+  for (var i = 0; i < hostels.length; i++) {
+    var h = hostels[i];
+    var sel = selectedValue === h.id ? ' selected' : '';
+    opts += '<option value="' + h.id + '"' + sel + '>' + esc(h.name) + '</option>';
+  }
+  $(selectId).innerHTML = opts;
+}
+
+async function loadHostels() {
+  var res = await App.apiFetch('/locations?type=HOSTEL&active=true');
+  if (!res || !res.ok) return;
+  hostels = await res.json();
+  if (!Array.isArray(hostels)) hostels = [];
+
+  var filterOpts = '<option value="">All Scopes</option><option value="global">Org-wide</option>';
+  for (var i = 0; i < hostels.length; i++) {
+    filterOpts += '<option value="' + hostels[i].id + '">Hostel: ' + esc(hostels[i].name) + '</option>';
+  }
+  $('filterScope').innerHTML = filterOpts;
+  buildScopeOptions('catScope');
+}
+
+async function loadCategories() {
+  var params = [];
+  var mod = $('filterModule').value;
+  var scope = $('filterScope').value;
+  var showInactive = $('showInactive').checked;
+
+  if (mod) params.push('module=' + encodeURIComponent(mod));
+  if (scope) params.push('hostelLocationId=' + encodeURIComponent(scope));
+  if (showInactive) params.push('includeInactive=true');
+
+  var res = await App.apiFetch('/complaint-categories' + (params.length ? ('?' + params.join('&')) : ''));
+  if (!res) return;
+  if (!res.ok) {
+    App.toast('Failed to load categories', 'error');
+    return;
+  }
+
+  var data = await res.json();
+  categories = data.categories || [];
+  renderSummary();
+  renderRows();
+}
+
+function renderSummary() {
+  var active = 0;
+  var inactive = 0;
+  var hostelScoped = 0;
+
+  for (var i = 0; i < categories.length; i++) {
+    if (categories[i].isActive) active++; else inactive++;
+    if (categories[i].hostelLocationId) hostelScoped++;
+  }
+
+  $('summary').innerHTML =
+    '<span>Total: <b>' + categories.length + '</b></span>' +
+    '<span>Active: <b>' + active + '</b></span>' +
+    (inactive ? ('<span>Inactive: <b>' + inactive + '</b></span>') : '') +
+    '<span>Hostel-specific: <b>' + hostelScoped + '</b></span>';
+}
+
+function renderRows() {
+  if (!categories.length) {
+    $('rows').innerHTML = '<tr><td colspan="7"><div class="cg-empty">No complaint categories found for the selected filters.</div></td></tr>';
+    return;
+  }
+
+  var html = '';
+  for (var i = 0; i < categories.length; i++) {
+    var c = categories[i];
+    var status = c.isActive
+      ? '<span class="badge badge-success">Active</span>'
+      : '<span class="badge badge-danger">Inactive</span>';
+
+    html += '<tr>' +
+      '<td><b>' + esc(c.name) + '</b>' + (c.description ? ('<div class="cg-scope">' + esc(c.description) + '</div>') : '') + '</td>' +
+      '<td><span class="cg-key">' + esc(c.key) + '</span></td>' +
+      '<td>' + esc(modLabel(c.module)) + '</td>' +
+      '<td>' + esc(scopeLabel(c)) + '</td>' +
+      '<td>' + status + '</td>' +
+      '<td>' + (c.sortOrder || 0) + '</td>' +
+      '<td><div class="cg-actions">' +
+        '<button class="btn btn-sm btn-outline" onclick="openEditModal(\'' + c.id + '\')">Edit</button>' +
+        (c.isActive
+          ? '<button class="btn btn-sm btn-ghost" style="color:var(--danger)" onclick="toggleActive(\'' + c.id + '\', false)">Disable</button>'
+          : '<button class="btn btn-sm btn-outline" onclick="toggleActive(\'' + c.id + '\', true)">Enable</button>') +
+        '<button class="btn btn-sm btn-danger" onclick="deleteCategory(\'' + c.id + '\')">Delete</button>' +
+      '</div></td>' +
+    '</tr>';
+  }
+
+  $('rows').innerHTML = html;
+}
+
+function resetFilters() {
+  $('filterModule').value = '';
+  $('filterScope').value = '';
+  $('showInactive').checked = false;
+  loadCategories();
+}
+
+function openCreateModal() {
+  editingId = null;
+  $('modalTitle').textContent = 'Create Complaint Category';
+  $('catName').value = '';
+  $('catKey').value = '';
+  $('catModule').value = 'ele';
+  $('catSort').value = '0';
+  $('catDesc').value = '';
+  $('catActive').checked = true;
+  buildScopeOptions('catScope', null);
+  App.hideError('modalError');
+  $('saveBtn').textContent = 'Create';
+  App.openModal('catModal');
+}
+
+function openEditModal(id) {
+  var cat = categories.find(function(x) { return x.id === id; });
+  if (!cat) return;
+
+  editingId = id;
+  $('modalTitle').textContent = 'Edit Complaint Category';
+  $('catName').value = cat.name || '';
+  $('catKey').value = cat.key || '';
+  $('catModule').value = cat.module || 'ele';
+  $('catSort').value = (cat.sortOrder || 0).toString();
+  $('catDesc').value = cat.description || '';
+  $('catActive').checked = !!cat.isActive;
+  buildScopeOptions('catScope', cat.hostelLocationId || null);
+  App.hideError('modalError');
+  $('saveBtn').textContent = 'Save Changes';
+  App.openModal('catModal');
+}
+
+async function saveCategory() {
+  App.hideError('modalError');
+
+  var name = $('catName').value.trim();
+  var key = $('catKey').value.trim();
+  if (!name) {
+    App.showError('modalError', 'Category name is required');
+    return;
+  }
+
+  var payload = {
+    name: name,
+    module: $('catModule').value,
+    key: key || undefined,
+    description: $('catDesc').value.trim() || null,
+    sortOrder: parseInt($('catSort').value, 10) || 0,
+    isActive: $('catActive').checked,
+    hostelLocationId: parseScopeValue($('catScope').value)
+  };
+
+  var btn = $('saveBtn');
+  btn.disabled = true;
+  btn.textContent = editingId ? 'Saving...' : 'Creating...';
+
+  try {
+    var res = await App.apiFetch(editingId ? ('/complaint-categories/' + editingId) : '/complaint-categories', {
+      method: editingId ? 'PATCH' : 'POST',
+      body: JSON.stringify(payload)
+    });
+
+    if (!res) return;
+
+    if (!res.ok) {
+      var err = await res.json().catch(function() { return {}; });
+      App.showError('modalError', err.error || 'Failed to save category');
+      return;
+    }
+
+    App.closeModal('catModal');
+    App.toast(editingId ? 'Category updated' : 'Category created', 'success');
+    await loadCategories();
+  } finally {
+    btn.disabled = false;
+    btn.textContent = editingId ? 'Save Changes' : 'Create';
+  }
+}
+
+async function toggleActive(id, isActive) {
+  var res = await App.apiFetch('/complaint-categories/' + id, {
+    method: 'PATCH',
+    body: JSON.stringify({ isActive: !!isActive })
+  });
+  if (!res) return;
+  if (!res.ok) {
+    var err = await res.json().catch(function() { return {}; });
+    App.toast(err.error || 'Failed to update status', 'error');
+    return;
+  }
+  App.toast(isActive ? 'Category enabled' : 'Category disabled', 'success');
+  loadCategories();
+}
+
+async function deleteCategory(id) {
+  var cat = categories.find(function(x) { return x.id === id; });
+  if (!cat) return;
+
+  var ok = await App.confirmDialog('Delete category "' + cat.name + '"?\n\nIf historical complaints use this category, deletion may be blocked.');
+  if (!ok) return;
+
+  var res = await App.apiFetch('/complaint-categories/' + id, { method: 'DELETE' });
+  if (!res) return;
+
+  if (!res.ok) {
+    var err = await res.json().catch(function() { return {}; });
+    App.toast(err.error || 'Failed to delete category', 'error');
+    return;
+  }
+
+  App.toast('Category deleted', 'success');
+  loadCategories();
+}
+
+$('catName').addEventListener('input', function() {
+  if (!$('catKey').value.trim()) {
+    $('catKey').placeholder = keyFromName($('catName').value || '');
+  }
+});
+
+(async function init() {
+  await loadHostels();
+  await loadCategories();
+})();
+</script>
+</body>
+</html>
