@@ -14,7 +14,7 @@ npm run seed                                    # load the demo organization + r
 npm run dev                                     # start the app (auto-reload) on http://localhost:3000
 ```
 
-After `npm run seed`, sign in as the demo admin **`admin@demo.kodspot.test` / `DemoPass123`** (electrician PIN `1234`). `npm run doctor` at any time checks your environment and tells you exactly what to fix. Uploaded images land in the git-ignored `data/uploads/` directory (`STORAGE_DRIVER=local`), served through the same `/images/` proxy as production.
+After `npm run seed`, sign in as the demo admin **`admin@demo.kodspot.test` / `DemoPass123`** (electrician PIN `123456`). `npm run doctor` at any time checks your environment and tells you exactly what to fix. Uploaded images land in the git-ignored `data/uploads/` directory (`STORAGE_DRIVER=local`), served through the same `/images/` proxy as production.
 
 ### Developer commands (run from the repository root)
 
@@ -34,7 +34,7 @@ After `npm run seed`, sign in as the demo admin **`admin@demo.kodspot.test` / `D
 | `npm run bug:list` | List the bug scenario registry — every fixed defect with a permanent reproduction (read-only). |
 | `npm run bug:run -- <ID>` | Reproduce a bug's triggering state in the local database, to inspect it in `npm run dev`. **Local-only.** |
 | `npm run bug:validate` | Reproduce every bug and assert its fix still holds (a regression check). **Local-only.** |
-| `npm run bug:test` | Run the bug regression suite (the same checks, via `node --test`). |
+| `npm run bug:test` | Run the bug regression suite (the same checks, via the guarded test runner `scripts/run-tests.js`). |
 
 Business scenarios live in [`apps/api/scenarios/`](scenarios/) and are the single source of truth reused by seeding, tests, and bug reproduction — they compose the shared factories in `apps/api/scenarios/factories.js`. The **bug reproduction library** ([`apps/api/scenarios/bugs/`](scenarios/bugs/)) builds on that system: every fixed defect is a reproducible scenario with a regression test, catalogued in [`docs/reference/bug-registry.generated.md`](../../docs/reference/bug-registry.generated.md). App-level commands (`test`, `lint`, `db:*`, `docs:routes`) live in `apps/api/`. See [`docs/reference/environment.md`](../../docs/reference/environment.md) for every environment variable, and [`docs/README.md`](../../docs/README.md) for the documentation index.
 
@@ -52,7 +52,15 @@ Run the automated test suite:
 npm test
 ```
 
-Unit tests (pure functions — crypto, password rules, module/status logic) and the HTTP-level app smoke tests run with no external dependencies. A second tier of integration tests (`test/integration/tenant-isolation.test.js`, `ticket-lifecycle.test.js`, `public-complaint.test.js`) requires a reachable `DATABASE_URL` and skips itself cleanly with a clear message if none is available — see `test/README.md` for the full tiering strategy.
+`npm test` runs `scripts/run-tests.js`. It loads a safety guard into every test process, blanks outbound credentials (SES, alerts, AI, R2), and writes a readable summary to `reports/test-summary.md` (git-ignored). **Tests only run against a disposable loopback test database.** `DATABASE_URL` must point at 127.0.0.1, localhost or ::1, and name a database ending in `_ci`, `_test` or `_e2e`. The local dev database from `.env.dev.example` (`electrical`) and the compose host `db` are **refused by design**, so tests can never touch data you care about. For example, with the dev Postgres from `docker-compose.dev.yml`:
+
+```
+docker exec electrical-db-dev createdb -U electrical electrical_test
+DATABASE_URL=postgresql://electrical:electrical@127.0.0.1:5432/electrical_test npx prisma migrate deploy
+DATABASE_URL=postgresql://electrical:electrical@127.0.0.1:5432/electrical_test npm test
+```
+
+Without a reachable database the DB-backed tests skip, and the run says `NOT EXECUTED: N tests — this is not a pass`. Set `QA_STRICT=1` to make that fail the run; under `CI=true` it always fails. See [`test/README.md`](test/README.md) for the tiers and the guard's exact rules, and [`docs/testing/COVERAGE_MATRIX.md`](../../docs/testing/COVERAGE_MATRIX.md) for what is and is not covered.
 
 Run a single test file (kept for backward compatibility with earlier tooling):
 

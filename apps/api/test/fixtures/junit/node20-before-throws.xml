@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<testsuites>
+	<testsuite name="probe before-throws suite" time="0.000732" disabled="0" errors="0" tests="2" failures="2" skipped="0" hostname="fixture-host">
+		<testcase name="first test after a throwing before()" time="0.000000" classname="test" failure="test did not finish before its parent and was cancelled">
+			<failure type="cancelledByParent" message="test did not finish before its parent and was cancelled">
+[Error [ERR_TEST_FAILURE]: test did not finish before its parent and was cancelled] { code: 'ERR_TEST_FAILURE', failureType: 'cancelledByParent', cause: 'test did not finish before its parent and was cancelled' }
+			</failure>
+		</testcase>
+		<testcase name="second test after a throwing before()" time="0.000000" classname="test" failure="test did not finish before its parent and was cancelled">
+			<failure type="cancelledByParent" message="test did not finish before its parent and was cancelled">
+[Error [ERR_TEST_FAILURE]: test did not finish before its parent and was cancelled] { code: 'ERR_TEST_FAILURE', failureType: 'cancelledByParent', cause: 'test did not finish before its parent and was cancelled' }
+			</failure>
+		</testcase>
+	</testsuite>
+	<!-- tests 2 -->
+	<!-- suites 1 -->
+	<!-- pass 0 -->
+	<!-- fail 0 -->
+	<!-- cancelled 2 -->
+	<!-- skipped 0 -->
+	<!-- todo 0 -->
+	<!-- duration_ms 77.1319 -->
+</testsuites>

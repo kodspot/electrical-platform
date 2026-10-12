@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="utf-8"?>
+<testsuites>
+	<testsuite name="probe before-throws suite" time="0.000529" disabled="0" errors="0" tests="2" failures="2" skipped="0" hostname="fixture-host">
+		<testcase name="first test after a throwing before()" time="0.000000" classname="test" file="C:\ci\electrical-platform\apps\api\test\probe\before-throws.test.js" failure="test did not finish before its parent and was cancelled">
+			<failure type="cancelledByParent" message="test did not finish before its parent and was cancelled">
+[Error [ERR_TEST_FAILURE]: test did not finish before its parent and was cancelled] { code: 'ERR_TEST_FAILURE', failureType: 'cancelledByParent', cause: 'test did not finish before its parent and was cancelled' }
+			</failure>
+		</testcase>
+		<testcase name="second test after a throwing before()" time="0.000000" classname="test" file="C:\ci\electrical-platform\apps\api\test\probe\before-throws.test.js" failure="test did not finish before its parent and was cancelled">
+			<failure type="cancelledByParent" message="test did not finish before its parent and was cancelled">
+[Error [ERR_TEST_FAILURE]: test did not finish before its parent and was cancelled] { code: 'ERR_TEST_FAILURE', failureType: 'cancelledByParent', cause: 'test did not finish before its parent and was cancelled' }
+			</failure>
+		</testcase>
+	</testsuite>
+	<testsuite name="probe fail suite" time="0.002928" disabled="0" errors="0" tests="1" failures="1" skipped="0" hostname="fixture-host">
+		<testcase name="fails with secret-looking text" time="0.002417" classname="test" file="C:\ci\electrical-platform\apps\api\test\probe\fail.test.js" failure="Expected values to be strictly equal:+ actual - expected+ 'Bearer eyJhbGciOiJIUzI1NiJ9.eyJ1c2VySWQiOiJ4In0.c2lnbmF0dXJlX3NpZ25hdHVyZQ postgresql://svc:S3cret@10.0.0.5/prod'- 'expected-value'">
+			<failure type="testCodeFailure" message="Expected values to be strictly equal:+ actual - expected+ 'Bearer eyJhbGciOiJIUzI1NiJ9.eyJ1c2VySWQiOiJ4In0.c2lnbmF0dXJlX3NpZ25hdHVyZQ postgresql://svc:S3cret@10.0.0.5/prod'- 'expected-value'">
+Error [ERR_TEST_FAILURE]: Expected values to be strictly equal:
++ actual - expected
+
++ 'Bearer eyJhbGciOiJIUzI1NiJ9.eyJ1c2VySWQiOiJ4In0.c2lnbmF0dXJlX3NpZ25hdHVyZQ postgresql://svc:S3cret@10.0.0.5/prod'
+- 'expected-value'
+
+    at new Promise (&lt;anonymous>)
+    at Array.map (&lt;anonymous>) {
+  code: 'ERR_TEST_FAILURE',
+  failureType: 'testCodeFailure',
+  cause: AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + 'Bearer eyJhbGciOiJIUzI1NiJ9.eyJ1c2VySWQiOiJ4In0.c2lnbmF0dXJlX3NpZ25hdHVyZQ postgresql://svc:S3cret@10.0.0.5/prod'
+  - 'expected-value'
+  
+      at TestContext.&lt;anonymous> (C:\ci\electrical-platform\apps\api\test\probe\fail.test.js:4:12)
+      at Test.runInAsyncScope (node:async_hooks:214:14)
+      at Test.run (node:internal/test_runner/test:1106:25)
+      at Test.start (node:internal/test_runner/test:1003:17)
+      at node:internal/test_runner/test:1516:71
+      at node:internal/per_context/primordials:464:82
+      at new Promise (&lt;anonymous>)
+      at new SafePromise (node:internal/per_context/primordials:433:3)
+      at node:internal/per_context/primordials:464:9
+      at Array.map (&lt;anonymous>) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'Bearer eyJhbGciOiJIUzI1NiJ9.eyJ1c2VySWQiOiJ4In0.c2lnbmF0dXJlX3NpZ25hdHVyZQ postgresql://svc:S3cret@10.0.0.5/prod',
+    expected: 'expected-value',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+}
+			</failure>
+		</testcase>
+	</testsuite>
+	<testcase name="test\probe\no-tests.js" time="0.042795" classname="test" file="C:\ci\electrical-platform\apps\api\test\probe\no-tests.js"/>
+	<testsuite name="probe pass suite" time="0.000766" disabled="0" errors="0" tests="1" failures="0" skipped="0" hostname="fixture-host">
+		<testcase name="passes and sees the preload" time="0.000328" classname="test" file="C:\ci\electrical-platform\apps\api\test\probe\pass.test.js"/>
+	</testsuite>
+	<testsuite name="probe skip suite" time="0.000854" disabled="0" errors="0" tests="1" failures="0" skipped="1" hostname="fixture-host">
+		<testcase name="skips like the DB-backed tests" time="0.000364" classname="test" file="C:\ci\electrical-platform\apps\api\test\probe\skip.test.js">
+			<skipped type="skipped" message="No database available in this environment"/>
+		</testcase>
+	</testsuite>
+	<testcase name="a todo test" time="0.000385" classname="test" file="C:\ci\electrical-platform\apps\api\test\probe\todo.test.js">
+		<skipped type="todo" message="not written yet"/>
+	</testcase>
+	<testcase name="top-level test passes" time="0.000413" classname="test" file="C:\ci\electrical-platform\apps\api\test\probe\toplevel.test.js"/>
+	<!-- tests 8 -->
+	<!-- suites 4 -->
+	<!-- pass 3 -->
+	<!-- fail 1 -->
+	<!-- cancelled 2 -->
+	<!-- skipped 1 -->
+	<!-- todo 1 -->
+	<!-- duration_ms 113.6446 -->
+</testsuites>

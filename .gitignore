@@ -9,6 +9,9 @@ data/
 # Dependencies
 node_modules/
 
+# Test reports (scrubbed output of apps/api/scripts/run-tests.js)
+apps/api/reports/
+
 # Logs
 *.log
 npm-debug.log*

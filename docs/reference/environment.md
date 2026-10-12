@@ -55,6 +55,22 @@ Unset is safe; behavior degrades gracefully. Recommended in production where not
 | `ALERT_TELEGRAM_BOT_TOKEN` / `ALERT_TELEGRAM_CHAT_ID` / `ALERT_WEBHOOK_URL` | 5xx error alerting (`errors.js`) | Alerting no-ops — errors only reach `data/logs/error.log` |
 | `GLOBAL_AI_API_KEY` / `GLOBAL_AI_PROVIDER` / `GLOBAL_AI_MODEL` | Org-level default AI key fallback (`lib/ai-provider.js`) | Orgs use only their own configured key |
 
+## Test-only (read by the test runner, never by the app)
+
+Read by `apps/api/scripts/run-tests.js`, `apps/api/test/setup/safety.js` and
+`apps/api/test/helpers/db.js` (QA-1). Not in `.env.example`: they are never set for the app
+and never belong in a `.env` file.
+
+| Variable | Controls | Notes |
+|---|---|---|
+| `QA_STRICT` | `1` makes `npm test` exit non-zero when any test was skipped, todo or cancelled (not executed). | Outside CI, skips otherwise only produce a `NOT EXECUTED: N tests — this is not a pass` warning. |
+| `CI` | `true` (set automatically by GitHub Actions) makes skipped/todo/cancelled tests fail the run, makes an unreachable database fail DB-backed tests instead of skipping them, and requires an explicit `DATABASE_URL` in the environment (a `.env` file is ignored). | Not a new variable; this documents what the test runner does with it. |
+
+The test guard also constrains `DATABASE_URL` and `NODE_ENV` while tests run: a loopback
+host, a database name ending in `_ci`/`_test`/`_e2e`, and `NODE_ENV=test`. It also blanks
+`SES_*`, `ALERT_*` and `GLOBAL_AI_*` and replaces `R2_*` with placeholders. See
+[`apps/api/test/README.md`](../../apps/api/test/README.md).
+
 ## Known discrepancies (as of the 2026-07 audit)
 
 - Some variables have appeared in a deployed `.env` that are **referenced nowhere in
