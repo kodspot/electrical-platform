@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<testsuites>
+	<testsuite name="probe pass suite" time="0.001048" disabled="0" errors="0" tests="1" failures="0" skipped="0" hostname="fixture-host">
+		<testcase name="passes and sees the preload" time="0.000485" classname="test"/>
+	</testsuite>
+	

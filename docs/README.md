@@ -65,6 +65,8 @@ Engineering understanding, not code duplication. Each links to the code it descr
   for the data model — read it directly rather than a hand-maintained copy.
 - [`apps/api/README.md`](../apps/api/README.md) — local development, test, and lint
   commands. [`apps/api/test/README.md`](../apps/api/test/README.md) — test-tiering strategy.
+- [`testing/COVERAGE_MATRIX.md`](testing/COVERAGE_MATRIX.md) — what the automated suite
+  does and does not cover, per workflow, module, route file and scheduled job (QA-1 snapshot).
 
 ### Operations — run, recover, scale
 - [`DEPLOYMENT.md`](DEPLOYMENT.md) — CI/CD, staging, and production deploy flow.

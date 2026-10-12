@@ -1,0 +1,9 @@
+{
+  "label": "QA-1 baseline — origin/main 2bdc263, Node v24.11.1, 2026-10-11, CI=true against a disposable Postgres (before QA-1 added any test)",
+  "tests": 276,
+  "pass": 276,
+  "fail": 0,
+  "cancelled": 0,
+  "skipped": 0,
+  "todo": 0
+}

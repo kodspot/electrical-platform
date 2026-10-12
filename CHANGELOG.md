@@ -22,6 +22,34 @@ has been git-tagged yet, so everything below is grouped under **Unreleased**.
 Complete and merged into the working tree as of this writing, pending its next deploy —
 see `docs/DEPLOYMENT.md` for how a change reaches production.
 
+### 2026-10-12
+
+- **`[QA-1]` Test-target safety, skip gate, run report, coverage inventory** —
+  - **Safety guard.** `npm test` (and `bug:test`, `test:phase1`) now runs through
+    `apps/api/scripts/run-tests.js`, which loads `test/setup/safety.js` into every test
+    process. The guard **fails closed**: tests refuse to start unless `NODE_ENV=test` and
+    `DATABASE_URL` points at a loopback host and a database named `*_ci`/`*_test`/`*_e2e`
+    with no connection-redirecting query parameters. Under `CI=true` the URL must also be
+    explicit in the environment. It blanks outbound SES/alert/AI credentials and
+    placeholders R2 before dotenv can inject the real `.env` values.
+  - **Skip gate.** `test/helpers/db.js#isDatabaseAvailable()` re-checks the same rules
+    against the URL Prisma actually captured. Under `CI=true` an unreachable database now
+    **fails** DB-backed tests instead of silently skipping them, and the run fails on any
+    skipped/todo/cancelled test (also opt-in locally with `QA_STRICT=1`).
+  - **Run report.** Each run writes a scrubbed `reports/junit.xml` and a readable
+    `reports/test-summary.md`: counts, baseline vs current, per-tier and per-file tables,
+    failures with an ENVIRONMENT/UNCLASSIFIED classification, and a
+    `NOT EXECUTED: N — this is not a pass` line. These use Node's built-in spec/JUnit
+    reporters plus a small reporter on Node's own API (`scripts/report-events.js`) for the
+    file paths and hook errors that Node 20's JUnit output drops.
+  - **Inventory.** New `docs/testing/COVERAGE_MATRIX.md`, with characterisation findings
+    F1–F11 (open questions for the owner, no code changed).
+  - **Docs and tests.** `apps/api/test/README.md` and `apps/api/README.md` are corrected,
+    including the stale demo electrician PIN (`123456`, not `1234`). New tests: safety
+    guard, DB gate, report, preload canary.
+  - **Scope.** Verified on Node 24.11.1 and Node 20.20.2 against a disposable Postgres. No
+    production code, dependency, workflow or compose change.
+
 ### 2026-07-22
 
 - **Production observability & operational diagnostics (platform milestone M6)** — Added a
