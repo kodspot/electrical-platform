@@ -24,6 +24,21 @@ see `docs/DEPLOYMENT.md` for how a change reaches production.
 
 ### 2026-10-13
 
+- **`[E2E-1]` Browser end-to-end package (`e2e/`).** It is a separate package with its own
+  lockfile and Node ≥ 22; the app stays on Node 20 and its dependencies and lockfile are
+  unchanged (ADR 0006).
+  - **Dependencies:** `@playwright/test` 1.63.0 (Apache-2.0), `@axe-core/playwright` 4.13.0
+    (MPL-2.0), `jsqr` 1.4.0 (Apache-2.0), and `playwright-core` 1.63.0, pinned to dedupe.
+  - **Configuration:** projects `chromium-desktop` and `chromium-mobile` (Pixel 7), with
+    HTML/JUnit/JSON reports in `e2e/reports/`.
+  - **App under test:** `webServer` starts the real app on :3100 with local storage, blanked
+    outbound credentials and generated secrets.
+  - **Safety:** the suite refuses any database that isn't loopback `_e2e`, reusing
+    `apps/api/test/setup/safety-rules.js`.
+  - **Seed:** a per-run seed through the scenario factories, with generated credentials only.
+  - **Root scripts:** `npm run e2e` (a disposable `postgres:15-alpine` container
+    `e2e-pg-<pid>` on 127.0.0.1:55433, removed at the end), `e2e:ui` and `e2e:codegen`.
+    Includes an environment smoke spec.
 - **User-visible (Release Notes):**
   - **Every electrician now needs an Employee ID.** It is required when adding an
     electrician (admin and super-admin screens), and it can't be blanked out later,

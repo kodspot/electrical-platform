@@ -1,0 +1,106 @@
+'use strict';
+
+const fs = require('node:fs');
+const path = require('node:path');
+const jsQR = require('jsqr');
+
+const SEED_FILE = path.join(__dirname, '..', '.auth', 'seed.json');
+const API_DIR = path.join(__dirname, '..', '..', 'apps', 'api');
+
+function seed() {
+  return JSON.parse(fs.readFileSync(SEED_FILE, 'utf8'));
+}
+
+let _prisma;
+/** Prisma client (the app's own generated client) for asserting database state. */
+function db() {
+  if (!_prisma) {
+    const { PrismaClient } = require(path.join(API_DIR, 'node_modules', '@prisma', 'client'));
+    _prisma = new PrismaClient({ datasources: { db: { url: process.env.DATABASE_URL } } });
+  }
+  return _prisma;
+}
+
+// One API login per account per worker process: fewer logins keeps well inside the login
+// rate limit, and UI login itself is exercised by the journeys and the negative cases.
+const sessions = new Map();
+async function apiLogin(request, { email, password }) {
+  if (sessions.has(email)) return sessions.get(email);
+  const res = await request.post('/api/auth/login', { data: { email, password } });
+  if (!res.ok()) throw new Error(`login failed (${res.status()})`);
+  const body = await res.json();
+  sessions.set(email, body);
+  return body;
+}
+
+/** Make the next page loads behave as an already-signed-in admin/supervisor/super-admin. */
+async function signIn(page, kind, account, orgSlug) {
+  const { token, user } = await apiLogin(page.request, account);
+  await page.addInitScript(({ kind, token, user, orgSlug }) => {
+    if (kind === 'admin') {
+      localStorage.setItem('token', token);
+      localStorage.setItem('user', JSON.stringify(user));
+    } else if (kind === 'supervisor') {
+      localStorage.setItem('sup_token', token);
+      localStorage.setItem('sup_user', JSON.stringify({ id: user.id, name: user.name, orgId: user.orgId }));
+    } else if (kind === 'superadmin') {
+      localStorage.setItem('sa_token', token);
+      localStorage.setItem('sa_user', JSON.stringify(user));
+    }
+    if (orgSlug) localStorage.setItem('orgSlug', orgSlug);
+    localStorage.setItem('activeModule', 'ele');
+  }, { kind, token, user, orgSlug });
+  return token;
+}
+
+const orgPage = (slug, page) => `/${slug}/ele/${page}`;
+
+/** Choose an option in a custom-select-enhanced <select>, the way a user does. */
+async function pickOption(page, selectId, label) {
+  const wrap = page.locator('.cs-wrap', { has: page.locator(`#${selectId}`) });
+  await wrap.locator('.cs-trigger').click();
+  await page.locator(`#cs-list-${selectId} .cs-option`, { hasText: label }).first().click();
+}
+
+/** Encode a solid-colour RGB PNG (the server checks image signatures and re-encodes with sharp). */
+function makePng(width, height, [r, g, b]) {
+  const zlib = require('node:zlib');
+  const chunk = (type, data) => {
+    const len = Buffer.alloc(4); len.writeUInt32BE(data.length);
+    const body = Buffer.concat([Buffer.from(type, 'ascii'), data]);
+    const crc = Buffer.alloc(4); crc.writeUInt32BE(zlib.crc32(body) >>> 0);
+    return Buffer.concat([len, body, crc]);
+  };
+  const ihdr = Buffer.alloc(13);
+  ihdr.writeUInt32BE(width, 0); ihdr.writeUInt32BE(height, 4);
+  ihdr[8] = 8; ihdr[9] = 2; // 8-bit, truecolour
+  const row = Buffer.concat([Buffer.from([0]), Buffer.alloc(width * 3).map((_, i) => [r, g, b][i % 3])]);
+  const raw = Buffer.concat(Array.from({ length: height }, () => row));
+  return Buffer.concat([
+    Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+    chunk('IHDR', ihdr), chunk('IDAT', zlib.deflateSync(raw)), chunk('IEND', Buffer.alloc(0))
+  ]);
+}
+const PNG = makePng(32, 32, [37, 99, 235]);
+const photo = (name = 'photo.png') => ({ name, mimeType: 'image/png', buffer: PNG });
+
+/** Render an SVG QR code in the browser and decode it with jsQR. Returns the encoded text. */
+async function decodeQrSvg(page, svg) {
+  const { width, height, data } = await page.evaluate(async (markup) => {
+    const size = 480;
+    const img = new Image();
+    img.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(markup)}`;
+    await img.decode();
+    const canvas = document.createElement('canvas');
+    canvas.width = size; canvas.height = size;
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, size, size);
+    ctx.drawImage(img, 0, 0, size, size);
+    const pixels = ctx.getImageData(0, 0, size, size);
+    return { width: size, height: size, data: Array.from(pixels.data) };
+  }, svg);
+  const code = jsQR(Uint8ClampedArray.from(data), width, height);
+  return code ? code.data : null;
+}
+
+module.exports = { seed, db, apiLogin, signIn, orgPage, pickOption, photo, decodeQrSvg };

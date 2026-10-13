@@ -1,0 +1,20 @@
+{
+  "name": "electrical-platform-e2e",
+  "private": true,
+  "description": "Browser end-to-end, visual and accessibility checks for the Kodspot Electrical Platform (Playwright). Separate package so the app's dependencies and lockfile stay untouched. See ADR 0006.",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "test": "playwright test",
+    "test:ui": "playwright test --ui",
+    "codegen": "playwright codegen",
+    "report": "playwright show-report reports/html"
+  },
+  "devDependencies": {
+    "@axe-core/playwright": "4.13.0",
+    "@playwright/test": "1.63.0",
+    "jsqr": "1.4.0",
+    "playwright-core": "1.63.0"
+  }
+}
