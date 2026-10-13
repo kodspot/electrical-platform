@@ -255,8 +255,8 @@ jobs:
             echo "=== CADDY STATUS ==="
             docker compose ps caddy
 
-            echo "=== CADDY LOGS ==="
-            docker compose logs --tail 50 caddy
+            # No `docker compose logs caddy`: Caddy's error log records the full request URI,
+            # query string (?token=) included, and this repository's logs are public. [C11]
 
             echo "=== CLEANUP UNUSED IMAGES ==="
             docker image prune -f

@@ -48,6 +48,16 @@ see `docs/DEPLOYMENT.md` for how a change reaches production.
   `AuditLog.newValue`.
 - **Tests:** `test/integration/reset-pages.test.js` covers both pages, the logs, the audit
   row and the PIN markup. It failed on the old code (5 failures) and passes now.
+- **`[C11]` Tokens out of Caddy's log and the public deploy log.**
+  - **Deploy log:** `deploy.yml` no longer prints `docker compose logs caddy` (only
+    `docker compose ps caddy`). The API log dump on a failed health check stays.
+    `deploy-staging.yml` never printed Caddy's logs.
+  - **Caddy log filter:** `infrastructure/Caddyfile` gains a global log filter. Caddy's error
+    log (e.g. a 502 during an API restart) recorded the full request URI, `?token=`
+    included. Every query value and the `/review/` token are now logged as `REDACTED`, and
+    proxying is unchanged.
+  - **Verification:** a throwaway `caddy:2-alpine` canary test: count 4 → 0, upstream still
+    200, and `caddy validate` passes on the full file.
 
 - **User-visible (Release Notes):** Electricians can pick up tickets again; acknowledging
   alerts, generating AI insights, duplicating templates and running production checks work
