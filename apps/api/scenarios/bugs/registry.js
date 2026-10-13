@@ -13,7 +13,8 @@ const BUGS_LIST = [
   require('./bug-0002-worker-permanent-delete-loses-history'),
   require('./bug-0003-public-complaint-spam-not-enforced'),
   require('./bug-0004-assigned-supervisor-double-notified'),
-  require('./bug-0005-worker-created-without-employee-id')
+  require('./bug-0005-worker-created-without-employee-id'),
+  require('./bug-0006-empty-json-body-rejected')
 ];
 
 const BUGS = Object.fromEntries(BUGS_LIST.map((b) => [b.id, b]));

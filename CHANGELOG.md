@@ -24,6 +24,23 @@ see `docs/DEPLOYMENT.md` for how a change reaches production.
 
 ### 2026-10-13
 
+- **User-visible (Release Notes):** Electricians can pick up tickets again; acknowledging
+  alerts, generating AI insights, duplicating templates and running production checks work
+  again.
+- **`[F14]` Body-less JSON requests accepted (BUG-0006).** `public/js/app.js` always sends
+  `Content-Type: application/json`, and Fastify rejected an empty JSON body with
+  `400 FST_ERR_CTP_EMPTY_JSON_BODY` before auth. That broke every body-less POST/PATCH from
+  the browser: electrician Pick Up, alert acknowledge (and acknowledge-all), AI insight
+  generate, template duplicate, notification mark-read and read-all, supervisor accept and
+  pickup, and the production-checks button.
+  - **Fix (server-side, one place):** `src/plugins/content.js` replaces the JSON parser. An
+    empty or whitespace-only body is read as `{}`; everything else goes to Fastify's own
+    parser, with prototype- and constructor-poisoning protection set to `error` and the body
+    limits unchanged. This also covers browsers holding a cached `app.js`.
+  - **Tests:** `test/integration/empty-json-body.test.js` replays all 12 call sites
+    browser-style. It failed on the old code (24/24 rejected) and passes now. It also checks
+    that malformed JSON and poisoning payloads are still rejected.
+
 - **User-visible (Release Notes):**
   - **Every electrician now needs an Employee ID.** It is required when adding an
     electrician (admin and super-admin screens), and it can't be blanked out later,
