@@ -30,6 +30,7 @@ const ALLOWED_PARENTS = {
   skipped: ['testcase']
 };
 const DB_SKIP_MESSAGE = /No database available/i;
+const REPORT_FAILED = 'test report could not be produced';
 const ENVIRONMENT_CAUSE = /ECONNREFUSED|P1001|Can't reach database server|database unreachable/i;
 
 // ── Scrubbing ──
@@ -171,6 +172,7 @@ function tierOf(file) {
   const special = {
     'test/integration/app-smoke.test.js': 'app-smoke',
     'test/integration/observability.test.js': 'app-smoke',
+    'test/integration/log-redaction.test.js': 'app-smoke',
     'test/integration/health-ready.test.js': 'env-aware',
     'test/integration/scenarios.test.js': 'scenario',
     'test/integration/bug-regressions.test.js': 'bug-regression'
@@ -257,7 +259,7 @@ function collectCases(parsed, events) {
 function decideExit({ childStatus, reportOk, counts, ci, strict }) {
   const reasons = [];
   if (childStatus !== 0) reasons.push(childStatus === null ? 'test process was killed by a signal' : `test process exited ${childStatus}`);
-  if (!reportOk) reasons.push('test report could not be produced');
+  if (!reportOk) reasons.push(REPORT_FAILED);
   if ((ci || strict) && counts) {
     for (const key of ['skipped', 'todo', 'cancelled']) {
       if (counts[key] > 0) reasons.push(`${counts[key]} test(s) ${key} under ${ci ? 'CI=true' : 'QA_STRICT=1'}`);
@@ -415,6 +417,7 @@ module.exports = {
   tierOf,
   classify,
   decideExit,
+  REPORT_FAILED,
   notExecuted,
   buildSummary,
   generateReport

@@ -15,7 +15,7 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const { spawnSync } = require('child_process');
-const { generateReport, decideExit, notExecuted } = require('./report-tests');
+const { generateReport, decideExit, notExecuted, REPORT_FAILED } = require('./report-tests');
 
 const API_DIR = path.join(__dirname, '..');
 const REPORTS_DIR = path.join(API_DIR, 'reports');
@@ -66,10 +66,14 @@ function main() {
     console.log(`[run-tests] Summary: ${path.relative(API_DIR, path.join(REPORTS_DIR, 'test-summary.md'))} · JUnit: ${path.relative(API_DIR, path.join(REPORTS_DIR, 'junit.xml'))}`);
     const ne = notExecuted(report.counts);
     if (ne > 0) console.log(`NOT EXECUTED: ${ne} tests — this is not a pass`);
-  } else {
-    console.error(`[run-tests] test report could not be produced: ${reportError ? reportError.message : 'unknown error'}`);
   }
-  for (const reason of decision.reasons) console.log(`[run-tests] ${reason}`);
+  for (const reason of decision.reasons) {
+    if (!report && reason === REPORT_FAILED) {
+      console.error(`[run-tests] ${reason}: ${reportError ? reportError.message : 'unknown error'}`);
+    } else {
+      console.log(`[run-tests] ${reason}`);
+    }
+  }
   console.log(`[run-tests] exit ${decision.code}`);
   process.exit(decision.code);
 }

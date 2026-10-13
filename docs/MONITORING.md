@@ -47,7 +47,9 @@ exact log lines. When someone reports a problem, ask for the `x-request-id` (or 
 ## Slow-request logging
 
 Requests slower than a threshold (default 2000ms, `SLOW_REQUEST_MS`) are logged at `warn`
-with the request id, method, path, status, and duration (`apps/api/src/plugins/observability.js`).
+with the request id, the route (`route`: method + route template, e.g. `GET /review/:token`),
+status, and duration (`apps/api/src/plugins/observability.js`). The raw URL is never logged —
+see [Credentials never reach logs](#credentials-never-reach-logs).
 This surfaces production latency problems **without** enabling per-request logging (which
 stays off at scale). Long-lived SSE streams are excluded so they aren't mistaken for slow
 requests.
@@ -87,6 +89,28 @@ blocks a response**. It only fires if configured:
   visible in the logs immediately, without hitting an endpoint.
 - Retrieve with `docker compose logs api` (the deploy script already dumps the last 150
   lines on a failed health check).
+
+### Credentials never reach logs
+
+This app carries credentials in URLs in several places: `?token=` on the SSE streams and the
+`/images/` proxy (an `<img>` or `EventSource` cannot send an `Authorization` header), the
+token as a path segment on `/review/:token`, and `?token=` on emailed reset links. So no log
+line, alert or `error.log` entry ever contains a raw URL. `apps/api/src/lib/log-redaction.js`
+(WP-A) enforces this in one place:
+
+| Sink | Protection |
+|---|---|
+| Fastify request lines (`incoming request` / `request completed`) | `req` serializer logs the route template, falling back to the path with its query removed |
+| Slow-request `warn` line | logs `route` (template), not the URL |
+| `request.log.error` / any `*.log.*` call | `err` serializer scrubs message and stack; a `logMethod` hook scrubs every string argument, including the message pino derives from an Error |
+| Telegram / webhook alert | route from the template; message, text and body scrubbed of JWT-shaped strings, `Bearer` values and `token=` values |
+| `error.log` | stack scrubbed the same way |
+
+Every logger `buildApp()` creates gets this, including a caller-supplied logger options
+object. pino `redact` is deliberately not used: it matches key paths, while the leak here is
+inside a string value. The reverse proxy (`infrastructure/Caddyfile`) has no `log` directive,
+so Caddy writes no access log. Regression tests: `apps/api/test/log-redaction.test.js` and
+`apps/api/test/integration/log-redaction.test.js`.
 
 ## What is *not* monitored (known gaps)
 

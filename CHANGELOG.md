@@ -22,6 +22,23 @@ has been git-tagged yet, so everything below is grouped under **Unreleased**.
 Complete and merged into the working tree as of this writing, pending its next deploy —
 see `docs/DEPLOYMENT.md` for how a change reaches production.
 
+### 2026-10-13
+
+- **`[WP-A]` Credentials kept out of logs and alerts.** The app carries credentials in URLs
+  (`?token=` on the SSE streams and `/images/`, `/review/:token`, reset links). Logs and
+  alerts now describe a request by its route template, falling back to the path without its
+  query; they never use the raw URL.
+  - New `apps/api/src/lib/log-redaction.js`: `stripQuery`, `describeTarget`,
+    `scrubJwtShapes`, `buildLoggerOptions`.
+  - Every logger `buildApp()` creates gets `req`/`url`/`err` serializers and a `logMethod`
+    hook (no pino `redact`), merged into a caller-supplied logger too.
+  - The slow-request log, Telegram/webhook alerts and `error.log` are scrubbed.
+  - Regression tests use a canary JWT across every token URL shape, the slow path, the 5xx
+    path and a caller-supplied logger, plus a control run showing that an unpatched logger
+    leaks.
+  - Also: `scripts/run-tests.js` now prints "test report could not be produced" once,
+    instead of twice.
+
 ### 2026-10-12
 
 - **`[QA-1]` Test-target safety, skip gate, run report, coverage inventory** —

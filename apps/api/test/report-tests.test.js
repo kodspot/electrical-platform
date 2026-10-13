@@ -109,6 +109,7 @@ describe('QA-1 report — file attribution, tiers, classification', () => {
     assert.strictEqual(tierOf('test/lib-crypto.test.js'), 'unit');
     assert.strictEqual(tierOf('test/integration/app-smoke.test.js'), 'app-smoke');
     assert.strictEqual(tierOf('test/integration/observability.test.js'), 'app-smoke');
+    assert.strictEqual(tierOf('test/integration/log-redaction.test.js'), 'app-smoke');
     assert.strictEqual(tierOf('test/integration/health-ready.test.js'), 'env-aware');
     assert.strictEqual(tierOf('test/integration/scenarios.test.js'), 'scenario');
     assert.strictEqual(tierOf('test/integration/bug-regressions.test.js'), 'bug-regression');
