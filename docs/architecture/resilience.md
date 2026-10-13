@@ -26,6 +26,31 @@ The design principle (Charter §8.3–§8.4, from `[WP12]`/`[WP10]`): **bake res
 shared primitive so a caller cannot forget it**, rather than requiring each call site to opt
 in. Both breakers' live status is reported on `/health`.
 
+### What counts as a database failure (F15)
+
+`dbBreaker` opens only on errors that say the database itself is unavailable
+(`isDbInfrastructureError` in `lib/circuit-breaker.js`):
+
+| Counts (5 in 60 s opens the breaker) | Does not count (still thrown to the caller) |
+|---|---|
+| `PrismaClientInitializationError`, `PrismaClientRustPanicError` | `PrismaClientValidationError` (a bad query shape) |
+| Known-request codes `P1001`, `P1002`, `P1008`, `P1017`, `P2024` | Every other `P2xxx` (e.g. `P2002` unique, `P2025` not found) |
+| `ECONNREFUSED`, `ECONNRESET`, `ETIMEDOUT` (on the error or its `cause`) | `PrismaClientUnknownRequestError`, any other error |
+
+- **Why:** counting request-level errors turned one request type into a platform-wide
+  outage. An electrician's photo loads threw validation errors, five of them opened the
+  breaker, and everyone got `503` for 30 s (BUG-0008).
+- **`PrismaClientUnknownRequestError` does not count.** The engine reached the database
+  and got an answer it could not map to a code. That means the request failed, not that the
+  database is down. A real outage surfaces as one of the errors in the left column.
+- **Probe rule:** if the single HALF_OPEN probe fails with an error that does not count, it
+  proved nothing. The probe slot is released and the next request probes. Counted failures
+  keep the original transitions.
+- **`aiBreaker`:** keeps the default (every error counts), since a provider error is the
+  provider's health.
+- **Tests:** `apps/api/test/db-breaker-classification.test.js` and
+  `apps/api/test/integration/f15-images-and-auth.test.js`.
+
 ## Scheduler locks (cross-instance safety)
 
 `lib/scheduler-lock.js` provides `runExclusive(prisma, lockKey, jobFn, logger)` using

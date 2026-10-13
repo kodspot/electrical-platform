@@ -9,15 +9,25 @@
  *   GET  /superadmin/qa/trend          the latest N runs, oldest first, for the trend chart
  *   GET  /superadmin/qa/ci-status      latest GitHub Actions runs (cached 60 s)
  *   POST /superadmin/qa/checks         live read-only production checks, streamed as NDJSON
+ *   POST /superadmin/qa/dispatch       start the e2e workflow on GitHub ("Run full test suite now")
  */
 
 const { PassThrough } = require('stream');
 const { prisma } = require('../lib/prisma');
 const { authenticateJWT, requirePolicy } = require('../middleware/auth');
-const { getCiStatus } = require('../lib/github');
+const { getCiStatus, dispatchE2eWorkflow } = require('../lib/github');
 const { runProductionChecks } = require('../services/production-checks');
 
 const SOURCES = new Set(['ci', 'local', 'e2e']);
+
+// What the page shows for each dispatch outcome, and the status this API answers with.
+const DISPATCH = {
+  started: { code: 202, message: 'started' },
+  not_on_main: { code: 409, message: 'the e2e workflow is not on main yet: it only becomes dispatchable after batch-2 is merged' },
+  token_rejected: { code: 502, message: 'dispatch token invalid, expired, or missing Actions write' },
+  github_unavailable: { code: 503, message: 'GitHub unavailable, try later' }
+};
+const dispatchEnabled = () => Boolean(process.env.GH_ACTIONS_DISPATCH_TOKEN);
 const LIST_SELECT = {
   id: true, createdAt: true, source: true, commitSha: true, ref: true, event: true, runUrl: true,
   nodeVersion: true, status: true, total: true, passed: true, failed: true, cancelled: true,
@@ -62,7 +72,31 @@ async function superadminQaRoutes(fastify) {
     return { runs: runs.reverse() };
   });
 
-  fastify.get('/superadmin/qa/ci-status', async () => getCiStatus());
+  // dispatchEnabled tells the page whether to offer "Run full test suite now".
+  fastify.get('/superadmin/qa/ci-status', async () => ({ ...(await getCiStatus()), dispatchEnabled: dispatchEnabled() }));
+
+  // "Run full test suite now": dispatch the e2e workflow on main. Feature off (404) while
+  // GH_ACTIONS_DISPATCH_TOKEN is unset. One dispatch per 10 minutes. The token is only ever
+  // sent to GitHub — never returned, logged or audited; the audit row holds statuses only.
+  fastify.post('/superadmin/qa/dispatch', {
+    config: { rateLimit: { max: 1, timeWindow: 600_000, keyGenerator: (req) => req.ip } }
+  }, async (request, reply) => {
+    if (!dispatchEnabled()) return reply.code(404).send({ error: 'Not found' });
+    const result = await dispatchE2eWorkflow({ requestedBy: 'superadmin' });
+    const outcome = DISPATCH[result.outcome] ? result.outcome : 'github_unavailable';
+    await prisma.auditLog.create({
+      data: {
+        orgId: null,
+        actorType: 'super_admin',
+        actorId: request.user.id,
+        action: 'sa_test_suite_dispatched',
+        entityType: 'Platform',
+        newValue: { outcome, githubStatus: result.githubStatus }
+      }
+    }).catch((err) => request.log.warn({ err: err.message }, 'dispatch audit write failed'));
+    const { code, message } = DISPATCH[outcome];
+    return reply.code(code).send({ state: outcome, message, url: outcome === 'started' ? result.url : null });
+  });
 
   // Streams one JSON object per line as each check finishes, then a final { done } line.
   // Authorization travels in the request header (fetch + ReadableStream on the page) — never

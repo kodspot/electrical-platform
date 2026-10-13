@@ -48,7 +48,22 @@ Constraints:
      reads, which the public repository allows.
    - **Token check:** the production checks read the token's expiry header and warn 14 days
      ahead.
-   - **Dispatch:** the same token will trigger the e2e workflow (Batch 2).
+   - **Dispatch (C8, 2026-10-13):** `POST /api/superadmin/qa/dispatch` uses the same token to
+     start `e2e.yml` on `main` (`workflow_dispatch`, `requested_by=superadmin`). It is
+     SUPER_ADMIN only and limited to one call per 10 minutes. With the token unset it
+     answers 404 and the page hides the button.
+     - **Outcomes:**
+
+       | GitHub answers | The page shows |
+       |---|---|
+       | 200 | a link to the run (`html_url`, `https://github.com/` only) |
+       | 204 | "started" |
+       | 404 / 422 | "the e2e workflow is not on main yet …" |
+       | 401 / 403 | "dispatch token invalid, expired, or missing Actions write" |
+       | 429, a timeout or anything else | "GitHub unavailable, try later" |
+
+     - **Audit:** every call is recorded as `sa_test_suite_dispatched`, holding the outcome
+       and GitHub's status only. The token is never returned, logged or audited.
 4. **Production checks are read-only and streamed.**
    - **What they touch:** a DB ping plus the migration ledger, R2 `HeadBucket` +
      `ListObjectsV2` (object metadata only), SMTP `verify()` (never sends), configuration

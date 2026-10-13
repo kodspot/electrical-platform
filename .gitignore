@@ -12,6 +12,14 @@ node_modules/
 # Test reports (scrubbed output of apps/api/scripts/run-tests.js)
 apps/api/reports/
 
+# End-to-end suite (e2e/): run output, per-run seed with generated credentials, and visual
+# baselines from any platform other than Linux (only CI-generated Linux baselines are kept).
+e2e/reports/
+e2e/test-results/
+e2e/.auth/
+e2e/tests/__screenshots__/win32/
+e2e/tests/__screenshots__/darwin/
+
 # Logs
 *.log
 npm-debug.log*

@@ -24,6 +24,30 @@ see `docs/DEPLOYMENT.md` for how a change reaches production.
 
 ### 2026-10-13
 
+- **User-visible (Release Notes):** Electricians can now see complaint and proof photos;
+  fixed a fault where loading photos could make the whole platform briefly unavailable.
+- **`[F15]` Database circuit breaker counts only infrastructure failures (BUG-0008).**
+  - **What was broken:** `dbBreaker` counted every error from a Prisma operation as a
+    database failure. The electrician queue loads ticket photos through `/api/images` with
+    the worker token, and that route looked the token up as a staff user
+    (`id: undefined`), which threw a Prisma validation error. Five of those within 60 s
+    opened the breaker, and every request from every user got `503` for 30 s.
+    Electricians never saw the photos either (401).
+  - **Breaker fix (`src/lib/circuit-breaker.js`, one place):** only infrastructure failures
+    count. Those are initialization errors, engine panics, `P1001`/`P1002`/`P1008`/`P1017`/
+    `P2024`, and `ECONNREFUSED`/`ECONNRESET`/`ETIMEDOUT`. Validation errors and every other
+    `P2xxx` still reach the caller but no longer count, and neither does
+    `PrismaClientUnknownRequestError` (see `docs/architecture/resilience.md`).
+  - **Probe change:** recovery after a counted failure is unchanged. If the trial request
+    fails with an error that does not count, the next request becomes the trial instead.
+  - **`middleware/auth.js`:** a token without `userId` now gets `401` before any query.
+  - **`/api/images`:** accepts staff and worker tokens, with the same checks as the
+    header-based auth paths: active account, `tokenInvalidBefore`, and active org. Another
+    org's image now answers `404` instead of `403`.
+  - **Tests:** `test/db-breaker-classification.test.js` and
+    `test/integration/f15-images-and-auth.test.js`. They failed on the old code (16 of 32)
+    and pass now.
+
 - **User-visible (Release Notes):** Password and PIN reset links from email now open a
   working reset page.
 - **`[F12]` Reset pages (BUG-0007).** The reset emails link to `/reset-password?token=…` and
@@ -75,6 +99,74 @@ see `docs/DEPLOYMENT.md` for how a change reaches production.
   - **Tests:** `test/integration/empty-json-body.test.js` replays all 12 call sites
     browser-style. It failed on the old code (24/24 rejected) and passes now. It also checks
     that malformed JSON and poisoning payloads are still rejected.
+
+- **User-visible (Release Notes), super-admin:** the Quality page has an **End-to-end** tab.
+  It shows the latest browser test run (journeys, accessibility and visual checks, with links
+  to the run and its report) and a **Run full test suite now** button.
+- **`[E2E-4]` e2e CI, reporting and the run-suite button.**
+  - **`.github/workflows/e2e.yml`:** triggers on PRs (no branch filter; `apps/api/**`,
+    `e2e/**`), nightly at 21:30 UTC, and `workflow_dispatch` (`update_snapshots`,
+    `requested_by`).
+    - It runs against a Postgres service on Node 22.
+    - The report is uploaded every run and traces only on failure, both kept 7 days.
+    - The Linux baselines are uploaded when `update_snapshots` is set.
+    - The summary (`e2e/scripts/summarize.js`) is posted to the Quality ingest with
+      `source: 'e2e'`.
+    - The deploy workflow is untouched.
+  - **`POST /api/superadmin/qa/dispatch`:** SUPER_ADMIN only, one call per 10 minutes, and
+    404 while `GH_ACTIONS_DISPATCH_TOKEN` is unset.
+    - It starts `e2e.yml` on `main` with `requested_by=superadmin`.
+    - GitHub 200 → the page shows the run link. 204 → "started". 404/422 → "the e2e workflow
+      is not on main yet: it only becomes dispatchable after batch-2 is merged". 401/403 →
+      "dispatch token invalid, expired, or missing Actions write". 429 or a timeout →
+      "GitHub unavailable, try later".
+    - Every call is audited as `sa_test_suite_dispatched` (statuses only). The token is
+      never returned or logged.
+  - **`ci-status`** now reports `dispatchEnabled`.
+  - **Tests:** `test/integration/qa-dispatch.test.js` (14 tests) and the e2e test
+    `quality-e2e-tab.spec.js`.
+- **User-visible (Release Notes):** screen readers now announce the mobile menu button on
+  admin pages ("Menu").
+- **`[E2E-3]` Design and accessibility checks (`e2e/tests/visual-a11y.spec.js`).** Ten pages
+  are checked on desktop and on a Pixel 7.
+  - **Visual:** `toHaveScreenshot` with the dynamic regions masked. Baselines are Linux
+    only, generated in CI. Until one exists, the check records "no baseline" and does not
+    fail.
+  - **Accessibility:** axe (WCAG 2.0/2.1 A + AA), report-only, failing only on critical
+    violations. Its first run found one critical, `button-name`: the mobile menu button
+    `#nav-toggle` had no accessible name on 11 admin pages. It now has `aria-label="Menu"`,
+    the same as `admin-attendance.html` already did.
+  - **Baseline counts:** 0 critical. The 45 serious nodes are `color-contrast`,
+    `link-in-text-block` and `scrollable-region-focusable`; see `e2e/README.md`.
+- **`[E2E-2]` Browser journeys J1–J8 (`e2e/tests/`).**
+  - **J1–J6, one story:** an admin creates a location and prints its QR; the QR decodes to
+    `APP_URL/s/<code>`. A guest on a phone reports a fault with a photo, and the database
+    shows the F2 nearest-supervisor assignment and F3's single notification. An admin adds
+    an electrician with PIN 123456, who signs in on a phone, sees the photo (F15) and picks
+    the ticket up (F14). The electrician resolves it with a proof photo; the supervisor
+    verifies and closes it, and the guest review link loads. Finally an internal ticket
+    shows in both lists.
+  - **J7 (negative cases):** an electrician can't open admin pages or APIs; org B can't
+    see org A's ticket; a wrong PIN shows an error; an invalid complaint creates nothing.
+  - **J8 (phone only):** the worker PIN reset from the emailed link (F12). The token is
+    removed from the address bar, the new PIN works, and the link can't be used twice.
+  - **Run with the fixes:** this found F14 and F15. With both fixed, three consecutive full
+    runs are green (15/15 each).
+- **`[E2E-1]` Browser end-to-end package (`e2e/`).** It is a separate package with its own
+  lockfile and Node ≥ 22; the app stays on Node 20 and its dependencies and lockfile are
+  unchanged (ADR 0006).
+  - **Dependencies:** `@playwright/test` 1.63.0 (Apache-2.0), `@axe-core/playwright` 4.13.0
+    (MPL-2.0), `jsqr` 1.4.0 (Apache-2.0), and `playwright-core` 1.63.0, pinned to dedupe.
+  - **Configuration:** projects `chromium-desktop` and `chromium-mobile` (Pixel 7), with
+    HTML/JUnit/JSON reports in `e2e/reports/`.
+  - **App under test:** `webServer` starts the real app on :3100 with local storage, blanked
+    outbound credentials and generated secrets.
+  - **Safety:** the suite refuses any database that isn't loopback `_e2e`, reusing
+    `apps/api/test/setup/safety-rules.js`.
+  - **Seed:** a per-run seed through the scenario factories, with generated credentials only.
+  - **Root scripts:** `npm run e2e` (a disposable `postgres:15-alpine` container
+    `e2e-pg-<pid>` on 127.0.0.1:55433, removed at the end), `e2e:ui` and `e2e:codegen`.
+    Includes an environment smoke spec.
 
 - **User-visible (Release Notes):**
   - **Every electrician now needs an Employee ID.** It is required when adding an

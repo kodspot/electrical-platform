@@ -17,7 +17,10 @@
     "bug:validate": "node apps/api/scripts/bug.js validate",
     "bug:test": "npm --prefix apps/api run bug:test",
     "ci": "npm --prefix apps/api run ci",
-    "release:check": "npm --prefix apps/api run release:check"
+    "release:check": "npm --prefix apps/api run release:check",
+    "e2e": "node e2e/scripts/run-e2e.js",
+    "e2e:ui": "node e2e/scripts/run-e2e.js --ui-mode",
+    "e2e:codegen": "npm --prefix e2e run codegen -- http://localhost:3000"
   },
   "devDependencies": {
     "prisma": "^5.9.0"

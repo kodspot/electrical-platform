@@ -189,6 +189,7 @@
   async function loadCi() {
     var data = await App.saFetchJson('/superadmin/qa/ci-status');
     var list = $('ciList');
+    showDispatch(Boolean(data && data.dispatchEnabled));
     var active = false;
     if (!data || data.state !== 'ok') {
       list.innerHTML = '<li class="q-muted">CI status unavailable' + (data && data.reason ? ' (' + esc(data.reason) + ')' : '') + '.</li>';
@@ -247,6 +248,124 @@
       list.insertAdjacentHTML('beforeend', '<li class="q-muted">The checks stream was interrupted.</li>');
     } finally {
       btn.disabled = false; btn.textContent = 'Run production checks';
+    }
+  });
+
+  // ── Tabs: Unit & integration | End-to-end ──
+  var e2eLoaded = false;
+  function selectTab(which) {
+    var e2e = which === 'e2e';
+    $('tabUnit').setAttribute('aria-selected', String(!e2e));
+    $('tabE2e').setAttribute('aria-selected', String(e2e));
+    $('tabUnit').tabIndex = e2e ? -1 : 0;
+    $('tabE2e').tabIndex = e2e ? 0 : -1;
+    $('panelUnit').hidden = e2e;
+    $('panelE2e').hidden = !e2e;
+    if (e2e && !e2eLoaded) { e2eLoaded = true; loadE2e(); }
+  }
+  $('tabUnit').addEventListener('click', function () { selectTab('unit'); });
+  $('tabE2e').addEventListener('click', function () { selectTab('e2e'); });
+  [$('tabUnit'), $('tabE2e')].forEach(function (tab) {
+    tab.addEventListener('keydown', function (e) {
+      if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+      e.preventDefault();
+      var next = tab.id === 'tabUnit' ? 'e2e' : 'unit';
+      selectTab(next);
+      $(next === 'e2e' ? 'tabE2e' : 'tabUnit').focus();
+    });
+  });
+
+  // ── End-to-end: latest run (journeys, accessibility, visual) ──
+  function e2eStatusBadge(s) {
+    var cls = s === 'passed' ? 'badge-success' : s === 'flaky' ? 'badge-warning' : s === 'skipped' ? 'badge-muted' : 'badge-danger';
+    return '<span class="badge ' + cls + '">' + esc(s || 'unknown') + '</span>';
+  }
+
+  function renderE2e(run) {
+    if (!run) {
+      $('e2eBadge').innerHTML = '';
+      $('e2eBody').innerHTML = '<p class="q-muted">No end-to-end runs recorded yet. The E2E workflow posts each run here once QA_INGEST_TOKEN is configured.</p>';
+      return;
+    }
+    var d = run.details || {};
+    var journeys = Array.isArray(d.journeys) ? d.journeys : [];
+    var pages = Array.isArray(d.pages) ? d.pages : [];
+    var flaky = (d.counts && d.counts.flaky) || 0;
+    $('e2eBadge').innerHTML = statusBadge(run.status);
+    var html =
+      '<div class="q-counts">' +
+        '<div class="q-count"><b>' + run.total + '</b><span>tests</span></div>' +
+        '<div class="q-count"><b>' + run.passed + '</b><span>passed</span></div>' +
+        '<div class="q-count"><b>' + run.failed + '</b><span>failed</span></div>' +
+        '<div class="q-count"><b>' + flaky + '</b><span>flaky</span></div>' +
+      '</div>' +
+      '<p class="q-muted">' + esc(fmtWhen(run.createdAt)) + ' · ' + esc(run.ref || '—') + ' · ' + esc((run.commitSha || '').slice(0, 7) || '—') +
+      ' · ' + esc(fmtDuration(run.durationMs)) +
+      (run.runUrl ? ' · ' + safeLink(run.runUrl, 'open run') + ' · ' + safeLink(run.runUrl + '#artifacts', 'report and traces') : '') + '</p>';
+
+    if (journeys.length) {
+      html += '<h3>Journeys</h3><div class="table-wrap"><table class="q-table"><thead><tr><th>Journey</th><th>Project</th><th>Status</th><th>Duration</th></tr></thead><tbody>' +
+        journeys.map(function (j) {
+          return '<tr><td style="white-space:normal">' + esc(j.title) + '</td><td>' + esc(j.project) + '</td><td>' + e2eStatusBadge(j.status) + '</td><td>' + esc(fmtDuration(j.durationMs)) + '</td></tr>';
+        }).join('') + '</tbody></table></div>';
+    }
+    if (pages.length) {
+      var noBaseline = pages.filter(function (p) { return p.visual === 'no-baseline'; }).length;
+      var diffs = pages.filter(function (p) { return p.visual === 'diff'; });
+      html += '<h3>Accessibility (axe) and visual checks</h3>' +
+        (noBaseline ? '<p class="q-muted">' + noBaseline + ' page view(s) have no visual baseline yet (baselines are generated in CI on Linux).</p>' : '') +
+        (diffs.length ? '<div class="q-warn" role="status">Visual differences: ' + esc(diffs.map(function (p) { return p.page + ' (' + p.project + ')'; }).join(', ')) + '</div>' : '') +
+        '<div class="table-wrap"><table class="q-table"><thead><tr><th>Page</th><th>Project</th><th>Critical</th><th>Serious</th><th>Moderate</th><th>Minor</th><th>Visual</th></tr></thead><tbody>' +
+        pages.map(function (p) {
+          var a = p.axe || {};
+          return '<tr><td>' + esc(p.page) + '</td><td>' + esc(p.project) + '</td><td>' + esc(a.critical == null ? '—' : a.critical) + '</td><td>' + esc(a.serious == null ? '—' : a.serious) +
+            '</td><td>' + esc(a.moderate == null ? '—' : a.moderate) + '</td><td>' + esc(a.minor == null ? '—' : a.minor) + '</td><td>' + esc(p.visual || '—') + '</td></tr>';
+        }).join('') + '</tbody></table></div>';
+    }
+    if (Array.isArray(d.failures) && d.failures.length) {
+      html += '<h3>Failures (' + d.failures.length + ')</h3>' + d.failures.map(function (f) {
+        return '<div class="q-fail"><b>' + esc(f.test) + '</b><div class="q-muted">' + esc(f.file) + ' · ' + esc(f.status) + '</div>' + esc(f.detail || '') + '</div>';
+      }).join('');
+    }
+    $('e2eBody').innerHTML = html;
+  }
+
+  async function loadE2e() {
+    $('e2eBody').innerHTML = '<div class="skeleton skeleton-card"></div>';
+    var list = await App.saFetchJson('/superadmin/qa/runs?source=e2e&limit=1');
+    if (!list) { $('e2eBody').innerHTML = '<p class="q-muted">Could not load end-to-end runs.</p>'; return; }
+    if (!list.runs.length) { renderE2e(null); return; }
+    var run = await App.saFetchJson('/superadmin/qa/runs/' + encodeURIComponent(list.runs[0].id));
+    renderE2e(run || list.runs[0]);
+  }
+
+  // ── "Run full test suite now" (offered only when the server has a dispatch token) ──
+  function showDispatch(enabled) {
+    $('dispatchBtn').hidden = !enabled;
+    if (!enabled) $('dispatchNote').textContent = 'Starting the suite from here is off: the server has no GitHub dispatch token configured.';
+  }
+
+  $('dispatchBtn').addEventListener('click', async function () {
+    var btn = this, msg = $('dispatchMsg');
+    btn.disabled = true; btn.textContent = 'Starting…';
+    msg.innerHTML = '';
+    try {
+      var res = await App.saFetch('/superadmin/qa/dispatch', { method: 'POST' });
+      if (!res) return;
+      if (res.status === 429) { msg.textContent = 'The suite was started moments ago — try again in 10 minutes.'; return; }
+      if (res.status === 404) { showDispatch(false); return; }
+      var body = null;
+      try { body = await res.json(); } catch (e) { /* handled below */ }
+      if (!body || !body.message) { msg.textContent = 'The suite could not be started.'; return; }
+      if (body.state === 'started') {
+        msg.innerHTML = 'Started.' + (body.url ? ' ' + safeLink(body.url, 'Follow the run') : ' It appears under Live CI shortly.');
+      } else {
+        msg.textContent = 'Not started: ' + body.message + '.';
+      }
+    } catch (e) {
+      msg.textContent = 'The suite could not be started.';
+    } finally {
+      btn.disabled = false; btn.textContent = 'Run full test suite now';
     }
   });
 
