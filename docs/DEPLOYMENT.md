@@ -31,6 +31,13 @@ page. It uses the `QA_INGEST_URL` and `QA_INGEST_TOKEN` secrets, never fails the
 when either secret is empty, and prints only the HTTP status. This repository is public, so
 its logs are too.
 
+**What a deploy prints.** If the API never becomes healthy, the deploy job prints the last
+150 API log lines (credential-free, see `docs/MONITORING.md`) and fails. It then always
+prints `docker compose ps caddy` (Caddy's container status). It does **not** print Caddy's
+logs: Caddy's error log records request URIs, and the public run log is the wrong place for
+them, even redacted. To read them, SSH into the host and run
+`docker compose logs --tail 50 caddy`. The staging job prints nothing from Caddy. (C11)
+
 **Secrets that reach the server only through the deploy job:** besides the long-standing
 ones, the deploy job passes `GIT_SHA` (`github.sha`), `IP_HASH_PEPPER`, `QA_INGEST_TOKEN` and
 `GH_ACTIONS_DISPATCH_TOKEN` through the SSH step's `env`/`envs:` and the `.env` it writes.

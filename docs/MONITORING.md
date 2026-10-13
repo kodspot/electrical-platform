@@ -108,9 +108,23 @@ line, alert or `error.log` entry ever contains a raw URL. `apps/api/src/lib/log-
 
 Every logger `buildApp()` creates gets this, including a caller-supplied logger options
 object. pino `redact` is deliberately not used: it matches key paths, while the leak here is
-inside a string value. The reverse proxy (`infrastructure/Caddyfile`) has no `log` directive,
-so Caddy writes no access log. Regression tests: `apps/api/test/log-redaction.test.js` and
-`apps/api/test/integration/log-redaction.test.js`.
+inside a string value. Regression tests: `apps/api/test/log-redaction.test.js` and
+`apps/api/test/integration/log-redaction.test.js`. The super-admin org-switch audit row
+(`AuditLog.newValue.url`) also stores the path without its query (C10).
+
+**Reverse proxy (Caddy).** `infrastructure/Caddyfile` has no `log` directive, so Caddy writes
+no access log. Caddy's *error* log is a different matter. `http.log.error`, written for
+example on a 502 while the API restarts, includes `request.uri` with its query string. A
+throwaway `caddy:2-alpine` canary test showed the token in that line (count 1 per failed
+request).
+- **The filter (C11):** a global `log default { format filter { … } }` block now rewrites
+  `request>uri` before the line is written. Every query value and the `/review/` path token
+  become `REDACTED`, matched case-insensitively and in percent-encoded form too. Only the
+  log line changes: the API still receives the full URI.
+- **Canary result:** count 4 → 0 across `?token=`, `?ToKeN=`, `?%74oken=` and
+  `/review/<token>`, and the proxied request still returned the upstream's 200.
+- **Deploy log:** the production deploy job prints only `docker compose ps caddy`, never
+  Caddy's logs. Read those on the host.
 
 ## Super-admin Quality page (`/superadmin-quality`)
 

@@ -24,6 +24,58 @@ see `docs/DEPLOYMENT.md` for how a change reaches production.
 
 ### 2026-10-13
 
+- **User-visible (Release Notes):** Password and PIN reset links from email now open a
+  working reset page.
+- **`[F12]` Reset pages (BUG-0007).** The reset emails link to `/reset-password?token=…` and
+  `/worker-reset-pin?token=…`, but neither page existed. Both URLs fell through to the
+  `/:orgSlug` route and answered "Organization not found".
+  - **Fix:** new `public/reset-password.html` and `public/worker-reset-pin.html`, with their
+    scripts in `public/js/`, routes in `src/routes/pages.js`, and both names added to
+    `NON_ORG_PREFIXES`. These are top-level paths, not `/{orgSlug}/{module}/{page}` (Charter
+    §10). That is deliberate: links already sent in emails fix the URLs, and the pages serve
+    users who have no org context yet, like `/superadmin-login`.
+  - **Token handling:** each page reads `?token=` once, then removes it from the address bar
+    with `history.replaceState`. `<meta name="referrer" content="no-referrer">` keeps it out
+    of `Referer` headers.
+  - **What the pages do:** they POST to the existing `/api/auth/reset-password` and
+    `/api/auth/worker-reset-pin`. On success they link to the right login page. An expired
+    or already-used link gets a clear message.
+- **PIN modal says 6 digits.** `admin-workers.html` used to ask for "4-6 digits" while the
+  API requires exactly 6. The label, `pattern`, `minlength`/`maxlength` and the client-side
+  check now all say 6.
+- **Super-admin audit URL without its query.** The `sa_org_context_*` audit row
+  (`middleware/auth.js`) now stores `stripQuery(request.url)`, so a `?token=` never lands in
+  `AuditLog.newValue`.
+- **Tests:** `test/integration/reset-pages.test.js` covers both pages, the logs, the audit
+  row and the PIN markup. It failed on the old code (5 failures) and passes now.
+- **`[C11]` Tokens out of Caddy's log and the public deploy log.**
+  - **Deploy log:** `deploy.yml` no longer prints `docker compose logs caddy` (only
+    `docker compose ps caddy`). The API log dump on a failed health check stays.
+    `deploy-staging.yml` never printed Caddy's logs.
+  - **Caddy log filter:** `infrastructure/Caddyfile` gains a global log filter. Caddy's error
+    log (e.g. a 502 during an API restart) recorded the full request URI, `?token=`
+    included. Every query value and the `/review/` token are now logged as `REDACTED`, and
+    proxying is unchanged.
+  - **Verification:** a throwaway `caddy:2-alpine` canary test: count 4 → 0, upstream still
+    200, and `caddy validate` passes on the full file.
+
+- **User-visible (Release Notes):** Electricians can pick up tickets again; acknowledging
+  alerts, generating AI insights, duplicating templates and running production checks work
+  again.
+- **`[F14]` Body-less JSON requests accepted (BUG-0006).** `public/js/app.js` always sends
+  `Content-Type: application/json`, and Fastify rejected an empty JSON body with
+  `400 FST_ERR_CTP_EMPTY_JSON_BODY` before auth. That broke every body-less POST/PATCH from
+  the browser: electrician Pick Up, alert acknowledge (and acknowledge-all), AI insight
+  generate, template duplicate, notification mark-read and read-all, supervisor accept and
+  pickup, and the production-checks button.
+  - **Fix (server-side, one place):** `src/plugins/content.js` replaces the JSON parser. An
+    empty or whitespace-only body is read as `{}`; everything else goes to Fastify's own
+    parser, with prototype- and constructor-poisoning protection set to `error` and the body
+    limits unchanged. This also covers browsers holding a cached `app.js`.
+  - **Tests:** `test/integration/empty-json-body.test.js` replays all 12 call sites
+    browser-style. It failed on the old code (24/24 rejected) and passes now. It also checks
+    that malformed JSON and poisoning payloads are still rejected.
+
 - **`[E2E-1]` Browser end-to-end package (`e2e/`).** It is a separate package with its own
   lockfile and Node ≥ 22; the app stays on Node 20 and its dependencies and lockfile are
   unchanged (ADR 0006).
@@ -39,6 +91,7 @@ see `docs/DEPLOYMENT.md` for how a change reaches production.
   - **Root scripts:** `npm run e2e` (a disposable `postgres:15-alpine` container
     `e2e-pg-<pid>` on 127.0.0.1:55433, removed at the end), `e2e:ui` and `e2e:codegen`.
     Includes an environment smoke spec.
+
 - **User-visible (Release Notes):**
   - **Every electrician now needs an Employee ID.** It is required when adding an
     electrician (admin and super-admin screens), and it can't be blanked out later,

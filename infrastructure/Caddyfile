@@ -7,6 +7,24 @@
 # This VM only handles electrical.kodspot.in.
 # ═══════════════════════════════════════════════════════════
 
+# Keep credentials out of Caddy's own log. There is no access log here, but Caddy's error
+# log (http.log.error, e.g. on a 502 while the API restarts) records the request URI, and
+# a URI can carry a credential (?token= on SSE / images / reset links, /review/<token>).
+# Every query value and the /review/ token are logged as REDACTED. Proxying is unchanged:
+# the API still receives the full URI. Verified with a canary in a throwaway
+# caddy:2-alpine (count 4 → 0, upstream 200). See docs/MONITORING.md. [C11]
+{
+    log default {
+        output stderr
+        format filter {
+            wrap json
+            fields {
+                request>uri regexp "(?i)(/review/|[?&][^=&]*=)[^&#]*" "${1}REDACTED"
+            }
+        }
+    }
+}
+
 # Primary electrical subdomain — automatic HTTPS via Let's Encrypt
 electrical.{$DOMAIN:kodspot.in} {
     reverse_proxy api:3000 {
