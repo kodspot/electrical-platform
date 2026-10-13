@@ -213,7 +213,7 @@
       <div class="wk-form-section active" id="tab-basic">
         <div class="form-row">
           <div class="form-group"><label class="form-label">Name *</label><input class="form-input" type="text" id="wName" required maxlength="100"></div>
-          <div class="form-group"><label class="form-label">Employee ID</label><input class="form-input" type="text" id="wEmpId" maxlength="50" placeholder="e.g. EMP-001"></div>
+          <div class="form-group"><label class="form-label" for="wEmpId">Employee ID *</label><input class="form-input" type="text" id="wEmpId" maxlength="50" placeholder="e.g. EMP-001" required title="Required — the electrician signs in with this Employee ID and their PIN"></div>
         </div>
         <div class="form-row">
           <div class="form-group"><label class="form-label">Phone</label><input class="form-input" type="tel" id="wPhone" maxlength="20"></div>
@@ -519,7 +519,7 @@ $('workerForm').addEventListener('submit', async function(e) {
     if (!res) { saveBtn.disabled = false; saveBtn.textContent = 'Save'; return; }
     if (!res.ok) {
       var d = await res.json();
-      App.showError('modalError', d.error || 'Failed');
+      App.showError('modalError', d.error || 'Failed', d.details);
       saveBtn.disabled = false; saveBtn.textContent = 'Save';
       return;
     }

@@ -36,7 +36,12 @@ pattern of baking behavior into a shared primitive.
 
 Underneath, the audience helpers (`createNotification`, `notifyAdmins`, `notifySupervisors`,
 `notifySupervisorIds`, `notifyWorkers`) each **persist** rows (batched via `createMany` for
-multi-recipient sends — Charter §7) and then **push** them live.
+multi-recipient sends — Charter §7) and then **push** them live. `notifySupervisors` takes an
+optional `{ excludeUserIds }` so a broadcast can skip recipients a caller already notified
+more specifically. A public complaint uses it so an assigned supervisor gets one
+notification, not two (WP-H F3). Failed notification steps on ticket creation are logged at
+`warn` (`notification step failed`, with `ticketId` and `step`), never swallowed silently
+(WP-H F4).
 
 ## 2. Persistence — nothing is lost offline
 

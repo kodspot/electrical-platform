@@ -35,7 +35,11 @@ owned rows.
 **Locations & assignment** — `Location` (self-referential hierarchy via `parentId`, 32
 `LocationType`s), `WorkerAssignment`, `SupervisorAssignment`. Coverage can be inherited
 down the hierarchy (`coverChildren`), resolved by `services/assignment-resolver.js` with
-recursive CTEs (Charter §7).
+recursive CTEs (Charter §7). Matches are returned in a stable order, and callers take the
+first as the auto-assignee: direct assignment, then nearest ancestor, then `isPrimary`
+(workers only), then oldest assignment (WP-H F2). The API requires `Worker.employeeId` on
+creation and refuses to clear it, because worker login uses it (WP-H F8). The column stays
+nullable, so existing rows are untouched.
 
 **Tickets** — `Ticket` is the central workflow entity (see the lifecycle below). Sources:
 internal or public (guest) complaint. `ComplaintCategory` defines per-org, optionally

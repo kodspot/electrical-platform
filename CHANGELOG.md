@@ -24,6 +24,31 @@ see `docs/DEPLOYMENT.md` for how a change reaches production.
 
 ### 2026-10-13
 
+- **User-visible (Release Notes):**
+  - **Every electrician now needs an Employee ID.** It is required when adding an
+    electrician (admin and super-admin screens), and it can't be blanked out later,
+    because it's what electricians sign in with alongside their PIN. Electricians added
+    earlier without one are unchanged, but an Employee ID must be entered the next time
+    one of them is edited.
+  - **Supervisors get one notification per public complaint.** A supervisor responsible
+    for the location no longer receives two.
+  - **Tickets go to the nearest responsible supervisor.** When several supervisors cover
+    a location, a new complaint or ticket is now consistently assigned to the one closest
+    to it.
+- **`[WP-H]` Approved fixes F2, F3, F4 and F8.**
+  - **F2:** stable assignment order in `services/assignment-resolver.js` (direct, then
+    nearest ancestor, then `isPrimary` for workers, then `createdAt`, then `id`).
+  - **F3:** `notifySupervisors()` gains an optional `{ excludeUserIds }` argument,
+    backward compatible; the public-complaint broadcast skips the supervisors who were
+    already notified directly.
+  - **F4:** failed notification steps on ticket creation (`public.js`, `tickets.js`) log
+    one `warn` line `{ ticketId, step, err }`; they stay fire-and-forget.
+  - **F8:** `employeeId` is required on worker create and can't be cleared via PATCH, on
+    both the admin and super-admin routes. This is an API contract change (Charter §9):
+    those requests now return 400.
+  - **Tests and docs:** `test/integration/approved-fixes.test.js`,
+    `test/integration/notification-step-warn.test.js`; bug registry BUG-0004 (F3) and
+    BUG-0005 (F8); `COVERAGE_MATRIX.md` updated.
 - **`[WP-A]` Credentials kept out of logs and alerts.** The app carries credentials in URLs
   (`?token=` on the SSE streams and `/images/`, `/review/:token`, reset links). Logs and
   alerts now describe a request by its route template, falling back to the path without its

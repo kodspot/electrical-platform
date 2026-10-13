@@ -349,9 +349,18 @@ async function publicRoutes(fastify, opts) {
     // should have been auto-assigned to a warden but wasn't (because a
     // second write failed) is a real workflow-integrity gap. [WP9]
     let supervisorIds = [];
+    let supervisorLookupError = null;
     try {
       supervisorIds = await getAssignedSupervisorIds(data.locationId, location.orgId);
-    } catch (_) { /* non-fatal */ }
+    } catch (err) { supervisorLookupError = err; }
+
+    // Every notification step below stays fire-and-forget (a failed ring must never fail the
+    // complaint), but is no longer silent: one warn line per failed step, with no URL, token
+    // or email in it. [WP-H F4]
+    const warnStep = (ticketId, step) => (err) => request.log.warn(
+      { ticketId, step, err: String((err && err.message) || err).slice(0, 200) },
+      'notification step failed'
+    );
 
     const ticket = await prisma.ticket.create({
       data: {
@@ -381,11 +390,12 @@ async function publicRoutes(fastify, opts) {
         location: { select: { name: true } }
       }
     });
+    if (supervisorLookupError) warnStep(ticket.id, 'resolve_supervisors')(supervisorLookupError);
 
     // Build a rich notification body with location breadcrumb so the
     // electrician knows exactly where to go without opening the app.
     let locationCrumb = location.name;
-    try { locationCrumb = await getLocationBreadcrumb(data.locationId) || location.name; } catch (_) { /* non-fatal */ }
+    try { locationCrumb = await getLocationBreadcrumb(data.locationId) || location.name; } catch (err) { warnStep(ticket.id, 'location_breadcrumb')(err); }
     const notifBody = `${ticket.title} — ${locationCrumb}`;
 
     // Notify each assigned supervisor directly (all of them, not just the
@@ -399,7 +409,7 @@ async function publicRoutes(fastify, opts) {
         body: notifBody,
         entityId: ticket.id,
         isUrgent: true
-      }).catch(() => {});
+      }).catch(warnStep(ticket.id, 'notify_assigned_supervisor'));
     }
 
     // Ring the electricians covering this location immediately so they can
@@ -416,7 +426,7 @@ async function publicRoutes(fastify, opts) {
           isUrgent: true
         });
       }
-    } catch (_) { /* non-fatal */ }
+    } catch (err) { warnStep(ticket.id, 'notify_workers')(err); }
 
     // Audit log
     await prisma.auditLog.create({
@@ -449,16 +459,18 @@ async function publicRoutes(fastify, opts) {
        ${data.description ? `<p><span class="label">Details:</span> <span class="val">${escHtml(data.description)}</span></p>` : ''}
        <p style="margin-top:16px;color:#888;font-size:12px">Please log in to the dashboard to review and assign this ticket.</p>`
       }
-    }).catch(() => {});
+    }).catch(warnStep(ticket.id, 'notify_admins'));
 
-    // Notify supervisors about new public complaint (no paired email)
+    // Notify the org's other supervisors (no paired email). Supervisors assigned to this
+    // location already received the direct "assigned" notification above, so they are
+    // excluded here — one notification each, not two. [WP-H F3]
     notifySupervisors(location.orgId, {
       type: 'public_complaint',
       title: 'New public complaint',
       body: notifBody,
       entityId: ticket.id,
       isUrgent: true
-    }).catch(() => {});
+    }, { excludeUserIds: supervisorIds }).catch(warnStep(ticket.id, 'notify_supervisors'));
 
     return {
       success: true,

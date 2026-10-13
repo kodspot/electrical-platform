@@ -788,7 +788,8 @@ async function superadminRoutes(fastify, opts) {
     }
 
     const schema = z.object({
-      employeeId: z.string().max(50).optional(),
+      // Required: worker-login identifies a worker by employeeId. [WP-H F8]
+      employeeId: z.string().trim().min(1, 'Employee ID is required').max(50),
       name: z.string().min(1).max(100).trim(),
       phone: z.string().max(20).optional(),
       email: z.string().email().max(200).optional(),
@@ -857,7 +858,8 @@ async function superadminRoutes(fastify, opts) {
     if (!worker) return reply.code(404).send({ error: 'Worker not found' });
 
     const schema = z.object({
-      employeeId: z.string().max(50).optional(),
+      // May be changed, never cleared — it is the worker's login identifier. [WP-H F8]
+      employeeId: z.string().trim().min(1, 'Employee ID cannot be empty').max(50).optional(),
       name: z.string().min(1).max(100).trim().optional(),
       phone: z.string().max(20).optional(),
       email: z.string().email().max(200).optional().or(z.literal('')),

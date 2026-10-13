@@ -152,10 +152,17 @@ async function ticketRoutes(fastify, opts) {
     // should have been auto-assigned but wasn't (because a second write
     // failed) is a real workflow-integrity gap, not just a cosmetic one. [WP9]
     let firstSup = null;
+    let supervisorLookupError = null;
     try {
       const supervisorIds = await getAssignedSupervisorIds(data.locationId, orgId);
       if (supervisorIds.length > 0) firstSup = supervisorIds[0];
-    } catch (_) { /* non-fatal */ }
+    } catch (err) { supervisorLookupError = err; }
+
+    // Fire-and-forget, but never silent: one warn line per failed step, no URL/token/email. [WP-H F4]
+    const warnStep = (ticketId, step) => (err) => request.log.warn(
+      { ticketId, step, err: String((err && err.message) || err).slice(0, 200) },
+      'notification step failed'
+    );
 
     const ticket = await prisma.ticket.create({
       data: {
@@ -172,6 +179,7 @@ async function ticketRoutes(fastify, opts) {
       },
       include: TICKET_INCLUDE
     });
+    if (supervisorLookupError) warnStep(ticket.id, 'resolve_supervisors')(supervisorLookupError);
 
     if (firstSup) {
       createNotification({
@@ -181,7 +189,7 @@ async function ticketRoutes(fastify, opts) {
         title: 'New ticket assigned to you',
         body: ticket.title + (location ? ' — ' + location.name : ''),
         entityId: ticket.id
-      }).catch(() => {});
+      }).catch(warnStep(ticket.id, 'notify_assigned_supervisor'));
     }
 
     // Fire-and-forget: alert evaluation for high-priority tickets

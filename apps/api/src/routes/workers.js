@@ -91,7 +91,9 @@ async function workerRoutes(fastify, opts) {
     preHandler: [requirePolicy('ORG_ADMIN')]
   }, async (request, reply) => {
     const schema = z.object({
-      employeeId: z.string().max(50).optional(),
+      // Required: worker-login identifies a worker by employeeId, so a worker created
+      // without one could never sign in. [WP-H F8]
+      employeeId: z.string().trim().min(1, 'Employee ID is required').max(50),
       name: z.string().min(1).max(100).trim(),
       phone: z.string().max(20).optional(),
       email: z.string().email().max(200).optional().or(z.literal('')),
@@ -159,7 +161,8 @@ async function workerRoutes(fastify, opts) {
   }, async (request, reply) => {
     const { id } = request.params;
     const schema = z.object({
-      employeeId: z.string().max(50).optional().nullable().or(z.literal('')),
+      // May be changed, never cleared — it is the worker's login identifier. [WP-H F8]
+      employeeId: z.string().trim().min(1, 'Employee ID cannot be empty').max(50).optional(),
       name: z.string().min(1).max(100).trim().optional(),
       phone: z.string().max(20).optional().nullable().or(z.literal('')),
       email: z.string().email().max(200).optional().nullable().or(z.literal('')),
@@ -195,7 +198,7 @@ async function workerRoutes(fastify, opts) {
     }
 
     // Normalize empty strings to null for clearable fields
-    const clearableFields = ['employeeId', 'phone', 'email', 'address', 'department', 'designation', 'bloodGroup', 'aadharNo', 'notes', 'gender'];
+    const clearableFields = ['phone', 'email', 'address', 'department', 'designation', 'bloodGroup', 'aadharNo', 'notes', 'gender'];
     for (const f of clearableFields) {
       if (data[f] === '') data[f] = null;
     }
