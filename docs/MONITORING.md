@@ -47,7 +47,9 @@ exact log lines. When someone reports a problem, ask for the `x-request-id` (or 
 ## Slow-request logging
 
 Requests slower than a threshold (default 2000ms, `SLOW_REQUEST_MS`) are logged at `warn`
-with the request id, method, path, status, and duration (`apps/api/src/plugins/observability.js`).
+with the request id, the route (`route`: method + route template, e.g. `GET /review/:token`),
+status, and duration (`apps/api/src/plugins/observability.js`). The raw URL is never logged —
+see [Credentials never reach logs](#credentials-never-reach-logs).
 This surfaces production latency problems **without** enabling per-request logging (which
 stays off at scale). Long-lived SSE streams are excluded so they aren't mistaken for slow
 requests.
@@ -87,6 +89,74 @@ blocks a response**. It only fires if configured:
   visible in the logs immediately, without hitting an endpoint.
 - Retrieve with `docker compose logs api` (the deploy script already dumps the last 150
   lines on a failed health check).
+
+### Credentials never reach logs
+
+This app carries credentials in URLs in several places: `?token=` on the SSE streams and the
+`/images/` proxy (an `<img>` or `EventSource` cannot send an `Authorization` header), the
+token as a path segment on `/review/:token`, and `?token=` on emailed reset links. So no log
+line, alert or `error.log` entry ever contains a raw URL. `apps/api/src/lib/log-redaction.js`
+(WP-A) enforces this in one place:
+
+| Sink | Protection |
+|---|---|
+| Fastify request lines (`incoming request` / `request completed`) | `req` serializer logs the route template, falling back to the path with its query removed |
+| Slow-request `warn` line | logs `route` (template), not the URL |
+| `request.log.error` / any `*.log.*` call | `err` serializer scrubs message and stack; a `logMethod` hook scrubs every string argument, including the message pino derives from an Error |
+| Telegram / webhook alert | route from the template; message, text and body scrubbed of JWT-shaped strings, `Bearer` values and `token=` values |
+| `error.log` | stack scrubbed the same way |
+
+Every logger `buildApp()` creates gets this, including a caller-supplied logger options
+object. pino `redact` is deliberately not used: it matches key paths, while the leak here is
+inside a string value. Regression tests: `apps/api/test/log-redaction.test.js` and
+`apps/api/test/integration/log-redaction.test.js`. The super-admin org-switch audit row
+(`AuditLog.newValue.url`) also stores the path without its query (C10).
+
+**Reverse proxy (Caddy).** `infrastructure/Caddyfile` has no `log` directive, so Caddy writes
+no access log. Caddy's *error* log is a different matter. `http.log.error`, written for
+example on a 502 while the API restarts, includes `request.uri` with its query string. A
+throwaway `caddy:2-alpine` canary test showed the token in that line (count 1 per failed
+request).
+- **The filter (C11):** a global `log default { format filter { … } }` block now rewrites
+  `request>uri` before the line is written. Every query value and the `/review/` path token
+  become `REDACTED`, matched case-insensitively and in percent-encoded form too. Only the
+  log line changes: the API still receives the full URI.
+- **Canary result:** count 4 → 0 across `?token=`, `?ToKeN=`, `?%74oken=` and
+  `/review/<token>`, and the proxied request still returned the upstream's 200.
+- **Deploy log:** the production deploy job prints only `docker compose ps caddy`, never
+  Caddy's logs. Read those on the host.
+
+## Super-admin Quality page (`/superadmin-quality`)
+
+A SUPER_ADMIN-only page (linked from the super-admin dashboard) that gathers the platform's
+quality signals in one place (WP-Q, [ADR 0005](adr/0005-qa-telemetry-in-production.md)):
+
+- **Latest test run, trend and history.** CI posts each run's scrubbed summary to
+  `POST /api/qa/runs`, authenticated with `QA_INGEST_TOKEN`, which answers 404 when unset.
+  Runs are stored in the platform-level `QaRun` table, which keeps the newest 500. The page
+  shows:
+  - the latest run, with a **NOT EXECUTED** warning whenever tests were skipped or cancelled
+  - a trend of the last 30 runs
+  - a runs table that drills into tiers, files and failures
+- **Live CI.** The latest GitHub Actions runs (`GET /api/superadmin/qa/ci-status`), cached
+  60 s server-side. The page polls every 15 s while a run is queued or in progress, otherwise
+  every 60 s, and pauses while the tab is hidden. It reads with `GH_ACTIONS_DISPATCH_TOKEN`
+  when set, otherwise unauthenticated (the repository is public).
+- **Run production checks.** Read-only checks, streamed live as NDJSON
+  (`POST /api/superadmin/qa/checks`). Each check is capped at 5 s, runs are limited to one
+  per 30 s, and every run is audited as `sa_production_checks_run` (statuses only).
+
+  | Check | PASS / WARN / FAIL |
+  |---|---|
+  | database | reachable and every shipped migration applied / extra unknown migrations / a shipped migration not applied |
+  | offsite-backups | newest `db-backups/` object ≤ 26 h old / ≤ 48 h / older, none, or an R2 error (by error name only); SKIPPED on the local storage driver |
+  | email | SMTP `verify()` succeeds, without sending / not configured / verify fails (error code only) |
+  | config: … | alerting, IP hash pepper, QA ingest token, dispatch token: configured or not (booleans only) |
+  | build | commit (`GIT_SHA`), Node version, uptime; WARN without `GIT_SHA` |
+  | live connections (SSE) | open SSE connection counts |
+  | github dispatch token | valid, with days to expiry / expires in under 14 days / expired or 401; "expiry unknown" when GitHub sends no expiry header; SKIPPED when unset |
+
+  Details never contain a host, bucket name, URL or secret.
 
 ## What is *not* monitored (known gaps)
 

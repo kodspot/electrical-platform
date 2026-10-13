@@ -1003,3 +1003,31 @@ model ElectricalImage {
 
   @@index([inspectionId])
 }
+
+/// Platform-level QA telemetry: one row per test run (CI, local or e2e), shown on the
+/// super-admin Quality page. Deliberately NOT tenant-scoped — it describes the platform's
+/// code, not any organization's data, and is readable only by SUPER_ADMIN. Written only by
+/// the token-authenticated ingest (POST /api/qa/runs), which keeps the newest 500 rows.
+/// [WP-Q, ADR 0005]
+model QaRun {
+  id          String   @id @default(uuid())
+  createdAt   DateTime @default(now())
+  source      String // 'ci' | 'local' | 'e2e'
+  commitSha   String?
+  ref         String?
+  event       String?
+  runUrl      String?
+  nodeVersion String?
+  status      String
+  total       Int      @default(0)
+  passed      Int      @default(0)
+  failed      Int      @default(0)
+  cancelled   Int      @default(0)
+  skipped     Int      @default(0)
+  todo        Int      @default(0)
+  durationMs  Int?
+  details     Json?
+
+  @@index([createdAt])
+  @@index([source, createdAt])
+}

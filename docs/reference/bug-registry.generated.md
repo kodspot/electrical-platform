@@ -19,8 +19,12 @@ Commands: `npm run bug:list` · `npm run bug:run -- <ID>` · `npm run bug:valida
 | BUG-0001 | HIGH | FIXED | ele | Admin could set a ticket to RESOLVED_PENDING_VERIFY directly | `test/integration/bug-regressions.test.js` |
 | BUG-0002 | MEDIUM | FIXED | ele | Permanent-deleting a worker silently dropped their inspection history | `test/integration/bug-regressions.test.js` |
 | BUG-0003 | HIGH | FIXED | complaints | Public-complaint spam risk score was computed but never enforced | `test/integration/bug-regressions.test.js` |
+| BUG-0004 | MEDIUM | FIXED | complaints | A supervisor assigned to a location got two notifications per public complaint | `test/integration/bug-regressions.test.js` |
+| BUG-0005 | HIGH | FIXED | ele | A worker could be created without an employeeId and then never log in | `test/integration/bug-regressions.test.js` |
+| BUG-0006 | CRITICAL | FIXED | ele | Body-less POST/PATCH from the browser was rejected (electricians could not pick up tickets) | `test/integration/bug-regressions.test.js` |
+| BUG-0007 | HIGH | FIXED | ele | Password and PIN reset links from email opened no page ("Organization not found") | `test/integration/bug-regressions.test.js` |
 
-Count: 3 bug scenario(s).
+Count: 7 bug scenario(s).
 
 ## BUG-0001 — Admin could set a ticket to RESOLVED_PENDING_VERIFY directly
 
@@ -76,4 +80,75 @@ Count: 3 bug scenario(s).
 2. Submit 3 public complaints from the same IP for the same location (all 200).
 3. Submit a 4th from the same IP+location.
 4. Broken: 200. Fixed: 429 (rejected).
+
+## BUG-0004 — A supervisor assigned to a location got two notifications per public complaint
+
+- **Severity:** MEDIUM · **Status:** FIXED · **Module:** complaints · **Category:** notification
+- **Origin:** QA-1 characterisation finding F3 (docs/testing/COVERAGE_MATRIX.md), fixed in [WP-H]
+- **Introduced:** pre-audit · **Fixed:** 2026-10-13
+- **Description:** On a public complaint, the location's assigned supervisors received the direct "assigned" notification and also the org-wide supervisor broadcast for the same ticket.
+- **Root cause:** POST /public/complaint called createNotification for each assigned supervisor and then notifySupervisors, which notifies every active supervisor in the org — including the assigned ones.
+- **Expected behavior:** An assigned supervisor gets exactly one notification for the complaint (the direct one); every other supervisor in the org gets the broadcast once.
+- **Broken behavior:** The assigned supervisor got two notifications for the same ticket.
+- **Scenario dependencies:** —
+- **Regression test:** `test/integration/bug-regressions.test.js`
+
+**Reproduction steps:**
+
+1. Create an org with a location, a supervisor assigned to it, and an unassigned supervisor.
+2. Submit a public complaint for the location.
+3. Broken: the assigned supervisor has 2 notifications for the ticket. Fixed: exactly 1; the unassigned supervisor has 1.
+
+## BUG-0005 — A worker could be created without an employeeId and then never log in
+
+- **Severity:** HIGH · **Status:** FIXED · **Module:** ele · **Category:** worker-workflow
+- **Origin:** QA-1 characterisation finding F8 (docs/testing/COVERAGE_MATRIX.md), fixed in [WP-H]
+- **Introduced:** pre-audit · **Fixed:** 2026-10-13
+- **Description:** POST /api/workers accepted a worker with no employeeId, but worker-login identifies workers by employeeId + PIN — so that worker could never sign in. PATCH could also clear an existing employeeId.
+- **Root cause:** employeeId was optional in the create schemas (workers.js, superadmin.js) and clearable in the PATCH schemas, while POST /auth/worker-login requires it.
+- **Expected behavior:** Creating a worker without a non-empty employeeId is rejected with 400; a worker created with one can have a PIN set and log in.
+- **Broken behavior:** The worker was created (200) with employeeId null and could not log in.
+- **Scenario dependencies:** —
+- **Regression test:** `test/integration/bug-regressions.test.js`
+
+**Reproduction steps:**
+
+1. Create an org with an admin.
+2. As the admin, POST /api/workers with a name and no employeeId.
+3. Broken: 200 and a worker who can never log in. Fixed: 400.
+
+## BUG-0006 — Body-less POST/PATCH from the browser was rejected (electricians could not pick up tickets)
+
+- **Severity:** CRITICAL · **Status:** FIXED · **Module:** ele · **Category:** ticket-workflow
+- **Origin:** Batch 2 e2e journey J4 (finding F14), fixed in C9
+- **Introduced:** pre-audit · **Fixed:** 2026-10-13
+- **Description:** The browser helpers send Content-Type: application/json even with no body; the server rejected every such POST/PATCH with 400 FST_ERR_CTP_EMPTY_JSON_BODY before auth — breaking electrician Pick Up, alert acknowledge, AI insight generate, template duplicate, notification mark-read and the production-checks button.
+- **Root cause:** public/js/app.js apiFetch/saFetch/elecFetch always set Content-Type: application/json, and Fastify's default JSON parser rejects an empty body. API tests used inject() without a content type, so they never saw it.
+- **Expected behavior:** POST /api/worker/tickets/:id/pickup with Content-Type: application/json and an empty body succeeds (200) and moves the ticket to IN_PROGRESS.
+- **Broken behavior:** 400 FST_ERR_CTP_EMPTY_JSON_BODY; the ticket stayed OPEN.
+- **Scenario dependencies:** —
+- **Regression test:** `test/integration/bug-regressions.test.js`
+
+**Reproduction steps:**
+
+1. Create an org with a location, an electrician assigned to it, and an OPEN ticket there.
+2. As the electrician, POST /api/worker/tickets/:id/pickup with Content-Type: application/json and no body — exactly what the electrician app sends.
+3. Broken: 400 FST_ERR_CTP_EMPTY_JSON_BODY. Fixed: 200, status IN_PROGRESS.
+
+## BUG-0007 — Password and PIN reset links from email opened no page ("Organization not found")
+
+- **Severity:** HIGH · **Status:** FIXED · **Module:** ele · **Category:** account-recovery
+- **Origin:** Batch 1 characterisation (finding F12), fixed in C10
+- **Introduced:** 2026-07-21 · **Fixed:** 2026-10-13
+- **Description:** The reset emails link to /reset-password?token=… and /worker-reset-pin?token=…, but no such pages existed; both URLs fell through to the /:orgSlug page route, which answered "Organization not found". Users could not reset from the email.
+- **Root cause:** WP14 added the reset APIs and the emailed links (auth.js, worker-auth.js) but no pages for the links to open; pages.js had no route for either path, so /:orgSlug matched them.
+- **Expected behavior:** GET /reset-password?token=… and GET /worker-reset-pin?token=… serve the reset pages (200, HTML).
+- **Broken behavior:** 404 {"error":"Organization not found"} (via the /:orgSlug route).
+- **Scenario dependencies:** —
+- **Regression test:** `test/integration/bug-regressions.test.js`
+
+**Reproduction steps:**
+
+1. Request a password or PIN reset; open the emailed link.
+2. Broken: "Organization not found". Fixed: the reset page with a new-password / new-PIN form.
 

@@ -54,6 +54,12 @@ async function pageRoutes(fastify) {
   fastify.get('/', sendPage('index.html'));
   fastify.get('/superadmin-login', sendPage('superadmin-login.html'));
   fastify.get('/superadmin-dashboard', sendPage('superadmin-dashboard.html'));
+  fastify.get('/superadmin-quality', sendPage('superadmin-quality.html'));
+
+  // Reset pages opened from emailed links (/reset-password?token=…, /worker-reset-pin?token=…).
+  // Registered explicitly so they are never matched as an org slug by /:orgSlug. [F12]
+  fastify.get('/reset-password', sendPage('reset-password.html'));
+  fastify.get('/worker-reset-pin', sendPage('worker-reset-pin.html'));
   fastify.get('/privacy', sendPage('privacy.html'));
   fastify.get('/terms', sendPage('terms.html'));
 

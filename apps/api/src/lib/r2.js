@@ -172,4 +172,4 @@ async function deleteFromR2(imageUrl) {
   }
 }
 
-module.exports = { uploadToR2, getFromR2, deleteFromR2, setLogger };
+module.exports = { uploadToR2, getFromR2, deleteFromR2, setLogger, getR2Client, currentDriver };

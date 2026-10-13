@@ -67,10 +67,19 @@ async function notifyAdmins(orgId, { type, title, body, entityId, isUrgent }) {
 
 /**
  * Notify all active supervisors of an org.
+ *
+ * `excludeUserIds` (optional) skips supervisors a caller has already notified more
+ * specifically — e.g. a public complaint's assigned supervisors, who get their own
+ * "assigned" notification and must not get the broadcast as a second one. [WP-H F3]
  */
-async function notifySupervisors(orgId, { type, title, body, entityId, isUrgent }) {
+async function notifySupervisors(orgId, { type, title, body, entityId, isUrgent }, { excludeUserIds = [] } = {}) {
   const supervisors = await prisma.user.findMany({
-    where: { orgId, role: 'SUPERVISOR', isActive: true },
+    where: {
+      orgId,
+      role: 'SUPERVISOR',
+      isActive: true,
+      ...(excludeUserIds.length ? { id: { notIn: excludeUserIds } } : {})
+    },
     select: { id: true }
   });
 

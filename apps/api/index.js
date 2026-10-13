@@ -36,6 +36,8 @@ const assetFailureRoutes = require('./src/routes/asset-failures');
 const alertRoutes = require('./src/routes/alerts');
 const workerAuthRoutes = require('./src/routes/worker-auth');
 const predictionRoutes = require('./src/routes/predictions');
+const qaRoutes = require('./src/routes/qa');
+const superadminQaRoutes = require('./src/routes/superadmin-qa');
 const pageRoutes = require('./src/routes/pages');
 
 // Services
@@ -48,25 +50,34 @@ const { registerSAuditHook } = require('./src/middleware/auth');
 
 // Error handling & logging
 const { logError, registerErrorHandlers } = require('./src/errors');
+const { buildLoggerOptions } = require('./src/lib/log-redaction');
 
 /**
  * Construct a fresh Fastify instance (no plugins/routes registered yet, not listening).
  * Kept separate from registerApp() so tests can build+register without connecting to
  * the database or binding a port.
  */
+function resolveLoggerOptions(logger) {
+  // Every logger this app builds gets the redacting serializers (src/lib/log-redaction.js),
+  // including a caller-supplied options object; `false` (no logging) stays false. [WP-A]
+  if (logger === false) return false;
+  if (logger && typeof logger === 'object') return buildLoggerOptions(logger);
+  return buildLoggerOptions({
+    level: process.env.NODE_ENV === 'production' ? 'warn' : 'info',
+    transport: process.env.NODE_ENV !== 'production' ? {
+      target: 'pino-pretty',
+      options: { colorize: true }
+    } : undefined
+  });
+}
+
 function buildApp(opts = {}) {
   const fastify = require('fastify')({
     trustProxy: true,
     ignoreTrailingSlash: true,
     requestTimeout: 30000, // 30s max per request
     genReqId: () => `req-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-    logger: opts.logger !== undefined ? opts.logger : {
-      level: process.env.NODE_ENV === 'production' ? 'warn' : 'info',
-      transport: process.env.NODE_ENV !== 'production' ? {
-        target: 'pino-pretty',
-        options: { colorize: true }
-      } : undefined
-    }
+    logger: resolveLoggerOptions(opts.logger)
   });
 
   setR2Logger(fastify.log);
@@ -120,6 +131,8 @@ async function registerApp(fastify) {
     api.register(alertRoutes);
     api.register(workerAuthRoutes);
     api.register(predictionRoutes);
+    api.register(qaRoutes);
+    api.register(superadminQaRoutes);
   }, { prefix: '/api' });
 
   // Page-serving routes (org-scoped URLs, short QR, etc.)

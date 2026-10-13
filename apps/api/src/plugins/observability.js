@@ -15,6 +15,8 @@
  *      deliberately off in production). Long-lived SSE streams are excluded.
  */
 
+const { describeTarget } = require('../lib/log-redaction');
+
 const SLOW_REQUEST_MS = parseInt(process.env.SLOW_REQUEST_MS, 10) || 2000;
 
 function registerObservability(fastify) {
@@ -30,8 +32,9 @@ function registerObservability(fastify) {
       if (!request.url.includes('/stream')) {
         const ms = reply.elapsedTime;
         if (typeof ms === 'number' && ms >= SLOW_REQUEST_MS) {
+          // The route, never request.url: URLs here can carry ?token= credentials. [WP-A]
           request.log.warn(
-            { reqId: request.id, method: request.method, url: request.url, statusCode: reply.statusCode, durationMs: Math.round(ms) },
+            { reqId: request.id, route: describeTarget(request), statusCode: reply.statusCode, durationMs: Math.round(ms) },
             'slow request'
           );
         }

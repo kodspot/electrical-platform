@@ -197,6 +197,7 @@
   <div class="topbar-left">
     <span class="topbar-brand">Kodspot</span>
     <span class="sa-badge">Super Admin</span>
+    <a href="/superadmin-quality" class="btn btn-sm btn-ghost" style="margin-left:.5rem" data-testid="nav-quality">Quality</a>
   </div>
   <div class="topbar-right">
     <span class="topbar-user" id="userName"></span>
@@ -503,7 +504,7 @@
       <div class="form-group" id="wOrgGroup"><label class="form-label">Organization *</label><select class="form-select" id="wOrg" required></select></div>
       <div class="form-row">
         <div class="form-group"><label class="form-label">Name *</label><input class="form-input" type="text" id="wName" required maxlength="200"></div>
-        <div class="form-group"><label class="form-label">Employee ID</label><input class="form-input" type="text" id="wEmpId" maxlength="50"></div>
+        <div class="form-group"><label class="form-label" for="wEmpId">Employee ID *</label><input class="form-input" type="text" id="wEmpId" maxlength="50" required title="Required — the electrician signs in with this Employee ID and their PIN"></div>
       </div>
       <div class="form-row">
         <div class="form-group"><label class="form-label">Phone</label><input class="form-input" type="tel" id="wPhone" maxlength="20"></div>

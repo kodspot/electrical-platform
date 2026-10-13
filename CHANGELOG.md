@@ -22,6 +22,139 @@ has been git-tagged yet, so everything below is grouped under **Unreleased**.
 Complete and merged into the working tree as of this writing, pending its next deploy —
 see `docs/DEPLOYMENT.md` for how a change reaches production.
 
+### 2026-10-13
+
+- **User-visible (Release Notes):** Password and PIN reset links from email now open a
+  working reset page.
+- **`[F12]` Reset pages (BUG-0007).** The reset emails link to `/reset-password?token=…` and
+  `/worker-reset-pin?token=…`, but neither page existed. Both URLs fell through to the
+  `/:orgSlug` route and answered "Organization not found".
+  - **Fix:** new `public/reset-password.html` and `public/worker-reset-pin.html`, with their
+    scripts in `public/js/`, routes in `src/routes/pages.js`, and both names added to
+    `NON_ORG_PREFIXES`. These are top-level paths, not `/{orgSlug}/{module}/{page}` (Charter
+    §10). That is deliberate: links already sent in emails fix the URLs, and the pages serve
+    users who have no org context yet, like `/superadmin-login`.
+  - **Token handling:** each page reads `?token=` once, then removes it from the address bar
+    with `history.replaceState`. `<meta name="referrer" content="no-referrer">` keeps it out
+    of `Referer` headers.
+  - **What the pages do:** they POST to the existing `/api/auth/reset-password` and
+    `/api/auth/worker-reset-pin`. On success they link to the right login page. An expired
+    or already-used link gets a clear message.
+- **PIN modal says 6 digits.** `admin-workers.html` used to ask for "4-6 digits" while the
+  API requires exactly 6. The label, `pattern`, `minlength`/`maxlength` and the client-side
+  check now all say 6.
+- **Super-admin audit URL without its query.** The `sa_org_context_*` audit row
+  (`middleware/auth.js`) now stores `stripQuery(request.url)`, so a `?token=` never lands in
+  `AuditLog.newValue`.
+- **Tests:** `test/integration/reset-pages.test.js` covers both pages, the logs, the audit
+  row and the PIN markup. It failed on the old code (5 failures) and passes now.
+- **`[C11]` Tokens out of Caddy's log and the public deploy log.**
+  - **Deploy log:** `deploy.yml` no longer prints `docker compose logs caddy` (only
+    `docker compose ps caddy`). The API log dump on a failed health check stays.
+    `deploy-staging.yml` never printed Caddy's logs.
+  - **Caddy log filter:** `infrastructure/Caddyfile` gains a global log filter. Caddy's error
+    log (e.g. a 502 during an API restart) recorded the full request URI, `?token=`
+    included. Every query value and the `/review/` token are now logged as `REDACTED`, and
+    proxying is unchanged.
+  - **Verification:** a throwaway `caddy:2-alpine` canary test: count 4 → 0, upstream still
+    200, and `caddy validate` passes on the full file.
+
+- **User-visible (Release Notes):** Electricians can pick up tickets again; acknowledging
+  alerts, generating AI insights, duplicating templates and running production checks work
+  again.
+- **`[F14]` Body-less JSON requests accepted (BUG-0006).** `public/js/app.js` always sends
+  `Content-Type: application/json`, and Fastify rejected an empty JSON body with
+  `400 FST_ERR_CTP_EMPTY_JSON_BODY` before auth. That broke every body-less POST/PATCH from
+  the browser: electrician Pick Up, alert acknowledge (and acknowledge-all), AI insight
+  generate, template duplicate, notification mark-read and read-all, supervisor accept and
+  pickup, and the production-checks button.
+  - **Fix (server-side, one place):** `src/plugins/content.js` replaces the JSON parser. An
+    empty or whitespace-only body is read as `{}`; everything else goes to Fastify's own
+    parser, with prototype- and constructor-poisoning protection set to `error` and the body
+    limits unchanged. This also covers browsers holding a cached `app.js`.
+  - **Tests:** `test/integration/empty-json-body.test.js` replays all 12 call sites
+    browser-style. It failed on the old code (24/24 rejected) and passes now. It also checks
+    that malformed JSON and poisoning payloads are still rejected.
+
+- **User-visible (Release Notes):**
+  - **Every electrician now needs an Employee ID.** It is required when adding an
+    electrician (admin and super-admin screens), and it can't be blanked out later,
+    because it's what electricians sign in with alongside their PIN. Electricians added
+    earlier without one are unchanged, but an Employee ID must be entered the next time
+    one of them is edited.
+  - **Supervisors get one notification per public complaint.** A supervisor responsible
+    for the location no longer receives two.
+  - **Tickets go to the nearest responsible supervisor.** When several supervisors cover
+    a location, a new complaint or ticket is now consistently assigned to the one closest
+    to it.
+- **User-visible (Release Notes), super-admin:** a new **Quality** page (`/superadmin-quality`,
+  linked from the super-admin dashboard). It shows:
+  - the latest automated test run (warning whenever tests didn't run), a 30-run trend and
+    run history with per-file and per-failure detail
+  - live CI status
+  - a **Run production checks** button that checks the database, offsite backups, email,
+    configuration and build without changing anything
+- **`[WP-Q]` Super-admin Quality page.**
+  - **New model:** `QaRun` (additive migration `20261013000000_wp_q_qa_runs`). It is
+    platform-level, not tenant-scoped, and keeps the newest 500 rows.
+  - **New routes:** `POST /api/qa/runs` (ingest), authenticated by `QA_INGEST_TOKEN`; it
+    returns 404 when unset, compares in constant time, and enforces a 256 KB limit, zod
+    validation and a rate limit. Also SUPER_ADMIN-only `GET /api/superadmin/qa/runs`,
+    `/runs/:id`, `/trend` and `/ci-status`, and `POST /api/superadmin/qa/checks`, which is
+    read-only, streamed as NDJSON, limited to one per 30 s and audited.
+  - **New libraries:** `lib/github.js` (versioned headers, 10 s timeout, 60 s CI-status cache,
+    whitelisted fields, token-expiry check) and `services/production-checks.js`.
+  - **Small additive exports:** `email.js` `verifyTransport()` (never sends) and `r2.js`
+    `getR2Client`.
+  - **Report:** `scripts/report-tests.js` also writes `reports/test-summary.json` (scrubbed,
+    ≤ 200 KB).
+  - **Page:** `public/superadmin-quality.html` + `js/superadmin-quality.js` (no inline script).
+  - **Tests:** `production-checks.test.js` and `integration/qa-dashboard.test.js`.
+  - **Docs:** ADR 0005, MONITORING, auth-and-tenancy (`QaRun` is not tenant-scoped),
+    environment (`QA_GITHUB_REPO`), the route index and COVERAGE_MATRIX.
+- **`[WP-OPS]` Deploy and CI hygiene.**
+  - **`docker-compose.yml`:** the db healthcheck uses `$$POSTGRES_USER`/`$$POSTGRES_DB`
+    (expanded in the container, not interpolated empty from the host). The `api` service
+    receives `GIT_SHA`, `IP_HASH_PEPPER`, `QA_INGEST_TOKEN` and `GH_ACTIONS_DISPATCH_TOKEN`.
+  - **`deploy.yml`:**
+    - `pull_request` has no branch filter, so stacked PRs run the test gate; the deploy
+      job's `push && main` guard is unchanged.
+    - The deploy job passes those four values (`GIT_SHA` from `github.sha`) to the server.
+    - The test job posts the scrubbed test summary to the Quality dashboard ingest:
+      best-effort, it skips when the secrets are empty and prints only the HTTP status.
+  - **`deploy-staging.yml`:** mirrors this, with `STAGING_`-prefixed server secrets. It also
+    switches to `npm run ci` and fixes a 30-char JWT placeholder that failed app boot.
+  - **Docs:** `.env.example`, `reference/environment.md` (closes finding M2) and
+    `DEPLOYMENT.md`.
+- **`[WP-H]` Approved fixes F2, F3, F4 and F8.**
+  - **F2:** stable assignment order in `services/assignment-resolver.js` (direct, then
+    nearest ancestor, then `isPrimary` for workers, then `createdAt`, then `id`).
+  - **F3:** `notifySupervisors()` gains an optional `{ excludeUserIds }` argument,
+    backward compatible; the public-complaint broadcast skips the supervisors who were
+    already notified directly.
+  - **F4:** failed notification steps on ticket creation (`public.js`, `tickets.js`) log
+    one `warn` line `{ ticketId, step, err }`; they stay fire-and-forget.
+  - **F8:** `employeeId` is required on worker create and can't be cleared via PATCH, on
+    both the admin and super-admin routes. This is an API contract change (Charter §9):
+    those requests now return 400.
+  - **Tests and docs:** `test/integration/approved-fixes.test.js`,
+    `test/integration/notification-step-warn.test.js`; bug registry BUG-0004 (F3) and
+    BUG-0005 (F8); `COVERAGE_MATRIX.md` updated.
+- **`[WP-A]` Credentials kept out of logs and alerts.** The app carries credentials in URLs
+  (`?token=` on the SSE streams and `/images/`, `/review/:token`, reset links). Logs and
+  alerts now describe a request by its route template, falling back to the path without its
+  query; they never use the raw URL.
+  - New `apps/api/src/lib/log-redaction.js`: `stripQuery`, `describeTarget`,
+    `scrubJwtShapes`, `buildLoggerOptions`.
+  - Every logger `buildApp()` creates gets `req`/`url`/`err` serializers and a `logMethod`
+    hook (no pino `redact`), merged into a caller-supplied logger too.
+  - The slow-request log, Telegram/webhook alerts and `error.log` are scrubbed.
+  - Regression tests use a canary JWT across every token URL shape, the slow path, the 5xx
+    path and a caller-supplied logger, plus a control run showing that an unpatched logger
+    leaks.
+  - Also: `scripts/run-tests.js` now prints "test report could not be produced" once,
+    instead of twice.
+
 ### 2026-10-12
 
 - **`[QA-1]` Test-target safety, skip gate, run report, coverage inventory** —

@@ -67,9 +67,14 @@ multi-tenant guarantee rests on.
 
 ### Which models are *not* tenant-scoped, and why that's safe
 
-Of the 31 models, only these lack `orgId`, each for a defensible reason:
+Of the 32 models, only these lack `orgId`, each for a defensible reason:
 
 - **`Organization`** — it *is* the tenant; it doesn't belong to one.
+- **`QaRun`** — platform-level QA telemetry (one row per CI/local/e2e test run) for the
+  super-admin Quality page. It describes the platform's code, not any tenant's data. It is
+  written only by the token-authenticated ingest (`POST /api/qa/runs`) and read only by
+  SUPER_ADMIN (`/api/superadmin/qa/*`). See ADR
+  [0005](../adr/0005-qa-telemetry-in-production.md).
 - **`ModuleDefinition`, `ModuleDependency`** — the global module *catalog*, system-wide by
   design (see [module-system.md](module-system.md)), not tenant data.
 - **`DutyRosterWorker`, `AssetImage`, `AssetFailureImage`, `InspectionTemplateItem`,
@@ -115,7 +120,8 @@ impersonation-like mechanism**, and it is fully audited:
   request made under `X-Org-Id` — reads (`sa_org_context_read`) as well as writes
   (`sa_org_context_write`). `[WP8]` closed the gap where only writes were logged; browsing
   an org's dashboard is almost all `GET` traffic, so excluding reads left most SA access
-  untracked.
+  untracked. The row's `newValue.url` is the path **without its query string**
+  (`stripQuery`): a query string can carry a `?token=` credential. (C10, 2026-10-13)
 - Because those entries carry the real `orgId`, they surface in the affected org's own
   `GET /api/audit-logs` — cross-tenant access is visible to the org whose data was
   accessed, not only to the SuperAdmin.

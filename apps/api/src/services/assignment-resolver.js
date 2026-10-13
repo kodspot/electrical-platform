@@ -66,11 +66,36 @@ async function getLocationDescendants(locationId, orgId, maxDepth = 10) {
 }
 
 /**
+ * Rank matching assignments into a stable, meaningful order and return the unique
+ * person ids. Callers take [0] as "the" assignee (public.js / tickets.js auto-assignment),
+ * so the order is part of the contract, not an accident of row order: [WP-H F2]
+ *   1. a direct assignment to the location itself (depth 0),
+ *   2. then the nearest ancestor with coverChildren (smaller depth first),
+ *   3. then isPrimary first (worker assignments only — SupervisorAssignment has no such field),
+ *   4. then the oldest assignment (createdAt), then assignment id as the final tie-break.
+ * A person matched at several levels keeps their best (nearest) position.
+ */
+function rankAssignees(assignments, ancestorIds, locationId, personKey) {
+  const depthOf = new Map(ancestorIds.map((id, depth) => [id, depth]));
+  return [...new Set(
+    assignments
+      .filter((a) => a.locationId === locationId || a.coverChildren)
+      .sort((a, b) =>
+        depthOf.get(a.locationId) - depthOf.get(b.locationId) ||
+        Number(b.isPrimary === true) - Number(a.isPrimary === true) ||
+        a.createdAt - b.createdAt ||
+        (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))
+      .map((a) => a[personKey])
+  )];
+}
+
+/**
  * Get worker IDs assigned to a location, walking UP the hierarchy.
  *
  * Logic:
  * 1. Direct assignments to this exact location → always included
  * 2. Assignments to ancestor locations with coverChildren=true → included
+ * Ordered by rankAssignees() above.
  *
  * @param {string} locationId - The location where an event occurred
  * @param {string} orgId - Organization ID
@@ -87,25 +112,16 @@ async function getAssignedWorkerIds(locationId, orgId) {
       worker: { isActive: true }
     },
     select: {
+      id: true,
       workerId: true,
       locationId: true,
-      coverChildren: true
+      coverChildren: true,
+      isPrimary: true,
+      createdAt: true
     }
   });
 
-  const workerIds = new Set();
-
-  for (const a of assignments) {
-    if (a.locationId === locationId) {
-      // Direct assignment — always matches
-      workerIds.add(a.workerId);
-    } else if (a.coverChildren) {
-      // Ancestor assignment with coverChildren — matches
-      workerIds.add(a.workerId);
-    }
-  }
-
-  return [...workerIds];
+  return rankAssignees(assignments, ancestorIds, locationId, 'workerId');
 }
 
 /**
@@ -126,23 +142,15 @@ async function getAssignedSupervisorIds(locationId, orgId) {
       supervisor: { isActive: true }
     },
     select: {
+      id: true,
       supervisorId: true,
       locationId: true,
-      coverChildren: true
+      coverChildren: true,
+      createdAt: true
     }
   });
 
-  const supervisorIds = new Set();
-
-  for (const a of assignments) {
-    if (a.locationId === locationId) {
-      supervisorIds.add(a.supervisorId);
-    } else if (a.coverChildren) {
-      supervisorIds.add(a.supervisorId);
-    }
-  }
-
-  return [...supervisorIds];
+  return rankAssignees(assignments, ancestorIds, locationId, 'supervisorId');
 }
 
 /**

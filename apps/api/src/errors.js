@@ -1,6 +1,7 @@
 const path = require('path');
 const { appendFile, mkdir, stat, truncate } = require('fs/promises');
 const { isProduction } = require('./config/env');
+const { describeTarget, scrubJwtShapes } = require('./lib/log-redaction');
 
 // Maximum error log size in bytes (50 MB) — auto-truncated to prevent disk fill
 const MAX_LOG_SIZE = 50 * 1024 * 1024;
@@ -10,7 +11,7 @@ async function logError(err) {
     const logDir = path.join(__dirname, '../../../data/logs');
     await mkdir(logDir, { recursive: true });
     const logPath = path.join(logDir, 'error.log');
-    await appendFile(logPath, `[${new Date().toISOString()}] ${err.stack}\n\n`);
+    await appendFile(logPath, `[${new Date().toISOString()}] ${scrubJwtShapes(err && err.stack)}\n\n`);
 
     // Auto-rotate: if log exceeds MAX_LOG_SIZE, truncate to keep recent entries
     try {
@@ -53,18 +54,20 @@ async function sendErrorAlert(error, request) {
 
     if (!telegramToken && !webhookUrl) return; // alerting not configured
 
-    // Debounce: don't spam alerts for the same route
-    const routeKey = `${request.method}:${request.routeOptions?.url || request.url}`;
-    const lastAlert = _alertCooldown.get(routeKey) || 0;
+    // Debounce: don't spam alerts for the same route. The route template (or the path with
+    // its query stripped), never the raw URL: URLs here can carry ?token= credentials. [WP-A]
+    const route = describeTarget(request);
+    const lastAlert = _alertCooldown.get(route) || 0;
     if (Date.now() - lastAlert < ALERT_COOLDOWN_MS) return;
-    _alertCooldown.set(routeKey, Date.now());
+    _alertCooldown.set(route, Date.now());
 
     const timestamp = new Date().toISOString();
     const statusCode = error.statusCode || 500;
-    const errMsg = (error.message || 'Unknown error').slice(0, 200).replace(/[_*`[\]]/g, '\\$&');
+    const safeMessage = scrubJwtShapes(error.message || 'Unknown error');
+    const errMsg = safeMessage.slice(0, 200).replace(/[_*`[\]]/g, '\\$&');
     const message = [
       `🚨 *Server Error ${statusCode}*`,
-      `Route: \`${request.method} ${request.url}\``,
+      `Route: \`${route}\``,
       `Error: ${errMsg}`,
       `Request ID: \`${request.id}\``,
       `Time: ${timestamp}`,
@@ -77,7 +80,7 @@ async function sendErrorAlert(error, request) {
       fetch(telegramUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ chat_id: telegramChatId, text: message, parse_mode: 'Markdown' }),
+        body: JSON.stringify({ chat_id: telegramChatId, text: scrubJwtShapes(message), parse_mode: 'Markdown' }),
         signal: AbortSignal.timeout(5000)
       }).catch(() => {}); // fire-and-forget
     }
@@ -87,7 +90,7 @@ async function sendErrorAlert(error, request) {
       fetch(webhookUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text: message, error: error.message, route: request.url, requestId: request.id, timestamp }),
+        body: JSON.stringify({ text: scrubJwtShapes(message), error: safeMessage, route, requestId: request.id, timestamp }),
         signal: AbortSignal.timeout(5000)
       }).catch(() => {}); // fire-and-forget
     }
