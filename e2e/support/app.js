@@ -3,6 +3,7 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const jsQR = require('jsqr');
+const { expect } = require('@playwright/test');
 
 const SEED_FILE = path.join(__dirname, '..', '.auth', 'seed.json');
 const API_DIR = path.join(__dirname, '..', '..', 'apps', 'api');
@@ -55,11 +56,19 @@ async function signIn(page, kind, account, orgSlug) {
 
 const orgPage = (slug, page) => `/${slug}/ele/${page}`;
 
-/** Choose an option in a custom-select-enhanced <select>, the way a user does. */
-async function pickOption(page, selectId, label) {
+const escapeRe = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+/**
+ * Choose an option in a custom-select-enhanced <select> (public/js/custom-select.js), the way
+ * a user does: open the trigger, click the option. Exact text by default ("Room" must not pick
+ * "Panel Room"); `exact: false` matches a substring, for long hierarchical labels.
+ */
+async function pickOption(page, selectId, label, { exact = true } = {}) {
   const wrap = page.locator('.cs-wrap', { has: page.locator(`#${selectId}`) });
   await wrap.locator('.cs-trigger').click();
-  await page.locator(`#cs-list-${selectId} .cs-option`, { hasText: label }).first().click();
+  const text = exact ? new RegExp(`^\\s*${escapeRe(label)}\\s*$`) : label;
+  await page.locator(`#cs-list-${selectId} .cs-option`).filter({ hasText: text }).first().click();
+  await expect(page.locator(`#${selectId}`)).not.toHaveValue('');
 }
 
 /** Encode a solid-colour RGB PNG (the server checks image signatures and re-encodes with sharp). */

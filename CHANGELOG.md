@@ -100,6 +100,20 @@ see `docs/DEPLOYMENT.md` for how a change reaches production.
     browser-style. It failed on the old code (24/24 rejected) and passes now. It also checks
     that malformed JSON and poisoning payloads are still rejected.
 
+- **`[E2E-2]` Browser journeys J1–J8 (`e2e/tests/`).**
+  - **J1–J6, one story:** an admin creates a location and prints its QR; the QR decodes to
+    `APP_URL/s/<code>`. A guest on a phone reports a fault with a photo, and the database
+    shows the F2 nearest-supervisor assignment and F3's single notification. An admin adds
+    an electrician with PIN 123456, who signs in on a phone, sees the photo (F15) and picks
+    the ticket up (F14). The electrician resolves it with a proof photo; the supervisor
+    verifies and closes it, and the guest review link loads. Finally an internal ticket
+    shows in both lists.
+  - **J7 (negative cases):** an electrician can't open admin pages or APIs; org B can't
+    see org A's ticket; a wrong PIN shows an error; an invalid complaint creates nothing.
+  - **J8 (phone only):** the worker PIN reset from the emailed link (F12). The token is
+    removed from the address bar, the new PIN works, and the link can't be used twice.
+  - **Run with the fixes:** this found F14 and F15. With both fixed, three consecutive full
+    runs are green (15/15 each).
 - **`[E2E-1]` Browser end-to-end package (`e2e/`).** It is a separate package with its own
   lockfile and Node ≥ 22; the app stays on Node 20 and its dependencies and lockfile are
   unchanged (ADR 0006).

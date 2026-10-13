@@ -61,3 +61,13 @@ Codegen points at your **dev** server and dev data. Use what it records as a sta
 - `support/`: the database guard, seed and DB access, sign-in, the custom-select picker, test
   images and QR decoding.
 - `tests/`: the specs.
+  - `smoke.spec.js`: the environment smoke check, in both projects.
+  - `journeys.spec.js`: J1–J7, desktop project only. J1–J6 are one ordered story (QR,
+    guest complaint, electrician, supervisor, internal ticket), and the steps that happen
+    on a phone open their own Pixel 7 context. J7 holds the negative cases (role, tenant,
+    wrong PIN, invalid complaint).
+  - `*.mobile.spec.js`: phone-only journeys, run in `chromium-mobile` only. For example,
+    J8 is the worker PIN reset from the emailed link.
+- **Every journey checks two things:** what the user sees, and the database or API state
+  behind it (through the app's own Prisma client). There are no fixed sleeps, only
+  auto-waiting locators and `expect.poll`.

@@ -55,7 +55,8 @@ module.exports = defineConfig({
     video: 'off'
   },
   projects: [
-    { name: 'chromium-desktop', use: { ...devices['Desktop Chrome'] } },
+    // *.mobile.spec.js files are phone-only journeys (e.g. J8): they run in chromium-mobile.
+    { name: 'chromium-desktop', use: { ...devices['Desktop Chrome'] }, testIgnore: /\.mobile\.spec\.js$/ },
     {
       name: 'chromium-mobile',
       use: { ...devices['Pixel 7'] },
