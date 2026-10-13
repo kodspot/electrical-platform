@@ -23,8 +23,9 @@ Commands: `npm run bug:list` · `npm run bug:run -- <ID>` · `npm run bug:valida
 | BUG-0005 | HIGH | FIXED | ele | A worker could be created without an employeeId and then never log in | `test/integration/bug-regressions.test.js` |
 | BUG-0006 | CRITICAL | FIXED | ele | Body-less POST/PATCH from the browser was rejected (electricians could not pick up tickets) | `test/integration/bug-regressions.test.js` |
 | BUG-0007 | HIGH | FIXED | ele | Password and PIN reset links from email opened no page ("Organization not found") | `test/integration/bug-regressions.test.js` |
+| BUG-0008 | CRITICAL | FIXED | ele | Electrician photo loads opened the database circuit breaker (whole platform 503 for 30 s) | `test/integration/bug-regressions.test.js` |
 
-Count: 7 bug scenario(s).
+Count: 8 bug scenario(s).
 
 ## BUG-0001 — Admin could set a ticket to RESOLVED_PENDING_VERIFY directly
 
@@ -151,4 +152,22 @@ Count: 7 bug scenario(s).
 
 1. Request a password or PIN reset; open the emailed link.
 2. Broken: "Organization not found". Fixed: the reset page with a new-password / new-PIN form.
+
+## BUG-0008 — Electrician photo loads opened the database circuit breaker (whole platform 503 for 30 s)
+
+- **Severity:** CRITICAL · **Status:** FIXED · **Module:** ele · **Category:** resilience
+- **Origin:** Batch 2 e2e journey J7 (finding F15), fixed in C12
+- **Introduced:** WP12 (dbBreaker wired into every Prisma operation) · **Fixed:** 2026-10-13
+- **Description:** The electrician queue loads ticket photos through /api/images with the worker token. The route looked the token up as a staff user (id: undefined), Prisma threw a validation error, and the database circuit breaker counted it as a database failure. Five such loads within 60 s opened the breaker: every request from every user got 503 for 30 s. Electricians never saw the photos either (401).
+- **Root cause:** dbBreaker counted every error thrown by a Prisma operation, including request-level validation errors; images.js and middleware/auth.js queried user.findUnique({ id: decoded.userId }) for worker tokens, which carry workerId, not userId.
+- **Expected behavior:** Worker image loads are served (own org) and never count as database failures; an unrelated request right after them succeeds.
+- **Broken behavior:** 401 for each photo, and after five of them the next unrelated request answered 503 "Service temporarily unavailable".
+- **Scenario dependencies:** —
+- **Regression test:** `test/integration/bug-regressions.test.js`
+
+**Reproduction steps:**
+
+1. Sign in as an electrician and GET /api/images/uploads/<orgId>/<file>?token=<worker token> five times.
+2. Make any unrelated request, e.g. an admin listing locations.
+3. Broken: 503 (database breaker OPEN). Fixed: 200, breaker CLOSED.
 

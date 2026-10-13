@@ -15,7 +15,8 @@ const BUGS_LIST = [
   require('./bug-0004-assigned-supervisor-double-notified'),
   require('./bug-0005-worker-created-without-employee-id'),
   require('./bug-0006-empty-json-body-rejected'),
-  require('./bug-0007-reset-links-open-no-page')
+  require('./bug-0007-reset-links-open-no-page'),
+  require('./bug-0008-worker-photos-open-db-breaker')
 ];
 
 const BUGS = Object.fromEntries(BUGS_LIST.map((b) => [b.id, b]));

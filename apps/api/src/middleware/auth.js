@@ -14,6 +14,9 @@ async function authenticateJWT(request, reply) {
     if (!token) return reply.code(401).send({ error: 'Unauthorized' });
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    // A worker token (workerId) or any token without userId is not a staff session:
+    // refuse it before querying (findUnique with id: undefined throws). [F15]
+    if (!decoded.userId) return reply.code(401).send({ error: 'Unauthorized' });
 
     const user = await prisma.user.findUnique({
       where: { id: decoded.userId },
