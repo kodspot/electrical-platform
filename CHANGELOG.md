@@ -35,6 +35,20 @@ see `docs/DEPLOYMENT.md` for how a change reaches production.
   - **Tickets go to the nearest responsible supervisor.** When several supervisors cover
     a location, a new complaint or ticket is now consistently assigned to the one closest
     to it.
+- **`[WP-OPS]` Deploy and CI hygiene.**
+  - **`docker-compose.yml`:** the db healthcheck uses `$$POSTGRES_USER`/`$$POSTGRES_DB`
+    (expanded in the container, not interpolated empty from the host). The `api` service
+    receives `GIT_SHA`, `IP_HASH_PEPPER`, `QA_INGEST_TOKEN` and `GH_ACTIONS_DISPATCH_TOKEN`.
+  - **`deploy.yml`:**
+    - `pull_request` has no branch filter, so stacked PRs run the test gate; the deploy
+      job's `push && main` guard is unchanged.
+    - The deploy job passes those four values (`GIT_SHA` from `github.sha`) to the server.
+    - The test job posts the scrubbed test summary to the Quality dashboard ingest:
+      best-effort, it skips when the secrets are empty and prints only the HTTP status.
+  - **`deploy-staging.yml`:** mirrors this, with `STAGING_`-prefixed server secrets. It also
+    switches to `npm run ci` and fixes a 30-char JWT placeholder that failed app boot.
+  - **Docs:** `.env.example`, `reference/environment.md` (closes finding M2) and
+    `DEPLOYMENT.md`.
 - **`[WP-H]` Approved fixes F2, F3, F4 and F8.**
   - **F2:** stable assignment order in `services/assignment-resolver.js` (direct, then
     nearest ancestor, then `isPrimary` for workers, then `createdAt`, then `id`).

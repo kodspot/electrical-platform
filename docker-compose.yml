@@ -16,7 +16,9 @@ services:
       - "127.0.0.1:5432:5432"
 
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U $POSTGRES_USER -d $POSTGRES_DB"]
+      # $$ so the container's own shell expands these at check time; a single $ would be
+      # interpolated by Compose from the host env, where POSTGRES_* are not set.
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -68,6 +70,10 @@ services:
       GLOBAL_AI_API_KEY: ${GLOBAL_AI_API_KEY:-}
       GLOBAL_AI_PROVIDER: ${GLOBAL_AI_PROVIDER:-}
       GLOBAL_AI_MODEL: ${GLOBAL_AI_MODEL:-}
+      GIT_SHA: ${GIT_SHA:-}
+      IP_HASH_PEPPER: ${IP_HASH_PEPPER:-}
+      QA_INGEST_TOKEN: ${QA_INGEST_TOKEN:-}
+      GH_ACTIONS_DISPATCH_TOKEN: ${GH_ACTIONS_DISPATCH_TOKEN:-}
 
     depends_on:
       db:

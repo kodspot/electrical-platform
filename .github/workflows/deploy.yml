@@ -4,9 +4,9 @@ on:
   push:
     branches:
       - main
+  # Every PR, into any branch (including stacked PRs), runs the test gate. Only the
+  # test job runs for a PR: the deploy job below is gated on a push to main.
   pull_request:
-    branches:
-      - main
 
 jobs:
   # Test gate: every push and every PR against main must pass lint + the full test
@@ -79,6 +79,41 @@ jobs:
         working-directory: apps/api
         run: npm run ci
 
+      # Sends the already-scrubbed run summary to the super-admin Quality dashboard
+      # (POST /api/qa/runs). Best-effort: it never fails the job, skips when the secrets or
+      # the summary file are absent, and prints only the HTTP status — never the URL or
+      # token (this repository's logs are public).
+      - name: Report test results to the Quality dashboard
+        if: always()
+        continue-on-error: true
+        working-directory: apps/api
+        env:
+          QA_INGEST_URL: ${{ secrets.QA_INGEST_URL }}
+          QA_INGEST_TOKEN: ${{ secrets.QA_INGEST_TOKEN }}
+          QA_SOURCE: ci
+          QA_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+          QA_REF: ${{ github.head_ref || github.ref_name }}
+          QA_EVENT: ${{ github.event_name }}
+          QA_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          if [ -z "$QA_INGEST_URL" ] || [ -z "$QA_INGEST_TOKEN" ]; then echo "QA ingest not configured; skipping."; exit 0; fi
+          if [ ! -f reports/test-summary.json ]; then echo "No reports/test-summary.json; skipping."; exit 0; fi
+          node <<'JS'
+          const fs = require('fs');
+          const summary = JSON.parse(fs.readFileSync('reports/test-summary.json', 'utf8'));
+          const body = {
+            source: process.env.QA_SOURCE, commitSha: process.env.QA_SHA, ref: process.env.QA_REF,
+            event: process.env.QA_EVENT, runUrl: process.env.QA_RUN_URL, nodeVersion: process.version, summary
+          };
+          fetch(process.env.QA_INGEST_URL, {
+            method: 'POST',
+            headers: { 'content-type': 'application/json', authorization: 'Bearer ' + process.env.QA_INGEST_TOKEN },
+            body: JSON.stringify(body),
+            signal: AbortSignal.timeout(15000)
+          }).then((r) => console.log('QA ingest HTTP status: ' + r.status))
+            .catch((e) => console.log('QA ingest request failed: ' + e.name));
+          JS
+
   deploy:
     name: Deploy to Production
     needs: test
@@ -128,6 +163,11 @@ jobs:
           GLOBAL_AI_PROVIDER: ${{ secrets.GLOBAL_AI_PROVIDER }}
           GLOBAL_AI_MODEL: ${{ secrets.GLOBAL_AI_MODEL }}
 
+          GIT_SHA: ${{ github.sha }}
+          IP_HASH_PEPPER: ${{ secrets.IP_HASH_PEPPER }}
+          QA_INGEST_TOKEN: ${{ secrets.QA_INGEST_TOKEN }}
+          GH_ACTIONS_DISPATCH_TOKEN: ${{ secrets.GH_ACTIONS_DISPATCH_TOKEN }}
+
         with:
           host: ${{ secrets.AWS_HOST }}
           username: ${{ secrets.AWS_USERNAME }}
@@ -136,7 +176,7 @@ jobs:
           timeout: 30m
           command_timeout: 30m
 
-          envs: NODE_ENV,PORT,DOMAIN,APP_URL,COOKIE_DOMAIN,DATABASE_URL,DB_USER,DB_PASSWORD,DB_NAME,JWT_SECRET,COOKIE_SECRET,ADMIN_KEY,R2_ACCOUNT_ID,R2_ACCESS_KEY_ID,R2_SECRET_ACCESS_KEY,R2_BUCKET_NAME,CORS_ORIGINS,SES_SMTP_HOST,SES_SMTP_USER,SES_SMTP_PASS,SES_FROM_EMAIL,DATA_ENCRYPTION_KEY,ALERT_TELEGRAM_BOT_TOKEN,ALERT_TELEGRAM_CHAT_ID,ALERT_WEBHOOK_URL,GLOBAL_AI_API_KEY,GLOBAL_AI_PROVIDER,GLOBAL_AI_MODEL
+          envs: NODE_ENV,PORT,DOMAIN,APP_URL,COOKIE_DOMAIN,DATABASE_URL,DB_USER,DB_PASSWORD,DB_NAME,JWT_SECRET,COOKIE_SECRET,ADMIN_KEY,R2_ACCOUNT_ID,R2_ACCESS_KEY_ID,R2_SECRET_ACCESS_KEY,R2_BUCKET_NAME,CORS_ORIGINS,SES_SMTP_HOST,SES_SMTP_USER,SES_SMTP_PASS,SES_FROM_EMAIL,DATA_ENCRYPTION_KEY,ALERT_TELEGRAM_BOT_TOKEN,ALERT_TELEGRAM_CHAT_ID,ALERT_WEBHOOK_URL,GLOBAL_AI_API_KEY,GLOBAL_AI_PROVIDER,GLOBAL_AI_MODEL,GIT_SHA,IP_HASH_PEPPER,QA_INGEST_TOKEN,GH_ACTIONS_DISPATCH_TOKEN
 
           script: |
             set -e
@@ -177,6 +217,10 @@ jobs:
             GLOBAL_AI_API_KEY=${GLOBAL_AI_API_KEY}
             GLOBAL_AI_PROVIDER=${GLOBAL_AI_PROVIDER}
             GLOBAL_AI_MODEL=${GLOBAL_AI_MODEL}
+            GIT_SHA=${GIT_SHA}
+            IP_HASH_PEPPER=${IP_HASH_PEPPER}
+            QA_INGEST_TOKEN=${QA_INGEST_TOKEN}
+            GH_ACTIONS_DISPATCH_TOKEN=${GH_ACTIONS_DISPATCH_TOKEN}
             EOF
 
             chmod 600 .env

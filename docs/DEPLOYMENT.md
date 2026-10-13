@@ -5,8 +5,9 @@ restore drill record — this document covers the day-to-day deploy pipeline onl
 
 ## How it works today
 
-Every push to `main`, and every pull request against `main`, runs the **Lint & Test**
-job in [`.github/workflows/deploy.yml`](../.github/workflows/deploy.yml): lint, then
+Every push to `main`, and every pull request into **any** branch (so stacked PRs are tested
+too), runs the **Lint & Test** job in
+[`.github/workflows/deploy.yml`](../.github/workflows/deploy.yml): lint, then
 the full test suite against a real, disposable PostgreSQL service container, including
 every database-backed integration test — no tests are skipped in CI, since a database
 is always available there. (This doc deliberately doesn't cite a specific test count —
@@ -20,7 +21,21 @@ the always-200 `/health`) until the container reports genuinely healthy before
 declaring the deploy successful.
 
 **Net effect: a broken change cannot reach production.** It will fail the test job and
-the deploy job simply won't run.
+the deploy job simply won't run. A pull request can never deploy, whatever branch it
+targets: the deploy job is guarded by
+`if: github.event_name == 'push' && github.ref == 'refs/heads/main'`.
+
+After the test gate, a best-effort step posts the run's scrubbed summary
+(`apps/api/reports/test-summary.json`) to `POST /api/qa/runs` for the super-admin Quality
+page. It uses the `QA_INGEST_URL` and `QA_INGEST_TOKEN` secrets, never fails the job, skips
+when either secret is empty, and prints only the HTTP status. This repository is public, so
+its logs are too.
+
+**Secrets that reach the server only through the deploy job:** besides the long-standing
+ones, the deploy job passes `GIT_SHA` (`github.sha`), `IP_HASH_PEPPER`, `QA_INGEST_TOKEN` and
+`GH_ACTIONS_DISPATCH_TOKEN` through the SSH step's `env`/`envs:` and the `.env` it writes.
+`docker-compose.yml` hands them to the `api` container. See
+[`reference/environment.md`](reference/environment.md).
 
 ## Staging
 

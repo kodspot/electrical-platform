@@ -54,6 +54,17 @@ Unset is safe; behavior degrades gracefully. Recommended in production where not
 | `SES_SMTP_HOST` / `SES_SMTP_USER` / `SES_SMTP_PASS` / `SES_FROM_EMAIL` | Email delivery (`lib/email.js`) | Email silently no-ops (password reset, notifications won't send) |
 | `ALERT_TELEGRAM_BOT_TOKEN` / `ALERT_TELEGRAM_CHAT_ID` / `ALERT_WEBHOOK_URL` | 5xx error alerting (`errors.js`) | Alerting no-ops — errors only reach `data/logs/error.log` |
 | `GLOBAL_AI_API_KEY` / `GLOBAL_AI_PROVIDER` / `GLOBAL_AI_MODEL` | Org-level default AI key fallback (`lib/ai-provider.js`) | Orgs use only their own configured key |
+| `GIT_SHA` | The deployed commit, shown in `/health/info` (`build.commit`) and the startup log (`lib/diagnostics.js`) | `commit: null` |
+| `QA_INGEST_TOKEN` | Bearer secret for `POST /api/qa/runs`, the CI → super-admin Quality page ingest | The ingest endpoint answers `404` |
+| `GH_ACTIONS_DISPATCH_TOKEN` | Fine-grained GitHub token (this repo only, Actions read+write): Quality page CI status and the "run full test suite" dispatch | CI status uses unauthenticated reads of the public repo; dispatch is unavailable |
+
+**How these reach production.** `IP_HASH_PEPPER`, `QA_INGEST_TOKEN` and
+`GH_ACTIONS_DISPATCH_TOKEN` are GitHub Actions repository secrets, and `GIT_SHA` is
+`github.sha`. All four reach the server **only** through the deploy job: it puts them in the
+SSH step's `env`/`envs:` and writes them into the server's `.env`, which
+`docker-compose.yml` passes to the `api` container. Never set them by hand on the server; the
+next deploy rewrites `.env`. `QA_INGEST_URL` is a **CI-only** secret (where the test job posts
+its summary); the app never reads it. Staging uses `STAGING_`-prefixed equivalents.
 
 ## Test-only (read by the test runner, never by the app)
 
@@ -78,9 +89,8 @@ host, a database name ending in `_ci`/`_test`/`_e2e`, and `NODE_ENV=test`. It al
   and are not in `.env.example` — leftover secret surface to confirm-and-remove. See
   [`../history/production-readiness-audit-2026-07.md`](../history/production-readiness-audit-2026-07.md)
   (finding M3).
-- `IP_HASH_PEPPER` is documented in `.env.example` but is **not** listed in the deploy
-  workflows' secret env lists (finding M2) — configuring it in production requires adding
-  it there too.
+- ~~`IP_HASH_PEPPER` is not listed in the deploy workflows' secret env lists (finding M2)~~
+  **Resolved 2026-10-13 (WP-OPS):** both deploy workflows now pass it to the server.
 
 ## Related
 
