@@ -2,6 +2,7 @@
 
 const jwt = require('jsonwebtoken');
 const { prisma } = require('../lib/prisma');
+const { stripQuery } = require('../lib/log-redaction');
 const { isModuleEnabled } = require('../services/module-policy');
 const { getPermissionPolicy } = require('./permission-policy');
 const { attachTenantContextFromUser, getTenantOrgId } = require('./tenant-context');
@@ -87,7 +88,8 @@ function registerSAuditHook(fastify) {
           action: request.method === 'GET' ? 'sa_org_context_read' : 'sa_org_context_write',
           entityType: 'Organization',
           entityId: orgId,
-          newValue: { orgName, method: request.method, url: request.url }
+          // The path without its query: a URL here can carry a ?token= credential. [WP-A]
+          newValue: { orgName, method: request.method, url: stripQuery(request.url) }
         }
       }).catch(() => {});
     }

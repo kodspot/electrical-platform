@@ -24,6 +24,31 @@ see `docs/DEPLOYMENT.md` for how a change reaches production.
 
 ### 2026-10-13
 
+- **User-visible (Release Notes):** Password and PIN reset links from email now open a
+  working reset page.
+- **`[F12]` Reset pages (BUG-0007).** The reset emails link to `/reset-password?token=…` and
+  `/worker-reset-pin?token=…`, but neither page existed. Both URLs fell through to the
+  `/:orgSlug` route and answered "Organization not found".
+  - **Fix:** new `public/reset-password.html` and `public/worker-reset-pin.html`, with their
+    scripts in `public/js/`, routes in `src/routes/pages.js`, and both names added to
+    `NON_ORG_PREFIXES`. These are top-level paths, not `/{orgSlug}/{module}/{page}` (Charter
+    §10). That is deliberate: links already sent in emails fix the URLs, and the pages serve
+    users who have no org context yet, like `/superadmin-login`.
+  - **Token handling:** each page reads `?token=` once, then removes it from the address bar
+    with `history.replaceState`. `<meta name="referrer" content="no-referrer">` keeps it out
+    of `Referer` headers.
+  - **What the pages do:** they POST to the existing `/api/auth/reset-password` and
+    `/api/auth/worker-reset-pin`. On success they link to the right login page. An expired
+    or already-used link gets a clear message.
+- **PIN modal says 6 digits.** `admin-workers.html` used to ask for "4-6 digits" while the
+  API requires exactly 6. The label, `pattern`, `minlength`/`maxlength` and the client-side
+  check now all say 6.
+- **Super-admin audit URL without its query.** The `sa_org_context_*` audit row
+  (`middleware/auth.js`) now stores `stripQuery(request.url)`, so a `?token=` never lands in
+  `AuditLog.newValue`.
+- **Tests:** `test/integration/reset-pages.test.js` covers both pages, the logs, the audit
+  row and the PIN markup. It failed on the old code (5 failures) and passes now.
+
 - **User-visible (Release Notes):** Electricians can pick up tickets again; acknowledging
   alerts, generating AI insights, duplicating templates and running production checks work
   again.

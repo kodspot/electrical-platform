@@ -300,8 +300,8 @@
     <h2 class="modal-title" id="pinModalTitle">Set Electrician PIN</h2>
     <div id="pinError" class="error-msg"></div>
     <p style="font-size:.78rem;color:var(--text-muted);margin-bottom:.65rem">Set a 6-digit numeric PIN for electrician login. They will use their Employee ID + PIN to log in.</p>
-    <div><label class="form-label">New PIN (4-6 digits) *</label><input class="form-input" id="pinInput" type="password" inputmode="numeric" pattern="\d{4,6}" minlength="4" maxlength="6" required placeholder="Enter PIN"></div>
-    <div style="margin-top:.5rem"><label class="form-label">Confirm PIN *</label><input class="form-input" id="pinConfirm" type="password" inputmode="numeric" pattern="\d{4,6}" minlength="4" maxlength="6" required placeholder="Confirm PIN"></div>
+    <div><label class="form-label">New PIN (6 digits) *</label><input class="form-input" id="pinInput" type="password" inputmode="numeric" pattern="\d{6}" minlength="6" maxlength="6" required placeholder="Enter 6-digit PIN"></div>
+    <div style="margin-top:.5rem"><label class="form-label">Confirm PIN *</label><input class="form-input" id="pinConfirm" type="password" inputmode="numeric" pattern="\d{6}" minlength="6" maxlength="6" required placeholder="Confirm PIN"></div>
     <div class="modal-actions">
       <button type="button" class="btn btn-outline" onclick="App.closeModal('pinModal')">Cancel</button>
       <button type="button" class="btn btn-primary" id="pinSaveBtn" onclick="saveWorkerPin()">Set PIN</button>
@@ -764,7 +764,7 @@ async function saveWorkerPin() {
   App.hideError('pinError');
   var pin = $('pinInput').value;
   var confirm = $('pinConfirm').value;
-  if (!pin || pin.length < 4 || !/^\d+$/.test(pin)) { App.showError('pinError', 'PIN must be 4-6 digits'); return; }
+  if (!/^\d{6}$/.test(pin || '')) { App.showError('pinError', 'PIN must be exactly 6 digits'); return; }
   if (pin !== confirm) { App.showError('pinError', 'PINs do not match'); return; }
   var btn = $('pinSaveBtn'); btn.disabled = true; btn.textContent = 'Saving…';
   var res = await App.apiFetch('/workers/' + _pinWorkerId + '/pin', {

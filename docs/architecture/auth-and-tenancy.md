@@ -120,7 +120,8 @@ impersonation-like mechanism**, and it is fully audited:
   request made under `X-Org-Id` — reads (`sa_org_context_read`) as well as writes
   (`sa_org_context_write`). `[WP8]` closed the gap where only writes were logged; browsing
   an org's dashboard is almost all `GET` traffic, so excluding reads left most SA access
-  untracked.
+  untracked. The row's `newValue.url` is the path **without its query string**
+  (`stripQuery`): a query string can carry a `?token=` credential. (C10, 2026-10-13)
 - Because those entries carry the real `orgId`, they surface in the affected org's own
   `GET /api/audit-logs` — cross-tenant access is visible to the org whose data was
   accessed, not only to the SuperAdmin.

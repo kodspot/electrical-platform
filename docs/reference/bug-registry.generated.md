@@ -22,8 +22,9 @@ Commands: `npm run bug:list` · `npm run bug:run -- <ID>` · `npm run bug:valida
 | BUG-0004 | MEDIUM | FIXED | complaints | A supervisor assigned to a location got two notifications per public complaint | `test/integration/bug-regressions.test.js` |
 | BUG-0005 | HIGH | FIXED | ele | A worker could be created without an employeeId and then never log in | `test/integration/bug-regressions.test.js` |
 | BUG-0006 | CRITICAL | FIXED | ele | Body-less POST/PATCH from the browser was rejected (electricians could not pick up tickets) | `test/integration/bug-regressions.test.js` |
+| BUG-0007 | HIGH | FIXED | ele | Password and PIN reset links from email opened no page ("Organization not found") | `test/integration/bug-regressions.test.js` |
 
-Count: 6 bug scenario(s).
+Count: 7 bug scenario(s).
 
 ## BUG-0001 — Admin could set a ticket to RESOLVED_PENDING_VERIFY directly
 
@@ -133,4 +134,21 @@ Count: 6 bug scenario(s).
 1. Create an org with a location, an electrician assigned to it, and an OPEN ticket there.
 2. As the electrician, POST /api/worker/tickets/:id/pickup with Content-Type: application/json and no body — exactly what the electrician app sends.
 3. Broken: 400 FST_ERR_CTP_EMPTY_JSON_BODY. Fixed: 200, status IN_PROGRESS.
+
+## BUG-0007 — Password and PIN reset links from email opened no page ("Organization not found")
+
+- **Severity:** HIGH · **Status:** FIXED · **Module:** ele · **Category:** account-recovery
+- **Origin:** Batch 1 characterisation (finding F12), fixed in C10
+- **Introduced:** 2026-07-21 · **Fixed:** 2026-10-13
+- **Description:** The reset emails link to /reset-password?token=… and /worker-reset-pin?token=…, but no such pages existed; both URLs fell through to the /:orgSlug page route, which answered "Organization not found". Users could not reset from the email.
+- **Root cause:** WP14 added the reset APIs and the emailed links (auth.js, worker-auth.js) but no pages for the links to open; pages.js had no route for either path, so /:orgSlug matched them.
+- **Expected behavior:** GET /reset-password?token=… and GET /worker-reset-pin?token=… serve the reset pages (200, HTML).
+- **Broken behavior:** 404 {"error":"Organization not found"} (via the /:orgSlug route).
+- **Scenario dependencies:** —
+- **Regression test:** `test/integration/bug-regressions.test.js`
+
+**Reproduction steps:**
+
+1. Request a password or PIN reset; open the emailed link.
+2. Broken: "Organization not found". Fixed: the reset page with a new-password / new-PIN form.
 

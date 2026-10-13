@@ -11,7 +11,7 @@ window.App = (function () {
   var VALID_MODULES = ['ele', 'civil', 'asset', 'complaints'];
 
   // ─── Org & Module Routing ───
-  var NON_ORG_PREFIXES = ['superadmin-login', 'superadmin-dashboard', 'superadmin-quality', 's', 'api', 'scan'];
+  var NON_ORG_PREFIXES = ['superadmin-login', 'superadmin-dashboard', 'superadmin-quality', 'reset-password', 'worker-reset-pin', 's', 'api', 'scan'];
 
   function getOrgSlug() {
     var parts = location.pathname.split('/').filter(Boolean);

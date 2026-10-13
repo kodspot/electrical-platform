@@ -13,7 +13,7 @@ route table. It is a **navigation index**, not full API documentation.
   per-row here — it cannot be read reliably from the route table.
 - For **request/response detail**, read the handler in `apps/api/src/routes/`.
 
-Counts: 210 API routes, 74 page/other routes.
+Counts: 210 API routes, 76 page/other routes.
 
 ## API routes (`/api`)
 
@@ -301,6 +301,7 @@ Counts: 210 API routes, 74 page/other routes.
 | GET | `/health/live` |
 | GET | `/health/ready` |
 | GET | `/privacy` |
+| GET | `/reset-password` |
 | GET | `/review/:token` |
 | GET | `/s/:code` |
 | GET | `/scan/:code` |
@@ -308,3 +309,4 @@ Counts: 210 API routes, 74 page/other routes.
 | GET | `/superadmin-login` |
 | GET | `/superadmin-quality` |
 | GET | `/terms` |
+| GET | `/worker-reset-pin` |
