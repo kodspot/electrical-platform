@@ -100,6 +100,31 @@ see `docs/DEPLOYMENT.md` for how a change reaches production.
     browser-style. It failed on the old code (24/24 rejected) and passes now. It also checks
     that malformed JSON and poisoning payloads are still rejected.
 
+- **User-visible (Release Notes), super-admin:** the Quality page has an **End-to-end** tab.
+  It shows the latest browser test run (journeys, accessibility and visual checks, with links
+  to the run and its report) and a **Run full test suite now** button.
+- **`[E2E-4]` e2e CI, reporting and the run-suite button.**
+  - **`.github/workflows/e2e.yml`:** triggers on PRs (no branch filter; `apps/api/**`,
+    `e2e/**`), nightly at 21:30 UTC, and `workflow_dispatch` (`update_snapshots`,
+    `requested_by`).
+    - It runs against a Postgres service on Node 22.
+    - The report is uploaded every run and traces only on failure, both kept 7 days.
+    - The Linux baselines are uploaded when `update_snapshots` is set.
+    - The summary (`e2e/scripts/summarize.js`) is posted to the Quality ingest with
+      `source: 'e2e'`.
+    - The deploy workflow is untouched.
+  - **`POST /api/superadmin/qa/dispatch`:** SUPER_ADMIN only, one call per 10 minutes, and
+    404 while `GH_ACTIONS_DISPATCH_TOKEN` is unset.
+    - It starts `e2e.yml` on `main` with `requested_by=superadmin`.
+    - GitHub 200 → the page shows the run link. 204 → "started". 404/422 → "the e2e workflow
+      is not on main yet: it only becomes dispatchable after batch-2 is merged". 401/403 →
+      "dispatch token invalid, expired, or missing Actions write". 429 or a timeout →
+      "GitHub unavailable, try later".
+    - Every call is audited as `sa_test_suite_dispatched` (statuses only). The token is
+      never returned or logged.
+  - **`ci-status`** now reports `dispatchEnabled`.
+  - **Tests:** `test/integration/qa-dispatch.test.js` (14 tests) and the e2e test
+    `quality-e2e-tab.spec.js`.
 - **User-visible (Release Notes):** screen readers now announce the mobile menu button on
   admin pages ("Menu").
 - **`[E2E-3]` Design and accessibility checks (`e2e/tests/visual-a11y.spec.js`).** Ten pages

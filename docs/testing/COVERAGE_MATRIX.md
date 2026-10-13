@@ -83,7 +83,7 @@ Columns as above. For route rows, "Starting state", "Test type", "Frequency" and
 | `pages.js` | IMPLEMENTED (15 page routes) | Guest, all | Active and suspended orgs | `GET /:orgSlug`, `GET /api/org/:slug` | Active org served; suspended → 404 | Org status | — | DB-backed | Every run | CI | `tenant-isolation-pages.test.js` (4 tests) | P2: `/s/:code`, `/scan/:code`, `/review/:token`, module manifest/sw MISSING |
 | `predictions.js` | IMPLEMENTED (5 routes) | Admin | Two orgs | risk-scores, anomalies, trends, asset | Org-scoped | Org scoping | — | DB-backed | Every run | CI | `tenant-isolation-predictions.test.js` | P3: `/predictions/ai-analysis`; correctness of predictions MISSING |
 | `qa.js` (added 2026-10-13, WP-Q) | IMPLEMENTED: `POST /api/qa/runs` | CI (shared-secret Bearer, outside JWT) | Fixture runs | ingest with no token set, wrong token, valid, oversize, invalid; trimming; pruning | 404 / 401 / 201 `{id}` / 413 / 400 with nothing echoed | Trimmed strings, capped arrays, scrubbed JWTs; newest-N retention | — | DB-backed | Every run | CI | `qa-dashboard.test.js` › "ingest: 404 while QA_INGEST_TOKEN is unset", "ingest: 401 …", "ingest: 201 returns only the id; strings are trimmed, details capped and scrubbed", "ingest: 413 …", "ingest: 400 …", "only the newest N runs are kept …" | P3: rate limit (10/min) not asserted |
-| `superadmin-qa.js` (added 2026-10-13, WP-Q) | IMPLEMENTED: runs, run, trend, ci-status, checks | Super-admin | SA, admin, supervisor and worker tokens; ingested runs | list, drill-in, trend; role rejection; NDJSON checks with local storage, no SMTP/GitHub | SA-only; NDJSON lines + done line; one run per 30 s | Non-SA rejected (401/403); a status-only audit row | — | DB-backed + unit (stubbed R2/SMTP/GitHub: `production-checks.test.js`) | Every run | CI | `qa-dashboard.test.js` › "the Quality API rejects ADMIN, SUPERVISOR and worker tokens", "a super-admin can list runs …", "production checks stream NDJSON, write a status-only audit row, and are rate-limited", "serves the Quality page"; `production-checks.test.js` (9 tests) | P3: the page's browser behaviour (covered by the Batch 2 e2e suite) |
+| `superadmin-qa.js` (added 2026-10-13, WP-Q) | IMPLEMENTED: runs, run, trend, ci-status, checks, dispatch (C8) | Super-admin | SA, admin, supervisor and worker tokens; ingested runs | list, drill-in, trend; role rejection; NDJSON checks with local storage, no SMTP/GitHub | SA-only; NDJSON lines + done line; one run per 30 s | Non-SA rejected (401/403); a status-only audit row | — | DB-backed + unit (stubbed R2/SMTP/GitHub: `production-checks.test.js`) | Every run | CI | `qa-dashboard.test.js` › "the Quality API rejects ADMIN, SUPERVISOR and worker tokens", "a super-admin can list runs …", "production checks stream NDJSON, write a status-only audit row, and are rate-limited", "serves the Quality page"; `production-checks.test.js` (9 tests); `qa-dispatch.test.js` (dispatch: exact request, every outcome, feature-off, rate limit, role, status-only audit, token never in response/audit/log) | Browser behaviour: e2e `quality-e2e-tab.spec.js` (End-to-end tab, dispatch off without a token) and `visual-a11y.spec.js` |
 | `public.js` | IMPLEMENTED (6 routes) | Guest | see W1 | see W1 | see W1 | see W1 | see W1 | DB-backed | Every run | CI | see W1 | see W1 |
 | `superadmin.js` | IMPLEMENTED (29 routes) | Super-admin | Two orgs, SA token | organizations list, org workers; X-Org-Id auditing | SA scoping and audit | Audit entries for SA reads/writes | — | DB-backed | Every run | CI | `tenant-isolation-superadmin.test.js`; `superadmin-impersonation-audit.test.js` | P2: module-activation endpoints, org create/suspend/delete, AI config MISSING |
 | `supervisors.js` | IMPLEMENTED (10 routes) | Admin | Two orgs | list/get/assignments cross-org; permanent delete | 404 cross-org; 409 parity | Org scoping | — | DB-backed | Every run | CI | `tenant-isolation-supervisors.test.js`; `permanent-delete-parity.test.js` | P2: create/password/stats MISSING |
@@ -103,6 +103,22 @@ Columns as above. For route rows, "Starting state", "Test type", "Frequency" and
 | IMAGE_CLEANUP (daily, 30-day retention) | IMPLEMENTED | System | — | — | — | — | — | — | — | — | MISSING | P2 |
 | GUEST_ANONYMIZATION (daily, 180 days) | IMPLEMENTED | System | — | — | — | — | — | — | — | — | MISSING | P2 (PII retention) |
 | TEMPLATE_SEEDING, ALERT_INSIGHT_CLEANUP | IMPLEMENTED | System | — | — | — | — | — | — | — | — | MISSING | P3 |
+
+## Browser journeys (`e2e/`, added 2026-10-13)
+
+Playwright against the real app on a disposable `_e2e` database ([ADR 0006](../adr/0006-browser-e2e-with-playwright.md), [`e2e/README.md`](../../e2e/README.md)). Run locally with `npm run e2e`; in CI by `.github/workflows/e2e.yml`.
+
+| Journey | Covers | Asserts (UI + DB/API) |
+|---|---|---|
+| J1 | W1 locations, QR | location created under the right parent; the printed and downloaded QR decode to `APP_URL/s/<code>` |
+| J2 | Public complaint (Pixel 7) | ticket created with photo, `source PUBLIC`; F2 nearest supervisor assigned; covering electricians notified; F3 one notification per supervisor; nothing in org B |
+| J3 | W4 worker create → PIN → login | create with employeeId, set PIN 123456, sign in on a phone, see the complaint and its photo (F15) |
+| J4 | Electrician pickup + resolve | pickup answers 200 → IN_PROGRESS (F14); resolve with proof → RESOLVED_PENDING_VERIFY |
+| J5 | Supervisor verify | → RESOLVED by the assigned supervisor; the guest review link loads |
+| J6 | Internal ticket | shows in the admin list and in the assigned supervisor's list |
+| J7 | Negative cases | electrician blocked from admin pages/APIs; org B cannot see org A's ticket; wrong PIN; invalid complaint creates nothing |
+| J8 | Worker PIN reset from the email link (Pixel 7) | F12 page; token removed from the address bar; new PIN signs in; link single-use |
+| Design/a11y | 10 pages × desktop + mobile | screenshot vs Linux baseline ("no baseline" until generated); axe fails only on critical |
 
 ## UNKNOWN rows (could not be settled by this inventory)
 

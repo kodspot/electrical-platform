@@ -1,0 +1,166 @@
+name: E2E
+
+# Browser end-to-end, visual and accessibility suite (e2e/, ADR 0006). Separate from
+# deploy.yml: it never deploys and holds no production credential.
+#   - every PR (no branch filter, so stacked PRs run too) touching the app or the suite;
+#   - nightly at 21:30 UTC (03:00 IST);
+#   - by hand or from the super-admin Quality page ("Run full test suite now"), which
+#     dispatches it on main with requested_by=superadmin.
+# This repository is public: logs and artifacts are world-readable. The app under test
+# runs on a disposable database with per-run generated secrets (playwright.config.js), so
+# traces hold no real credential; the ingest token is passed only through env and never
+# printed.
+
+on:
+  pull_request:
+    paths:
+      - "apps/api/**"
+      - "e2e/**"
+      - ".github/workflows/e2e.yml"
+  schedule:
+    - cron: "30 21 * * *"
+  workflow_dispatch:
+    inputs:
+      update_snapshots:
+        description: "Regenerate the Linux visual baselines and upload them as an artifact"
+        type: boolean
+        default: false
+      requested_by:
+        description: "Who started this run (the Quality page sends 'superadmin')"
+        type: string
+        default: "manual"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: e2e-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  e2e:
+    name: e2e
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_USER: e2e
+          POSTGRES_PASSWORD: e2e
+          POSTGRES_DB: electrical_e2e
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U e2e -d electrical_e2e"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      CI: "true"
+      # Loopback + a name ending in _e2e: the only kind of database the suite will touch.
+      DATABASE_URL: postgresql://e2e:e2e@127.0.0.1:5432/electrical_e2e
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+          cache-dependency-path: |
+            apps/api/package-lock.json
+            e2e/package-lock.json
+
+      - name: Install the app
+        working-directory: apps/api
+        run: npm ci
+
+      - name: Install the e2e suite
+        working-directory: e2e
+        run: npm ci
+
+      - name: Install Chromium
+        working-directory: e2e
+        run: npx playwright install --with-deps chromium
+
+      - name: Run the e2e suite
+        working-directory: e2e
+        env:
+          UPDATE_SNAPSHOTS: ${{ github.event_name == 'workflow_dispatch' && inputs.update_snapshots && 'true' || 'false' }}
+        run: |
+          if [ "$UPDATE_SNAPSHOTS" = "true" ]; then
+            npx playwright test --update-snapshots=all
+          else
+            npx playwright test
+          fi
+
+      - name: Summarize
+        if: always()
+        working-directory: e2e
+        run: node scripts/summarize.js || echo "No report to summarize."
+
+      - name: Upload the report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-report
+          path: |
+            e2e/reports/
+          retention-days: 7
+          if-no-files-found: ignore
+
+      - name: Upload traces (failures only)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-traces
+          path: e2e/test-results/
+          retention-days: 7
+          if-no-files-found: ignore
+
+      - name: Upload the Linux visual baselines
+        if: github.event_name == 'workflow_dispatch' && inputs.update_snapshots
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-snapshots-linux
+          path: e2e/tests/__screenshots__/linux/
+          retention-days: 7
+          if-no-files-found: warn
+
+      # Sends the summary to the super-admin Quality page (POST /api/qa/runs, source 'e2e').
+      # Best-effort: never fails the job, skips when a secret or the summary is absent, and
+      # prints only the HTTP status — never the URL or the token.
+      - name: Report results to the Quality dashboard
+        if: always()
+        continue-on-error: true
+        working-directory: e2e
+        env:
+          QA_INGEST_URL: ${{ secrets.QA_INGEST_URL }}
+          QA_INGEST_TOKEN: ${{ secrets.QA_INGEST_TOKEN }}
+          QA_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+          QA_REF: ${{ github.head_ref || github.ref_name }}
+          QA_EVENT: ${{ github.event_name }}
+          QA_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          if [ -z "$QA_INGEST_URL" ] || [ -z "$QA_INGEST_TOKEN" ]; then echo "QA ingest not configured; skipping."; exit 0; fi
+          if [ ! -f reports/e2e-summary.json ]; then echo "No reports/e2e-summary.json; skipping."; exit 0; fi
+          node <<'JS'
+          const fs = require('fs');
+          const summary = JSON.parse(fs.readFileSync('reports/e2e-summary.json', 'utf8'));
+          const body = {
+            source: 'e2e', commitSha: process.env.QA_SHA, ref: process.env.QA_REF,
+            event: process.env.QA_EVENT, runUrl: process.env.QA_RUN_URL, nodeVersion: process.version, summary
+          };
+          fetch(process.env.QA_INGEST_URL, {
+            method: 'POST',
+            headers: { 'content-type': 'application/json', authorization: 'Bearer ' + process.env.QA_INGEST_TOKEN },
+            body: JSON.stringify(body),
+            signal: AbortSignal.timeout(15000)
+          }).then((r) => console.log('QA ingest HTTP status: ' + r.status))
+            .catch((e) => console.log('QA ingest request failed: ' + e.name));
+          JS

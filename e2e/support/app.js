@@ -22,15 +22,26 @@ function db() {
   return _prisma;
 }
 
-// One API login per account per worker process: fewer logins keeps well inside the login
-// rate limit, and UI login itself is exercised by the journeys and the negative cases.
-const sessions = new Map();
+// One API login per account per RUN, shared across worker processes (each project gets its
+// own worker): the app allows 10 logins per 15 minutes per address, and the suite must stay
+// inside the production limit, not loosen it. The cache is keyed by the per-run seed id, so
+// a session from an earlier run's database (and secret) is never reused. UI login itself is
+// exercised by the journeys and the negative cases.
+const SESSIONS_FILE = path.join(__dirname, '..', '.auth', 'sessions.json');
+function readSessions() {
+  try { return JSON.parse(fs.readFileSync(SESSIONS_FILE, 'utf8')); } catch { return {}; }
+}
 async function apiLogin(request, { email, password }) {
-  if (sessions.has(email)) return sessions.get(email);
+  const key = `${seed().run}:${email}`;
+  const cached = readSessions()[key];
+  if (cached) return cached;
   const res = await request.post('/api/auth/login', { data: { email, password } });
   if (!res.ok()) throw new Error(`login failed (${res.status()})`);
   const body = await res.json();
-  sessions.set(email, body);
+  const all = readSessions();
+  for (const k of Object.keys(all)) if (!k.startsWith(`${seed().run}:`)) delete all[k];
+  all[key] = body;
+  fs.writeFileSync(SESSIONS_FILE, JSON.stringify(all));
   return body;
 }
 

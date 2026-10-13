@@ -128,3 +128,31 @@ By rule, across both projects:
 
 These are known, report-only items for a later design pass. A new critical violation fails
 the suite.
+
+## CI (`.github/workflows/e2e.yml`)
+
+**When it runs**
+- on every pull request that touches `apps/api/**`, `e2e/**` or the workflow, with no
+  branch filter, so stacked PRs run too
+- nightly at 21:30 UTC (03:00 IST)
+- by hand (inputs `update_snapshots`, `requested_by`)
+- from the super-admin Quality page's **Run full test suite now** button, which dispatches
+  it on `main`
+
+**What it does**
+1. Starts Postgres 15 as a service (`electrical_e2e` on 127.0.0.1).
+2. Installs Node 22, then runs `npm ci` for the app and for `e2e/`, plus
+   `playwright install --with-deps chromium`.
+3. Runs `npx playwright test`, retrying once in CI.
+
+**What it produces**
+- `scripts/summarize.js` writes `reports/e2e-summary.json` (counts, journeys, per-page axe
+  and visual state, first-line failures).
+- The `e2e-report` artifact is always uploaded and kept 7 days.
+- The `e2e-traces` artifact is uploaded on failure only and kept 7 days.
+- With `update_snapshots`, the `e2e-snapshots-linux` artifact holds the new baselines.
+- The summary is posted to `POST /api/qa/runs` with `source: 'e2e'`, for the Quality page's
+  End-to-end tab. This step is best-effort: it skips when `QA_INGEST_URL`/`QA_INGEST_TOKEN`
+  are unset and prints only the HTTP status.
+
+The deploy workflow is separate, and this one never deploys.

@@ -66,6 +66,14 @@ Constraints:
 
 - **CI gains a second workflow** (`e2e.yml`, Node 22) for PRs touching `apps/api/**` or
   `e2e/**`, plus a nightly run. It is separate from the deploy workflow and never deploys.
+- **Artifacts are public.** The repository is public, so the report and traces (uploaded
+  only on failure, kept 7 days) are world-readable.
+  - This is acceptable because the app under test runs on a disposable database with
+    secrets generated per run (`playwright.config.js`), so a trace holds no real
+    credential.
+  - The axe attachments carry selectors only, never node HTML.
+- **Visual baselines are Linux-only and reviewed by a person.** The workflow, run with
+  `update_snapshots`, uploads them as an artifact, and a person commits them.
 - **There are two lockfiles to keep current.** `npm audit` for `e2e/` is separate from the
   app's.
 - **Selectors:** journeys rely on stable `data-testid` hooks added to `public/`. Removing

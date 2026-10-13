@@ -157,6 +157,23 @@ quality signals in one place (WP-Q, [ADR 0005](adr/0005-qa-telemetry-in-producti
   | github dispatch token | valid, with days to expiry / expires in under 14 days / expired or 401; "expiry unknown" when GitHub sends no expiry header; SKIPPED when unset |
 
   Details never contain a host, bucket name, URL or secret.
+- **End-to-end tab.** This shows the latest run that the **E2E** workflow
+  (`.github/workflows/e2e.yml`) posted with `source: 'e2e'`:
+  - the journeys
+  - axe counts and visual state per page and project
+  - failures
+  - links to the run and its artifacts (report; traces on failure)
+
+  The workflow runs on every PR that touches `apps/api/**` or `e2e/**`, nightly at 21:30 UTC
+  (03:00 IST), and on demand.
+- **Run full test suite now** (on the End-to-end tab) dispatches that workflow on `main`
+  (`POST /api/superadmin/qa/dispatch`).
+  - It is only offered when `GH_ACTIONS_DISPATCH_TOKEN` is set: `ci-status` reports
+    `dispatchEnabled`.
+  - It is limited to one dispatch per 10 minutes, and each one is audited as
+    `sa_test_suite_dispatched` (statuses only).
+  - It only works once `e2e.yml` is on `main`. Before that, GitHub answers 404/422 and the
+    page says so.
 
 ## What is *not* monitored (known gaps)
 

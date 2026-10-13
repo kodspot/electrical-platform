@@ -112,4 +112,41 @@ async function checkDispatchToken({ now = Date.now() } = {}) {
   return { status: 'PASS', detail: `token accepted; expires in ${days} days` };
 }
 
-module.exports = { repo, githubFetch, getCiStatus, checkDispatchToken, _resetCiCacheForTests, API_VERSION };
+const E2E_WORKFLOW = 'e2e.yml';
+
+/**
+ * Start the e2e workflow (workflow_dispatch on main). Returns { outcome, githubStatus, url }:
+ *   started            — 200 (url = the run's html_url, https://github.com/ only) or 204 (url null)
+ *   not_on_main        — 404 / 422: the workflow file is not on main yet
+ *   token_rejected     — 401 / 403
+ *   github_unavailable — 429, any other status, a timeout or a network error
+ *   disabled           — GH_ACTIONS_DISPATCH_TOKEN unset (no call made)
+ * githubStatus is the HTTP status or "timeout"/"network" — never a URL, header or token.
+ */
+async function dispatchE2eWorkflow({ requestedBy = 'superadmin' } = {}) {
+  if (!process.env.GH_ACTIONS_DISPATCH_TOKEN) return { outcome: 'disabled', githubStatus: null, url: null };
+  let res;
+  try {
+    res = await githubFetch(`/repos/${repo()}/actions/workflows/${E2E_WORKFLOW}/dispatches`, {
+      method: 'POST',
+      body: { ref: 'main', inputs: { requested_by: requestedBy } }
+    });
+  } catch (err) {
+    return { outcome: 'github_unavailable', githubStatus: reasonOf(err), url: null };
+  }
+  const s = res.status;
+  if (s === 200) {
+    let url = null;
+    try {
+      const body = await res.json();
+      if (typeof body.html_url === 'string' && body.html_url.startsWith('https://github.com/')) url = body.html_url;
+    } catch { /* a 200 without a usable body is still a started run */ }
+    return { outcome: 'started', githubStatus: 200, url };
+  }
+  if (s === 204) return { outcome: 'started', githubStatus: 204, url: null };
+  if (s === 404 || s === 422) return { outcome: 'not_on_main', githubStatus: s, url: null };
+  if (s === 401 || s === 403) return { outcome: 'token_rejected', githubStatus: s, url: null };
+  return { outcome: 'github_unavailable', githubStatus: s, url: null };
+}
+
+module.exports = { repo, githubFetch, getCiStatus, checkDispatchToken, dispatchE2eWorkflow, _resetCiCacheForTests, API_VERSION };

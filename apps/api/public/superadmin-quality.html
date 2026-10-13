@@ -48,6 +48,12 @@
   .q-card { padding: .85rem; }
   .q-trend svg { height: 130px; }
 }
+.q-tabs { display: flex; gap: .25rem; border-bottom: 1px solid var(--border); margin-bottom: 1rem; }
+.q-tabs button { background: none; border: 0; border-bottom: 2px solid transparent; padding: .55rem .85rem; font: inherit; font-size: .85rem; font-weight: 600; color: var(--text-muted); cursor: pointer; }
+.q-tabs button[aria-selected="true"] { color: var(--text); border-bottom-color: var(--primary); }
+.q-tabs button:focus-visible { outline: 2px solid var(--primary); outline-offset: -2px; }
+[hidden] { display: none !important; }
+.q-dispatch-msg { margin-top: .5rem; font-size: .8rem; }
 </style>
 </head>
 <body>
@@ -67,6 +73,12 @@
 </nav>
 
 <main class="container" style="max-width:1100px">
+  <div class="q-tabs" role="tablist" aria-label="Test suites">
+    <button type="button" role="tab" id="tabUnit" aria-controls="panelUnit" aria-selected="true">Unit &amp; integration</button>
+    <button type="button" role="tab" id="tabE2e" aria-controls="panelE2e" aria-selected="false" tabindex="-1" data-testid="qa-tab-e2e">End-to-end</button>
+  </div>
+
+  <div id="panelUnit" role="tabpanel" aria-labelledby="tabUnit">
   <div class="q-grid">
     <section class="q-card" aria-labelledby="latestTitle" data-testid="qa-latest">
       <h2 id="latestTitle">Latest test run <span class="q-spacer"></span><span id="latestBadge"></span></h2>
@@ -119,9 +131,25 @@
     </div>
     <div class="q-detail" id="runDetail" aria-live="polite"></div>
   </section>
+  </div>
+
+  <div id="panelE2e" role="tabpanel" aria-labelledby="tabE2e" hidden>
+    <section class="q-card" aria-labelledby="dispatchTitle" data-testid="qa-dispatch" style="margin-bottom:1rem">
+      <h2 id="dispatchTitle">Full test suite <span class="q-spacer"></span>
+        <button class="btn btn-sm btn-sa" id="dispatchBtn" type="button" hidden>Run full test suite now</button>
+      </h2>
+      <p class="q-muted" id="dispatchNote">Runs the browser end-to-end, visual and accessibility suite on main in GitHub Actions. Results appear here when it finishes.</p>
+      <div class="q-dispatch-msg" id="dispatchMsg" role="status" aria-live="polite"></div>
+    </section>
+
+    <section class="q-card" aria-labelledby="e2eTitle" data-testid="qa-e2e-latest">
+      <h2 id="e2eTitle">Latest end-to-end run <span class="q-spacer"></span><span id="e2eBadge"></span></h2>
+      <div id="e2eBody"><p class="q-muted">Open this tab to load the latest run.</p></div>
+    </section>
+  </div>
 </main>
 
 <script src="/js/app.js?v=15"></script>
-<script src="/js/superadmin-quality.js?v=1"></script>
+<script src="/js/superadmin-quality.js?v=2"></script>
 </body>
 </html>
