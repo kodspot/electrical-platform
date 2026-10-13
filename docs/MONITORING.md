@@ -112,6 +112,38 @@ inside a string value. The reverse proxy (`infrastructure/Caddyfile`) has no `lo
 so Caddy writes no access log. Regression tests: `apps/api/test/log-redaction.test.js` and
 `apps/api/test/integration/log-redaction.test.js`.
 
+## Super-admin Quality page (`/superadmin-quality`)
+
+A SUPER_ADMIN-only page (linked from the super-admin dashboard) that gathers the platform's
+quality signals in one place (WP-Q, [ADR 0005](adr/0005-qa-telemetry-in-production.md)):
+
+- **Latest test run, trend and history.** CI posts each run's scrubbed summary to
+  `POST /api/qa/runs`, authenticated with `QA_INGEST_TOKEN`, which answers 404 when unset.
+  Runs are stored in the platform-level `QaRun` table, which keeps the newest 500. The page
+  shows:
+  - the latest run, with a **NOT EXECUTED** warning whenever tests were skipped or cancelled
+  - a trend of the last 30 runs
+  - a runs table that drills into tiers, files and failures
+- **Live CI.** The latest GitHub Actions runs (`GET /api/superadmin/qa/ci-status`), cached
+  60 s server-side. The page polls every 15 s while a run is queued or in progress, otherwise
+  every 60 s, and pauses while the tab is hidden. It reads with `GH_ACTIONS_DISPATCH_TOKEN`
+  when set, otherwise unauthenticated (the repository is public).
+- **Run production checks.** Read-only checks, streamed live as NDJSON
+  (`POST /api/superadmin/qa/checks`). Each check is capped at 5 s, runs are limited to one
+  per 30 s, and every run is audited as `sa_production_checks_run` (statuses only).
+
+  | Check | PASS / WARN / FAIL |
+  |---|---|
+  | database | reachable and every shipped migration applied / extra unknown migrations / a shipped migration not applied |
+  | offsite-backups | newest `db-backups/` object ≤ 26 h old / ≤ 48 h / older, none, or an R2 error (by error name only); SKIPPED on the local storage driver |
+  | email | SMTP `verify()` succeeds, without sending / not configured / verify fails (error code only) |
+  | config: … | alerting, IP hash pepper, QA ingest token, dispatch token: configured or not (booleans only) |
+  | build | commit (`GIT_SHA`), Node version, uptime; WARN without `GIT_SHA` |
+  | live connections (SSE) | open SSE connection counts |
+  | github dispatch token | valid, with days to expiry / expires in under 14 days / expired or 401; "expiry unknown" when GitHub sends no expiry header; SKIPPED when unset |
+
+  Details never contain a host, bucket name, URL or secret.
+
 ## What is *not* monitored (known gaps)
 
 There is **no external APM or uptime monitor** beyond the health endpoints and Docker's

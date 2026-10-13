@@ -54,6 +54,7 @@ async function pageRoutes(fastify) {
   fastify.get('/', sendPage('index.html'));
   fastify.get('/superadmin-login', sendPage('superadmin-login.html'));
   fastify.get('/superadmin-dashboard', sendPage('superadmin-dashboard.html'));
+  fastify.get('/superadmin-quality', sendPage('superadmin-quality.html'));
   fastify.get('/privacy', sendPage('privacy.html'));
   fastify.get('/terms', sendPage('terms.html'));
 

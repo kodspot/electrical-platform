@@ -67,9 +67,14 @@ multi-tenant guarantee rests on.
 
 ### Which models are *not* tenant-scoped, and why that's safe
 
-Of the 31 models, only these lack `orgId`, each for a defensible reason:
+Of the 32 models, only these lack `orgId`, each for a defensible reason:
 
 - **`Organization`** — it *is* the tenant; it doesn't belong to one.
+- **`QaRun`** — platform-level QA telemetry (one row per CI/local/e2e test run) for the
+  super-admin Quality page. It describes the platform's code, not any tenant's data. It is
+  written only by the token-authenticated ingest (`POST /api/qa/runs`) and read only by
+  SUPER_ADMIN (`/api/superadmin/qa/*`). See ADR
+  [0005](../adr/0005-qa-telemetry-in-production.md).
 - **`ModuleDefinition`, `ModuleDependency`** — the global module *catalog*, system-wide by
   design (see [module-system.md](module-system.md)), not tenant data.
 - **`DutyRosterWorker`, `AssetImage`, `AssetFailureImage`, `InspectionTemplateItem`,

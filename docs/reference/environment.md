@@ -56,6 +56,7 @@ Unset is safe; behavior degrades gracefully. Recommended in production where not
 | `GLOBAL_AI_API_KEY` / `GLOBAL_AI_PROVIDER` / `GLOBAL_AI_MODEL` | Org-level default AI key fallback (`lib/ai-provider.js`) | Orgs use only their own configured key |
 | `GIT_SHA` | The deployed commit, shown in `/health/info` (`build.commit`) and the startup log (`lib/diagnostics.js`) | `commit: null` |
 | `QA_INGEST_TOKEN` | Bearer secret for `POST /api/qa/runs`, the CI → super-admin Quality page ingest | The ingest endpoint answers `404` |
+| `QA_GITHUB_REPO` | `owner/name` of the repository the Quality page reads CI status from (`lib/github.js`) | `kodspot/electrical-platform` |
 | `GH_ACTIONS_DISPATCH_TOKEN` | Fine-grained GitHub token (this repo only, Actions read+write): Quality page CI status and the "run full test suite" dispatch | CI status uses unauthenticated reads of the public repo; dispatch is unavailable |
 
 **How these reach production.** `IP_HASH_PEPPER`, `QA_INGEST_TOKEN` and

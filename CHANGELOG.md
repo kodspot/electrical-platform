@@ -35,6 +35,31 @@ see `docs/DEPLOYMENT.md` for how a change reaches production.
   - **Tickets go to the nearest responsible supervisor.** When several supervisors cover
     a location, a new complaint or ticket is now consistently assigned to the one closest
     to it.
+- **User-visible (Release Notes), super-admin:** a new **Quality** page (`/superadmin-quality`,
+  linked from the super-admin dashboard). It shows:
+  - the latest automated test run (warning whenever tests didn't run), a 30-run trend and
+    run history with per-file and per-failure detail
+  - live CI status
+  - a **Run production checks** button that checks the database, offsite backups, email,
+    configuration and build without changing anything
+- **`[WP-Q]` Super-admin Quality page.**
+  - **New model:** `QaRun` (additive migration `20261013000000_wp_q_qa_runs`). It is
+    platform-level, not tenant-scoped, and keeps the newest 500 rows.
+  - **New routes:** `POST /api/qa/runs` (ingest), authenticated by `QA_INGEST_TOKEN`; it
+    returns 404 when unset, compares in constant time, and enforces a 256 KB limit, zod
+    validation and a rate limit. Also SUPER_ADMIN-only `GET /api/superadmin/qa/runs`,
+    `/runs/:id`, `/trend` and `/ci-status`, and `POST /api/superadmin/qa/checks`, which is
+    read-only, streamed as NDJSON, limited to one per 30 s and audited.
+  - **New libraries:** `lib/github.js` (versioned headers, 10 s timeout, 60 s CI-status cache,
+    whitelisted fields, token-expiry check) and `services/production-checks.js`.
+  - **Small additive exports:** `email.js` `verifyTransport()` (never sends) and `r2.js`
+    `getR2Client`.
+  - **Report:** `scripts/report-tests.js` also writes `reports/test-summary.json` (scrubbed,
+    ≤ 200 KB).
+  - **Page:** `public/superadmin-quality.html` + `js/superadmin-quality.js` (no inline script).
+  - **Tests:** `production-checks.test.js` and `integration/qa-dashboard.test.js`.
+  - **Docs:** ADR 0005, MONITORING, auth-and-tenancy (`QaRun` is not tenant-scoped),
+    environment (`QA_GITHUB_REPO`), the route index and COVERAGE_MATRIX.
 - **`[WP-OPS]` Deploy and CI hygiene.**
   - **`docker-compose.yml`:** the db healthcheck uses `$$POSTGRES_USER`/`$$POSTGRES_DB`
     (expanded in the container, not interpolated empty from the host). The `api` service

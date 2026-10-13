@@ -13,7 +13,7 @@ route table. It is a **navigation index**, not full API documentation.
   per-row here — it cannot be read reliably from the route table.
 - For **request/response detail**, read the handler in `apps/api/src/routes/`.
 
-Counts: 204 API routes, 73 page/other routes.
+Counts: 210 API routes, 74 page/other routes.
 
 ## API routes (`/api`)
 
@@ -150,6 +150,7 @@ Counts: 204 API routes, 73 page/other routes.
 | GET | `/api/public/location/:code` |
 | GET | `/api/public/review/:token` |
 | POST | `/api/public/review/:token` |
+| POST | `/api/qa/runs` |
 | GET | `/api/shift-config` |
 | POST | `/api/superadmin/ai/test-key` |
 | GET | `/api/superadmin/ai/usage` |
@@ -176,6 +177,11 @@ Counts: 204 API routes, 73 page/other routes.
 | POST | `/api/superadmin/organizations/:orgId/supervisors` |
 | GET | `/api/superadmin/organizations/:orgId/workers` |
 | POST | `/api/superadmin/organizations/:orgId/workers` |
+| POST | `/api/superadmin/qa/checks` |
+| GET | `/api/superadmin/qa/ci-status` |
+| GET | `/api/superadmin/qa/runs` |
+| GET | `/api/superadmin/qa/runs/:id` |
+| GET | `/api/superadmin/qa/trend` |
 | GET | `/api/superadmin/users` |
 | PATCH | `/api/superadmin/users/:id` |
 | PATCH | `/api/superadmin/users/:id/password` |
@@ -300,4 +306,5 @@ Counts: 204 API routes, 73 page/other routes.
 | GET | `/scan/:code` |
 | GET | `/superadmin-dashboard` |
 | GET | `/superadmin-login` |
+| GET | `/superadmin-quality` |
 | GET | `/terms` |

@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
+<meta name="theme-color" content="#1E40AF">
+<meta name="robots" content="noindex, nofollow">
+<title>Quality — Super Admin — Kodspot</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/css/design-system.css?v=10">
+<style>
+.sa-badge { display: inline-block; font-size: .65rem; font-weight: 600; background: rgba(255,255,255,.15); color: rgba(255,255,255,.9); padding: .15rem .5rem; border-radius: 50px; letter-spacing: .03em; white-space: nowrap; }
+.q-nav { display: flex; gap: .25rem; margin-left: .75rem; }
+.q-nav a { color: rgba(255,255,255,.75); text-decoration: none; font-size: .82rem; padding: .35rem .65rem; border-radius: var(--radius-sm); }
+.q-nav a[aria-current="page"] { background: rgba(255,255,255,.15); color: #fff; font-weight: 600; }
+.q-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1rem; margin-bottom: 1rem; }
+.q-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 1rem 1.15rem; min-width: 0; }
+.q-card h2 { font-size: .95rem; font-weight: 700; margin: 0 0 .65rem; color: var(--text); display: flex; align-items: center; gap: .5rem; flex-wrap: wrap; }
+.q-card h2 .q-spacer { flex: 1; }
+.q-muted { color: var(--text-muted); font-size: .78rem; }
+.q-counts { display: grid; grid-template-columns: repeat(auto-fit, minmax(80px, 1fr)); gap: .5rem; margin: .65rem 0; }
+.q-count { background: var(--bg); border-radius: var(--radius-sm); padding: .5rem .6rem; }
+.q-count b { display: block; font-size: 1.2rem; color: var(--text); }
+.q-count span { font-size: .7rem; color: var(--text-muted); }
+.q-warn { background: var(--warning-bg); color: var(--warning-text); border-radius: var(--radius-sm); padding: .5rem .7rem; font-size: .8rem; font-weight: 600; margin: .5rem 0; }
+.q-trend svg { width: 100%; height: 160px; display: block; }
+.q-legend { display: flex; gap: .9rem; flex-wrap: wrap; font-size: .72rem; color: var(--text-muted); margin-top: .35rem; }
+.q-legend i { display: inline-block; width: .7rem; height: .7rem; border-radius: 2px; margin-right: .3rem; vertical-align: -1px; }
+.q-table { width: 100%; border-collapse: collapse; font-size: .8rem; }
+.q-table th, .q-table td { text-align: left; padding: .45rem .5rem; border-bottom: 1px solid var(--border-light); white-space: nowrap; }
+.q-table th { color: var(--text-muted); font-weight: 600; font-size: .72rem; text-transform: uppercase; letter-spacing: .03em; }
+.q-table tbody tr[data-run-id] { cursor: pointer; }
+.q-table tbody tr[data-run-id]:hover, .q-table tbody tr[data-run-id]:focus { background: var(--primary-light); outline: none; }
+.q-detail { margin-top: .75rem; }
+.q-detail h3 { font-size: .82rem; margin: .9rem 0 .4rem; }
+.q-fail { border-left: 3px solid var(--danger); background: var(--danger-bg); padding: .45rem .6rem; border-radius: 0 var(--radius-sm) var(--radius-sm) 0; margin-bottom: .4rem; font-size: .76rem; white-space: normal; word-break: break-word; }
+.q-checks { list-style: none; margin: .5rem 0 0; padding: 0; }
+.q-checks li { display: flex; gap: .6rem; align-items: flex-start; padding: .4rem 0; border-bottom: 1px solid var(--border-light); font-size: .8rem; }
+.q-checks li .badge { flex-shrink: 0; min-width: 4.5rem; text-align: center; }
+.q-checks li b { display: block; }
+.q-ci li { flex-wrap: wrap; }
+.q-ci a { color: var(--primary); }
+.q-pager { display: flex; gap: .5rem; align-items: center; justify-content: flex-end; margin-top: .6rem; }
+@media (max-width: 640px) {
+  .q-nav { margin-left: .25rem; }
+  .q-card { padding: .85rem; }
+  .q-trend svg { height: 130px; }
+}
+</style>
+</head>
+<body>
+<nav class="topbar topbar-sa">
+  <div class="topbar-left">
+    <span class="topbar-brand">Kodspot</span>
+    <span class="sa-badge">Super Admin</span>
+    <div class="q-nav">
+      <a href="/superadmin-dashboard">Dashboard</a>
+      <a href="/superadmin-quality" aria-current="page">Quality</a>
+    </div>
+  </div>
+  <div class="topbar-right">
+    <span class="topbar-user" id="userName"></span>
+    <button class="btn btn-sm btn-ghost" id="logoutBtn" type="button">Logout</button>
+  </div>
+</nav>
+
+<main class="container" style="max-width:1100px">
+  <div class="q-grid">
+    <section class="q-card" aria-labelledby="latestTitle" data-testid="qa-latest">
+      <h2 id="latestTitle">Latest test run <span class="q-spacer"></span><span id="latestBadge"></span></h2>
+      <div id="latestBody"><div class="skeleton skeleton-card"></div></div>
+    </section>
+
+    <section class="q-card q-trend" aria-labelledby="trendTitle" data-testid="qa-trend">
+      <h2 id="trendTitle">Last 30 runs</h2>
+      <div id="trendChart"><div class="skeleton skeleton-card"></div></div>
+      <div class="q-legend" aria-hidden="true">
+        <span><i style="background:var(--success)"></i>passed</span>
+        <span><i style="background:var(--danger)"></i>failed / cancelled</span>
+        <span><i style="background:var(--warning)"></i>not executed</span>
+      </div>
+    </section>
+  </div>
+
+  <div class="q-grid">
+    <section class="q-card" aria-labelledby="ciTitle" data-testid="qa-live-ci">
+      <h2 id="ciTitle">Live CI <span class="q-spacer"></span><span class="q-muted" id="ciUpdated"></span></h2>
+      <ul class="q-checks q-ci" id="ciList"><li class="q-muted">Loading…</li></ul>
+    </section>
+
+    <section class="q-card" aria-labelledby="checksTitle" data-testid="qa-checks">
+      <h2 id="checksTitle">Production checks <span class="q-spacer"></span>
+        <button class="btn btn-sm btn-sa" id="runChecksBtn" type="button">Run production checks</button>
+      </h2>
+      <p class="q-muted">Read-only: database and migrations, offsite backups, email connection (nothing sent), configuration, build, live connections, and the dispatch token.</p>
+      <ul class="q-checks" id="checksList" aria-live="polite"></ul>
+    </section>
+  </div>
+
+  <section class="q-card" aria-labelledby="runsTitle" data-testid="qa-runs">
+    <h2 id="runsTitle">Test runs <span class="q-spacer"></span>
+      <label class="q-muted" for="sourceFilter">Source</label>
+      <select id="sourceFilter" class="form-input" style="width:auto;min-height:32px;padding:.2rem .5rem">
+        <option value="">All</option><option value="ci">CI</option><option value="e2e">End-to-end</option><option value="local">Local</option>
+      </select>
+    </h2>
+    <div class="table-wrap">
+      <table class="q-table">
+        <thead><tr><th>When</th><th>Source</th><th>Status</th><th>Total</th><th>Passed</th><th>Failed</th><th>Not run</th><th>Duration</th><th>Commit</th><th>Ref</th></tr></thead>
+        <tbody id="runsBody"><tr><td colspan="10" class="q-muted">Loading…</td></tr></tbody>
+      </table>
+    </div>
+    <div class="q-pager">
+      <button class="btn btn-sm btn-outline" id="prevPage" type="button">Previous</button>
+      <span class="q-muted" id="pageInfo"></span>
+      <button class="btn btn-sm btn-outline" id="nextPage" type="button">Next</button>
+    </div>
+    <div class="q-detail" id="runDetail" aria-live="polite"></div>
+  </section>
+</main>
+
+<script src="/js/app.js?v=15"></script>
+<script src="/js/superadmin-quality.js?v=1"></script>
+</body>
+</html>

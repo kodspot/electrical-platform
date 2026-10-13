@@ -96,7 +96,24 @@ async function emailAdmins(prisma, orgId, subject, html) {
   } catch { /* never break */ }
 }
 
+/**
+ * Checks the SMTP connection and credentials without sending anything (nodemailer
+ * transporter.verify()). Used by the super-admin production checks. [WP-Q]
+ * Returns { configured: false } when SES_* is unset, else { configured: true, ok, code? }.
+ */
+async function verifyTransport() {
+  const transport = getSesTransporter();
+  if (!transport) return { configured: false };
+  try {
+    await transport.verify();
+    return { configured: true, ok: true };
+  } catch (err) {
+    return { configured: true, ok: false, code: err.code || err.name || 'ERROR' };
+  }
+}
+
 module.exports = {
+  verifyTransport,
   getSesTransporter,
   SES_FROM,
   escHtml,

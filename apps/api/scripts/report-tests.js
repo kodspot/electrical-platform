@@ -285,6 +285,79 @@ function tally(list) {
 
 const row = (cells) => `| ${cells.map((c) => String(c).replace(/\|/g, '\\|')).join(' | ')} |`;
 
+/** Per-tier and per-file tallies plus the failure list — shared by the markdown and JSON reports. */
+function groupCases(cases) {
+  const byFile = new Map();
+  for (const c of cases) {
+    const key = c.file || '(file unknown)';
+    if (!byFile.has(key)) byFile.set(key, []);
+    byFile.get(key).push(c);
+  }
+  const byTier = new Map();
+  for (const [file, list] of byFile) {
+    const tier = tierOf(file);
+    if (!byTier.has(tier)) byTier.set(tier, { files: 0, list: [] });
+    byTier.get(tier).files++;
+    byTier.get(tier).list.push(...list);
+  }
+  const tiers = [...byTier].sort((a, b) => a[0].localeCompare(b[0]))
+    .map(([tier, { files, list }]) => ({ tier, files, ...tally(list) }));
+  const files = [...byFile].sort((a, b) => a[0].localeCompare(b[0]))
+    .map(([file, list]) => ({ file, tier: tierOf(file), ...tally(list) }));
+  const failures = cases.filter((c) => c.status === 'failed' || c.status === 'cancelled').map((c) => ({
+    test: [...c.trail, c.name].join(' › '),
+    file: c.file || '(file unknown)',
+    status: c.status,
+    classification: c.classification,
+    // Scrub BEFORE truncating: a token cut mid-way would no longer match the patterns.
+    detail: truncate(scrub(c.hookCause ? `cancelled because a suite hook failed: ${c.hookCause}` : c.detail))
+  }));
+  return { tiers, files, failures };
+}
+
+const JSON_SUMMARY_MAX_BYTES = 200 * 1024;
+
+/**
+ * Machine-readable twin of test-summary.md, for the super-admin Quality page (CI posts it to
+ * POST /api/qa/runs). Every string is scrubbed. Capped at 200 KB: failures are trimmed first,
+ * then the per-file table, and the number dropped is recorded in `truncated`. [WP-Q]
+ */
+function buildJsonSummary({ counts, cases, nodeVersion, ci, strict, decision }) {
+  const ne = notExecuted(counts);
+  const { tiers, files, failures } = groupCases(cases);
+  const summary = {
+    status: decision.code !== 0 ? 'failed' : ne > 0 ? 'passed_with_not_executed' : 'passed',
+    counts: {
+      tests: counts.tests, pass: counts.pass, fail: counts.fail, cancelled: counts.cancelled,
+      skipped: counts.skipped, todo: counts.todo, notExecuted: ne
+    },
+    durationMs: typeof counts.duration_ms === 'number' ? Math.round(counts.duration_ms) : null,
+    nodeVersion,
+    ci: !!ci,
+    strict: !!strict,
+    exitCode: decision.code,
+    reasons: decision.reasons,
+    tiers,
+    files,
+    failures,
+    truncated: { failures: 0, files: 0 }
+  };
+  // Scrub string values, never the serialized JSON (a pattern ending at an escaped quote
+  // would otherwise unescape it and break the document).
+  const deepScrub = (v) => (typeof v === 'string' ? scrub(v)
+    : Array.isArray(v) ? v.map(deepScrub)
+      : v && typeof v === 'object' ? Object.fromEntries(Object.entries(v).map(([k, x]) => [k, deepScrub(x)]))
+        : v);
+  const scrubbed = () => deepScrub(summary);
+  let out = scrubbed();
+  while (Buffer.byteLength(JSON.stringify(out)) > JSON_SUMMARY_MAX_BYTES && (summary.failures.length || summary.files.length)) {
+    if (summary.failures.length) { summary.failures.pop(); summary.truncated.failures++; }
+    else { summary.files.pop(); summary.truncated.files++; }
+    out = scrubbed();
+  }
+  return out;
+}
+
 function buildSummary({ counts, cases, baseline, nodeVersion, ci, strict, decision }) {
   const ne = notExecuted(counts);
   const status = decision.code !== 0 ? '❌ FAILED' : ne > 0 ? '⚠️ PASSED — BUT NOT EVERYTHING RAN' : '✅ PASSED';
@@ -322,50 +395,28 @@ function buildSummary({ counts, cases, baseline, nodeVersion, ci, strict, decisi
       counts.cancelled - baseline.cancelled, counts.skipped - baseline.skipped, counts.todo - baseline.todo]), '');
   }
 
-  const byFile = new Map();
-  for (const c of cases) {
-    const key = c.file || '(file unknown)';
-    if (!byFile.has(key)) byFile.set(key, []);
-    byFile.get(key).push(c);
-  }
-  const byTier = new Map();
-  for (const [file, list] of byFile) {
-    const tier = tierOf(file);
-    if (!byTier.has(tier)) byTier.set(tier, { files: 0, list: [] });
-    byTier.get(tier).files++;
-    byTier.get(tier).list.push(...list);
-  }
+  const { tiers, files, failures } = groupCases(cases);
 
   lines.push('## By tier', '');
   lines.push(row(['Tier', 'Files', 'Tests', 'Passed', 'Failed', 'Cancelled', 'Skipped', 'Todo']));
   lines.push(row(['---', '---', '---', '---', '---', '---', '---', '---']));
-  for (const [tier, { files, list }] of [...byTier].sort((a, b) => a[0].localeCompare(b[0]))) {
-    const t = tally(list);
-    lines.push(row([tier, files, t.tests, t.passed, t.failed, t.cancelled, t.skipped, t.todo]));
-  }
+  for (const t of tiers) lines.push(row([t.tier, t.files, t.tests, t.passed, t.failed, t.cancelled, t.skipped, t.todo]));
   lines.push('');
 
   lines.push('## By file', '');
   lines.push(row(['File', 'Tier', 'Tests', 'Passed', 'Failed', 'Cancelled', 'Skipped', 'Todo']));
   lines.push(row(['---', '---', '---', '---', '---', '---', '---', '---']));
-  for (const [file, list] of [...byFile].sort((a, b) => a[0].localeCompare(b[0]))) {
-    const t = tally(list);
-    lines.push(row([`\`${file}\``, tierOf(file), t.tests, t.passed, t.failed, t.cancelled, t.skipped, t.todo]));
-  }
+  for (const f of files) lines.push(row([`\`${f.file}\``, f.tier, f.tests, f.passed, f.failed, f.cancelled, f.skipped, f.todo]));
   lines.push('');
 
-  const problems = cases.filter((c) => c.status === 'failed' || c.status === 'cancelled');
-  lines.push(`## Failures and cancellations (${problems.length})`, '');
-  if (problems.length === 0) {
+  lines.push(`## Failures and cancellations (${failures.length})`, '');
+  if (failures.length === 0) {
     lines.push('None.', '');
   } else {
     lines.push('Classification is automatic only for clearly mechanical causes (ENVIRONMENT); everything else is UNCLASSIFIED until a person marks it PRODUCT or TEST.', '');
     lines.push(row(['Test', 'File', 'Status', 'Classification', 'Expected vs actual / cause']));
     lines.push(row(['---', '---', '---', '---', '---']));
-    for (const c of problems) {
-      const detail = c.hookCause ? `cancelled because a suite hook failed: ${c.hookCause}` : c.detail;
-      lines.push(row([[...c.trail, c.name].join(' › '), c.file || '(file unknown)', c.status, c.classification, truncate(detail)]));
-    }
+    for (const f of failures) lines.push(row([f.test, f.file, f.status, f.classification, f.detail]));
     lines.push('');
   }
 
@@ -399,12 +450,14 @@ function generateReport({ rawJunitPath, eventsPath, outDir, baselinePath, childS
   const baseline = baselinePath && fs.existsSync(baselinePath) ? JSON.parse(fs.readFileSync(baselinePath, 'utf8')) : null;
   const decision = decideExit({ childStatus, reportOk: true, counts: parsed.counts, ci, strict });
   const summary = buildSummary({ counts: parsed.counts, cases, baseline, nodeVersion, ci, strict, decision });
+  const jsonSummary = buildJsonSummary({ counts: parsed.counts, cases, nodeVersion, ci, strict, decision });
 
   fs.mkdirSync(outDir, { recursive: true });
   fs.writeFileSync(path.join(outDir, 'junit.xml'), scrubbedXml);
   fs.writeFileSync(path.join(outDir, 'test-summary.md'), summary);
+  fs.writeFileSync(path.join(outDir, 'test-summary.json'), JSON.stringify(jsonSummary, null, 2));
   if (process.env.GITHUB_STEP_SUMMARY) fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, `${summary}\n`);
-  return { counts: parsed.counts, cases, summary, decision };
+  return { counts: parsed.counts, cases, summary, jsonSummary, decision };
 }
 
 module.exports = {
@@ -418,6 +471,8 @@ module.exports = {
   classify,
   decideExit,
   REPORT_FAILED,
+  buildJsonSummary,
+  JSON_SUMMARY_MAX_BYTES,
   notExecuted,
   buildSummary,
   generateReport

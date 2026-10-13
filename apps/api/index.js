@@ -36,6 +36,8 @@ const assetFailureRoutes = require('./src/routes/asset-failures');
 const alertRoutes = require('./src/routes/alerts');
 const workerAuthRoutes = require('./src/routes/worker-auth');
 const predictionRoutes = require('./src/routes/predictions');
+const qaRoutes = require('./src/routes/qa');
+const superadminQaRoutes = require('./src/routes/superadmin-qa');
 const pageRoutes = require('./src/routes/pages');
 
 // Services
@@ -129,6 +131,8 @@ async function registerApp(fastify) {
     api.register(alertRoutes);
     api.register(workerAuthRoutes);
     api.register(predictionRoutes);
+    api.register(qaRoutes);
+    api.register(superadminQaRoutes);
   }, { prefix: '/api' });
 
   // Page-serving routes (org-scoped URLs, short QR, etc.)

@@ -11,7 +11,8 @@ const os = require('node:os');
 const path = require('node:path');
 
 const {
-  scrub, parseJUnit, parseEvents, collectCases, tierOf, decideExit, generateReport
+  scrub, parseJUnit, parseEvents, collectCases, tierOf, decideExit, generateReport,
+  buildJsonSummary, JSON_SUMMARY_MAX_BYTES
 } = require('../scripts/report-tests');
 
 const FIXTURES = path.join(__dirname, 'fixtures', 'junit');
@@ -140,6 +141,55 @@ describe('QA-1 report — scrubbing', () => {
     const scrubbed = scrub(fixture('node20-combined.xml'));
     assertScrubbed(scrubbed);
     assert.doesNotThrow(() => parseJUnit(scrubbed));
+  });
+});
+
+describe('WP-Q report — test-summary.json', () => {
+  const realCases = () => collectCases(parseJUnit(scrub(fixture('node20-combined.xml'))), parseEvents(fixture('node20-combined.events.jsonl')));
+  const realCounts = () => parseJUnit(fixture('node20-combined.xml')).counts;
+
+  it('carries status, counts, duration, tiers, files and scrubbed failures', () => {
+    const decision = decideExit({ childStatus: 1, reportOk: true, counts: realCounts(), ci: false, strict: false });
+    const s = buildJsonSummary({ counts: realCounts(), cases: realCases(), nodeVersion: 'v20.20.2', ci: false, strict: false, decision });
+    assert.strictEqual(s.status, 'failed');
+    assert.deepStrictEqual(s.counts, { tests: 8, pass: 3, fail: 1, cancelled: 2, skipped: 1, todo: 1, notExecuted: 4 });
+    assert.strictEqual(typeof s.durationMs, 'number');
+    assert.strictEqual(s.nodeVersion, 'v20.20.2');
+    assert.ok(s.tiers.length >= 1 && s.files.every((f) => f.file.startsWith('test/probe/')));
+    assert.strictEqual(s.failures.length, 3);
+    assertScrubbed(JSON.stringify(s));
+  });
+
+  it('is capped at 200 KB, trimming failures first and recording how many were dropped', () => {
+    const big = Array.from({ length: 3000 }, (_, i) => ({
+      name: `case ${i} ${'x'.repeat(300)}`, trail: [], file: `test/f${i}.test.js`, status: 'failed', detail: 'y'.repeat(380), classification: 'UNCLASSIFIED'
+    }));
+    const counts = { tests: 3000, pass: 0, fail: 3000, cancelled: 0, skipped: 0, todo: 0 };
+    const decision = decideExit({ childStatus: 1, reportOk: true, counts, ci: false, strict: false });
+    const s = buildJsonSummary({ counts, cases: big, nodeVersion: 'v24', ci: false, strict: false, decision });
+    assert.ok(Buffer.byteLength(JSON.stringify(s)) <= JSON_SUMMARY_MAX_BYTES);
+    assert.ok(s.truncated.failures > 0, 'failures must be trimmed first');
+    assert.strictEqual(s.counts.fail, 3000, 'counts are never trimmed');
+  });
+
+  it('stays valid JSON when a scrubbed value sits next to an escaped quote', () => {
+    const cases = [{ name: 'q', trail: [], file: 'test/q.test.js', status: 'failed', classification: 'UNCLASSIFIED', detail: 'got "token=abc\\" and more"' }];
+    const counts = { tests: 1, pass: 0, fail: 1, cancelled: 0, skipped: 0, todo: 0 };
+    const decision = decideExit({ childStatus: 1, reportOk: true, counts, ci: false, strict: false });
+    const s = buildJsonSummary({ counts, cases, nodeVersion: 'v24', ci: false, strict: false, decision });
+    assert.doesNotThrow(() => JSON.parse(JSON.stringify(s)));
+    assert.ok(!JSON.stringify(s).includes('abc'));
+  });
+
+  it('generateReport writes test-summary.json next to the markdown', () => {
+    const out = fs.mkdtempSync(path.join(os.tmpdir(), 'qa1-report-'));
+    try {
+      generateReport({ rawJunitPath: path.join(FIXTURES, 'node24-combined.xml'), eventsPath: null, outDir: out, baselinePath: null, childStatus: 1, ci: false, strict: false, nodeVersion: 'v24' });
+      const s = JSON.parse(fs.readFileSync(path.join(out, 'test-summary.json'), 'utf8'));
+      assert.strictEqual(s.counts.tests, 8);
+    } finally {
+      fs.rmSync(out, { recursive: true, force: true });
+    }
   });
 });
 
