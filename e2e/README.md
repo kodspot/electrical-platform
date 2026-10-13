@@ -68,6 +68,63 @@ Codegen points at your **dev** server and dev data. Use what it records as a sta
     wrong PIN, invalid complaint).
   - `*.mobile.spec.js`: phone-only journeys, run in `chromium-mobile` only. For example,
     J8 is the worker PIN reset from the emailed link.
+  - `visual-a11y.spec.js`: the design and accessibility checks (below), in both projects.
 - **Every journey checks two things:** what the user sees, and the database or API state
   behind it (through the app's own Prisma client). There are no fixed sleeps, only
   auto-waiting locators and `expect.poll`.
+
+## Design and accessibility checks (`tests/visual-a11y.spec.js`)
+
+There are 10 pages, each checked on desktop and on Pixel 7:
+- the admin, supervisor and electrician logins
+- the admin dashboard, tickets, locations and QR print pages
+- the guest complaint page (`/s/<code>`)
+- the electrician's My Work page
+- `/superadmin-quality`
+
+The pages show a dedicated "visual" org with fixed names, codes and tickets, so the
+screenshots don't depend on the per-run seed.
+
+**Visual (`toHaveScreenshot`, `support/visual.js`)**
+- **What's masked:** times, dates and relative times; `<canvas>`; and per-page dynamic
+  regions such as the dashboard charts and the Quality page's live CI and trend.
+- **Where baselines live:** `tests/__screenshots__/<platform>/<project>/<page>.png`.
+- **Only Linux baselines are ever committed.** The Windows and macOS directories are
+  git-ignored.
+- **Until a baseline exists for the current platform**, the check records an annotation
+  `no baseline: <page>`, attaches the masked screenshot, and does **not** fail.
+- **Creating or refreshing baselines:**
+  1. Run the **E2E** workflow by hand with `update_snapshots` = `true`.
+  2. Download the `e2e-snapshots-linux` artifact.
+  3. Review the images.
+  4. Commit them under `e2e/tests/__screenshots__/linux/`.
+
+**Accessibility (axe-core, WCAG 2.0/2.1 A + AA)**
+- It's report-only, and the test fails **only on critical violations**.
+- Counts per impact are recorded as an `axe` annotation, plus an attachment that holds rule
+  ids, help text and selectors only. Node HTML is left out on purpose: it could carry an
+  `?token=` image URL into a public artifact.
+
+**Baseline counts (2026-10-13, after fixing the one critical finding).** The critical finding
+was `button-name` on the mobile menu button `#nav-toggle` on 11 admin pages, which now
+carries `aria-label="Menu"`. Cells show serious-violation nodes, desktop / mobile; critical
+is 0 everywhere:
+
+| Page | Serious |
+|---|---|
+| admin-login, supervisor-login, electrician-login | 0 / 0 |
+| admin-dashboard | 4 / 4 |
+| admin-tickets | 5 / 1 |
+| admin-locations | 3 / 3 |
+| admin-qr-print | 0 / 0 |
+| guest-complaint | 2 / 2 |
+| electrician-my-work | 1 / 1 |
+| superadmin-quality | 10 / 9 |
+
+By rule, across both projects:
+- `color-contrast`: 24 nodes
+- `link-in-text-block`: 20 nodes
+- `scrollable-region-focusable`: 1 node
+
+These are known, report-only items for a later design pass. A new critical violation fails
+the suite.

@@ -100,6 +100,19 @@ see `docs/DEPLOYMENT.md` for how a change reaches production.
     browser-style. It failed on the old code (24/24 rejected) and passes now. It also checks
     that malformed JSON and poisoning payloads are still rejected.
 
+- **User-visible (Release Notes):** screen readers now announce the mobile menu button on
+  admin pages ("Menu").
+- **`[E2E-3]` Design and accessibility checks (`e2e/tests/visual-a11y.spec.js`).** Ten pages
+  are checked on desktop and on a Pixel 7.
+  - **Visual:** `toHaveScreenshot` with the dynamic regions masked. Baselines are Linux
+    only, generated in CI. Until one exists, the check records "no baseline" and does not
+    fail.
+  - **Accessibility:** axe (WCAG 2.0/2.1 A + AA), report-only, failing only on critical
+    violations. Its first run found one critical, `button-name`: the mobile menu button
+    `#nav-toggle` had no accessible name on 11 admin pages. It now has `aria-label="Menu"`,
+    the same as `admin-attendance.html` already did.
+  - **Baseline counts:** 0 critical. The 45 serious nodes are `color-contrast`,
+    `link-in-text-block` and `scrollable-region-focusable`; see `e2e/README.md`.
 - **`[E2E-2]` Browser journeys J1–J8 (`e2e/tests/`).**
   - **J1–J6, one story:** an admin creates a location and prints its QR; the QR decodes to
     `APP_URL/s/<code>`. A guest on a phone reports a fault with a photo, and the database
