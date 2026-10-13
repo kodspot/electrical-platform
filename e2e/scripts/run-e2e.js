@@ -52,7 +52,10 @@ for (let i = 0; i < 20; i++) {
 }
 
 const env = { ...process.env, DATABASE_URL: `postgresql://e2e:e2e@127.0.0.1:${PORT}/electrical_e2e` };
-const args = ['playwright', 'test', ...(ui ? ['--ui'] : []), ...passthrough];
-const res = spawnSync('npx', args, { cwd: E2E_DIR, stdio: 'inherit', env, shell: process.platform === 'win32' });
+// Run Playwright's CLI with node directly — no shell — so pass-through arguments such as
+// `--grep "J1|J2"` reach Playwright verbatim instead of being parsed by a shell.
+const cli = path.join(E2E_DIR, 'node_modules', '@playwright', 'test', 'cli.js');
+const args = [cli, 'test', ...(ui ? ['--ui'] : []), ...passthrough];
+const res = spawnSync(process.execPath, args, { cwd: E2E_DIR, stdio: 'inherit', env });
 cleanup();
 process.exit(res.status === null ? 1 : res.status);
