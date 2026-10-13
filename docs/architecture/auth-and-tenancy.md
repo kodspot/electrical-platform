@@ -33,6 +33,21 @@ token reflects field devices that stay logged in.
    suspended or deleted org stops being reachable everywhere at once.
 
 `authenticateWorkerJWT` mirrors this for workers, including the `tokenInvalidBefore` check.
+`authenticateJWT` refuses a token without `userId` (e.g. a worker token) with `401` before
+any query. (F15)
+
+**The image proxy (`GET /api/images/*`, `routes/images.js`)** takes its token as `?token=`,
+because an `<img>` cannot send a header. It accepts both token types and applies the same
+checks:
+- **Staff (`userId`):** the account is active, the token is not issued before
+  `tokenInvalidBefore`, and the org is `ACTIVE`. `SUPER_ADMIN` may read any org.
+- **Worker (`workerId`):** the same three checks.
+- **Neither id:** `401` without a query.
+
+Keys are `uploads/<orgId>/…`. A non-super-admin may read only their own org's keys, and
+another org's key answers `404`, not `403`, so its existence is not disclosed (§6.1).
+`?token=` never reaches a log line (`lib/log-redaction.js`, see `docs/MONITORING.md`).
+(F15, 2026-10-13)
 
 ## Brute-force protection on sensitive endpoints
 

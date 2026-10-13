@@ -24,6 +24,30 @@ see `docs/DEPLOYMENT.md` for how a change reaches production.
 
 ### 2026-10-13
 
+- **User-visible (Release Notes):** Electricians can now see complaint and proof photos;
+  fixed a fault where loading photos could make the whole platform briefly unavailable.
+- **`[F15]` Database circuit breaker counts only infrastructure failures (BUG-0008).**
+  - **What was broken:** `dbBreaker` counted every error from a Prisma operation as a
+    database failure. The electrician queue loads ticket photos through `/api/images` with
+    the worker token, and that route looked the token up as a staff user
+    (`id: undefined`), which threw a Prisma validation error. Five of those within 60 s
+    opened the breaker, and every request from every user got `503` for 30 s.
+    Electricians never saw the photos either (401).
+  - **Breaker fix (`src/lib/circuit-breaker.js`, one place):** only infrastructure failures
+    count. Those are initialization errors, engine panics, `P1001`/`P1002`/`P1008`/`P1017`/
+    `P2024`, and `ECONNREFUSED`/`ECONNRESET`/`ETIMEDOUT`. Validation errors and every other
+    `P2xxx` still reach the caller but no longer count, and neither does
+    `PrismaClientUnknownRequestError` (see `docs/architecture/resilience.md`).
+  - **Probe change:** recovery after a counted failure is unchanged. If the trial request
+    fails with an error that does not count, the next request becomes the trial instead.
+  - **`middleware/auth.js`:** a token without `userId` now gets `401` before any query.
+  - **`/api/images`:** accepts staff and worker tokens, with the same checks as the
+    header-based auth paths: active account, `tokenInvalidBefore`, and active org. Another
+    org's image now answers `404` instead of `403`.
+  - **Tests:** `test/db-breaker-classification.test.js` and
+    `test/integration/f15-images-and-auth.test.js`. They failed on the old code (16 of 32)
+    and pass now.
+
 - **User-visible (Release Notes):** Password and PIN reset links from email now open a
   working reset page.
 - **`[F12]` Reset pages (BUG-0007).** The reset emails link to `/reset-password?token=…` and
