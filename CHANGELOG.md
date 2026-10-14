@@ -24,6 +24,19 @@ see `docs/DEPLOYMENT.md` for how a change reaches production.
 
 ### 2026-10-14
 
+- **`[PR-B]` Every deploy checks the running Caddy.**
+  - **The checks:** after the API is healthy, both deploy scripts run `caddy validate` on the
+    running container's config and require `caddy adapt … | grep -c REDACTED` to be at
+    least 1, which shows the C11 credential log filter is live. Either failure fails the
+    deploy. Caddy's logs and config are never printed.
+  - **Recorded commit:** the deployed commit is written to `~/.electrical-deployed-sha` (or
+    `~/.electrical-staging-deployed-sha`) outside the repo, and the next deploy uses it to
+    note whether the Caddyfile changed.
+  - **Correction:** the 2026-10-13 report said the filter was not live because deploys never
+    recreate Caddy. That was wrong. Both deploys run `docker compose down` before
+    `up -d`, which recreates Caddy every time. The filter has most likely been live since
+    PR #3 deployed, and these checks now prove it on every deploy.
+
 - **`[PR-A]` GitHub Actions bumped to their current majors** in `deploy.yml`,
   `deploy-staging.yml` and `e2e.yml`: `actions/checkout` v4 → v7, `actions/setup-node`
   v4 → v7, `actions/upload-artifact` v4 → v7.

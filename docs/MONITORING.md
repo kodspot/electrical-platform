@@ -125,6 +125,9 @@ request).
   `/review/<token>`, and the proxied request still returned the upstream's 200.
 - **Deploy log:** the production deploy job prints only `docker compose ps caddy`, never
   Caddy's logs. Read those on the host.
+- **Deploy check:** every deploy (production and staging) fails unless the running Caddy
+  passes `caddy validate` and its adapted config contains `REDACTED`. That shows the filter
+  is live in the container, not just in the file. See `docs/DEPLOYMENT.md`.
 
 ## Super-admin Quality page (`/superadmin-quality`)
 
