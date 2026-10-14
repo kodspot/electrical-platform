@@ -63,6 +63,28 @@ whether the Caddyfile changed. A manual `docker compose up -d` without `down` wo
 recreate Caddy: after changing the Caddyfile by hand, run
 `docker compose up -d --force-recreate --no-deps caddy`.
 
+**The image is smoke-tested in CI before anything deploys** (ADR 0008). The Lint & Test job
+builds `apps/api/Dockerfile` (Node 24), starts it with `NODE_ENV=production` against a fresh
+database on the CI Postgres, and lets it run every migration. It then requires
+`/health/ready` = 200, bootstraps the super-admin and signs in by email and password, and
+stops it. Only HTTP statuses are printed. A report-only "Lint & Test (Node 22)" job runs the
+same gate on the previous runtime for one release; it never blocks a deploy.
+
+**Before merging a change that adds a migration** (for example F13's
+`20261014000000_f13_module_defaults`), the owner confirms on the production host that the
+database is up to date with the migrations already on `main`:
+
+```bash
+cd ~/electrical-platform && docker compose exec -T api npx prisma migrate status
+```
+
+- **"Database schema is up to date!"** — safe to merge. The deploy then applies the new
+  migration.
+- **"Following migration(s) have not yet been applied"** — an earlier deploy did not migrate.
+  Investigate before merging.
+- **"failed migrations" or "migrations not found locally"** — the history diverged. Do not
+  merge; restore a backup into a scratch database first (`docs/DISASTER_RECOVERY.md`).
+
 **Secrets that reach the server only through the deploy job:** besides the long-standing
 ones, the deploy job passes `GIT_SHA` (`github.sha`), `IP_HASH_PEPPER`, `QA_INGEST_TOKEN` and
 `GH_ACTIONS_DISPATCH_TOKEN` through the SSH step's `env`/`envs:` and the `.env` it writes.

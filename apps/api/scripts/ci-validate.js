@@ -121,6 +121,16 @@ function checkGenerated() {
   }
 }
 
+// ── Schema drift (F13) — the one check here that uses a database ──
+// Diffs the migrated DATABASE_URL against schema.prisma (scripts/schema-drift.js). Skipped
+// with a notice when no database is reachable, except under CI=true, where it must run.
+function checkSchemaDrift() {
+  const r = require('./schema-drift').check({ npx: NPX, spawnOpts: SHELL_SPAWN });
+  if (r.status === 'fail') fail('schema drift', r.detail);
+  else if (r.status === 'skip') console.log(`  - schema drift — ${r.detail}`);
+  else pass('schema drift', r.detail);
+}
+
 const release = process.argv.includes('--release');
 console.log(`\nRepository validation${release ? ' — release readiness' : ''}\n`);
 
@@ -128,6 +138,7 @@ checkStructure();
 checkPackage();
 checkEnv();
 checkMigrations();
+checkSchemaDrift();
 checkGenerated();
 
 console.log('');

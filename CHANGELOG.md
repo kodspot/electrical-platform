@@ -22,6 +22,79 @@ has been git-tagged yet, so everything below is grouped under **Unreleased**.
 Complete and merged into the working tree as of this writing, pending its next deploy —
 see `docs/DEPLOYMENT.md` for how a change reaches production.
 
+### 2026-10-14 (runtime)
+
+- **User-visible (Release Notes):** none intended. The same pages and API run on a newer,
+  long-term-supported runtime. One fix ships with it: old bookmark links of the form
+  `/{org}/{page}` redirect again (they would have failed on the new framework).
+- **`[RUNTIME]` Node 24, Fastify 5, bcrypt 6** ([ADR 0008](docs/adr/0008-runtime-upgrade-node24-fastify5.md)).
+  - **Runtime:** `node:24-alpine`, `engines >=24`, and CI, staging and e2e on Node 24. A
+    report-only Node 22 job runs for one release.
+  - **Packages:** fastify 4.29 → **5.12.5**; `@fastify/cookie` 11.1.2, `cors` 11.3.0,
+    `helmet` 13.1.1, `multipart` 10.1.2, `rate-limit` 11.2.0, `static` 10.1.5; bcrypt
+    5.1.1 → **6.0.0**. Each is the newest release at least 14 days old.
+  - **Fastify 5 breaking changes:** all 22 are reviewed in ADR 0008. Code changes:
+    - `reply.redirect(url, 301)` (`routes/pages.js:214`); the v4 argument order returned a
+      500;
+    - nothing else: empty-body DELETEs are already handled by the F14 parser, and
+      `request.hostname` dropping the port only affects logs.
+  - **New tests:**
+    - `fastify5-compat` (12): the redirect (red on the old call), all 9 browser DELETE call
+      sites with an empty JSON body, SSE over a real socket, and `hostname`/`host`;
+    - `bcrypt-compat` (5): three bcrypt-5.1.1 hashes verify under bcrypt 6;
+    - `bcrypt-compat-login`: a bcrypt-5 stored password signs in through the API.
+  - **Audit:** runtime `npm audit` shows 0 vulnerabilities, and `.github/audit-exceptions.json`
+    is empty (16 → 0).
+  - **CI image smoke test:** build the production image, then run it against a fresh
+    database (migrations applied in the image) and check `/health/ready` 200, bootstrap 200
+    and an email-and-password login 200.
+  - **Docs:** ADR 0008, the release-notes draft `docs/releases/v1.0.0-draft.md` (Charter §18;
+    not tagged), DEPLOYMENT, the architecture overview, and the Charter §22 table.
+
+### 2026-10-14 (visual baselines)
+
+- **`[E2E]` All 20 visual baselines.** The two pages rejected in PR B now have deterministic
+  inputs:
+  - **admin-dashboard:** the browser clock is frozen to 2026-01-15, so its date picker no
+    longer shows today.
+  - **superadmin-quality:** the Live CI feed (`/api/superadmin/qa/ci-status`) is stubbed
+    with three fixed runs, so the list has a fixed height and real content instead of a mask.
+  - **Result:** their four Linux baselines (desktop and mobile) were generated in CI on this
+    branch and reviewed. The 16 existing baselines are unchanged.
+
+### 2026-10-14 (F13)
+
+- **User-visible (Release Notes), admin:** permanently deleting a supervisor who still has
+  history (tickets created, attendance marked, duty rosters, asset events or failures,
+  inspections) now explains which records keep them, instead of failing with a server error.
+- **`[F13]` Schema and migration drift resolved.** The decision: the database's current shape
+  is the truth.
+  - **`schema.prisma` now declares:**
+    - `Ticket.createdBy` `onDelete: Restrict`;
+    - `@@index([sourceIp, createdAt])`, `([slaDeadlineAt, status])` and
+      `([orgId, status, verifiedAt])` on Ticket;
+    - `@default(now())` on `updatedAt` for ModuleDefinition, OrgModuleActivation and
+      SupervisorAssignment;
+    - `@default([])` on `InspectionTemplate.locationTypes`.
+
+    No database change for any of these.
+  - **One migration**, `20261014000000_f13_module_defaults`: the `Organization.enabledModules`
+    and `Ticket.module` defaults go from `'hk'` (a module that no longer exists) to `'ele'`.
+    Defaults only; no rows are updated.
+  - **Proof:** on a fresh database, `migrate deploy` then `migrate diff` in both directions
+    leaves only the four Prisma 5 join-table primary-key/unique-index statements. Those are a
+    known artifact, resolved at the Prisma 6 upgrade.
+  - **Drift gate:** `ci-validate` now runs `scripts/schema-drift.js`. It diffs the migrated CI
+    database against the schema and fails on any statement outside that four-statement
+    allowlist (`test/schema-drift.test.js`). It is skipped locally without a database and
+    required under `CI=true`.
+  - **BUG-0009:** `DELETE /supervisors/:id/permanent` checked only inspections, so any of the
+    other five RESTRICT references made it fail with a 500. It now pre-checks all six and
+    answers 409 with the counts (`test/integration/supervisor-delete-guard.test.js`; red on
+    the old code, 4 failures with 500).
+  - **Docs:** `data-model.md`, `DEPLOYMENT.md` (the owner confirms `prisma migrate status` on
+    the host before merging a migration), `COVERAGE_MATRIX` (F13 resolved).
+
 ### 2026-10-14
 
 - **`[PR-B]` Caddyfile: `caddy fmt`, and the forwarded-header bug fixed.**

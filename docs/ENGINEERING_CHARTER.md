@@ -256,7 +256,7 @@ Run this table for **every** change. If an artifact's trigger condition isn't me
 |---|---|---|
 | **README** | [`README.md`](../README.md), [`apps/api/README.md`](../apps/api/README.md) | Setup, run, test, or deploy instructions change, or a new top-level capability is added. |
 | **CHANGELOG** | [`CHANGELOG.md`](../CHANGELOG.md) (established by `[WP16]`) | Every merged change gets an entry, without exception. |
-| **Release Notes** | (none yet — created with the first tagged release) | The change is visible to a guest, electrician, supervisor, admin, or superadmin — a new capability, a behavior change, or a customer-noticeable bug fix. |
+| **Release Notes** | [`docs/releases/`](releases/) (the first, `v1.0.0-draft.md`, is drafted; published with the first tagged release) | The change is visible to a guest, electrician, supervisor, admin, or superadmin — a new capability, a behavior change, or a customer-noticeable bug fix. |
 | **Architecture Documentation** | [`docs/architecture/`](architecture/) | A new pattern, service, external integration, or structural relationship is introduced, or an existing one materially changes (e.g. a new module, a topology change, a new shared-state mechanism). |
 | **API Documentation** | [`docs/reference/routes.generated.md`](reference/routes.generated.md) — **generated** | A route is added or removed. Do not hand-edit: regenerate with `node scripts/gen-route-index.js` (or `npm run docs:routes`) from `apps/api/`. |
 | **Database Documentation** | `apps/api/prisma/schema.prisma` (canonical), [`docs/architecture/data-model.md`](architecture/data-model.md) (relationships/lifecycles) | Any schema/migration change — new model, field, relationship, index, or constraint. |
