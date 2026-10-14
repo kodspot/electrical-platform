@@ -13,15 +13,23 @@
  *
  * Usage:
  *   node backup-r2.js upload <localFilePath>
+ *   node backup-r2.js upload - <name>          # body from stdin (name: kodspot_YYYYMMDD_HHMMSS.sql.gz)
  *   node backup-r2.js list
- *   node backup-r2.js download <key> <destPath>
+ *   node backup-r2.js download <key> <destPath|->
+ *   node backup-r2.js download-latest <destPath|->
  *   node backup-r2.js prune <retentionDays>
+ *
+ * The production host has no Node.js: infrastructure/backup-db.sh and restore-db.sh run this
+ * script inside the app container (`docker compose exec -T api node scripts/backup-r2.js ...`)
+ * and stream the archive through stdin/stdout ("-"), so the container never needs access to
+ * the host's backup directory. In stdout mode every log line goes to stderr.
  */
 
 const path = require('path');
 const fs = require('fs');
 
-require('dotenv').config({ path: path.join(__dirname, '..', '..', '..', '.env') });
+// quiet: dotenv 17 otherwise prints a banner to stdout, which would corrupt `download ... -`.
+require('dotenv').config({ path: path.join(__dirname, '..', '..', '..', '.env'), quiet: true });
 
 const {
   S3Client,
@@ -57,19 +65,36 @@ const client = new S3Client({
   maxAttempts: 3
 });
 
-async function upload(localFilePath) {
-  if (!fs.existsSync(localFilePath)) {
-    throw new Error(`File not found: ${localFilePath}`);
+const STDIN_NAME = /^kodspot_\d{8}_\d{6}\.sql\.gz$/;
+
+async function readStdin() {
+  const chunks = [];
+  for await (const chunk of process.stdin) chunks.push(chunk);
+  return Buffer.concat(chunks);
+}
+
+async function upload(localFilePath, stdinName) {
+  let key;
+  let body;
+  if (localFilePath === '-') {
+    if (!STDIN_NAME.test(stdinName || '')) throw new Error('upload -: the name must look like kodspot_YYYYMMDD_HHMMSS.sql.gz');
+    key = PREFIX + stdinName;
+    body = await readStdin();
+    if (body.length === 0) throw new Error('upload -: stdin was empty');
+  } else {
+    if (!fs.existsSync(localFilePath)) {
+      throw new Error(`File not found: ${localFilePath}`);
+    }
+    key = PREFIX + path.basename(localFilePath);
+    body = fs.readFileSync(localFilePath);
   }
-  const key = PREFIX + path.basename(localFilePath);
-  const body = fs.readFileSync(localFilePath);
   await client.send(new PutObjectCommand({
     Bucket: BUCKET_NAME,
     Key: key,
     Body: body,
     ContentType: 'application/gzip'
   }));
-  console.log(`Uploaded ${localFilePath} (${body.length} bytes) -> r2://${BUCKET_NAME}/${key}`);
+  console.log(`Uploaded ${localFilePath === '-' ? 'stdin' : localFilePath} (${body.length} bytes) -> r2://${BUCKET_NAME}/${key}`);
 }
 
 async function list() {
@@ -92,7 +117,13 @@ async function downloadOne(key, destPath) {
   const res = await client.send(new GetObjectCommand({ Bucket: BUCKET_NAME, Key: key }));
   const chunks = [];
   for await (const chunk of res.Body) chunks.push(chunk);
-  fs.writeFileSync(destPath, Buffer.concat(chunks));
+  const body = Buffer.concat(chunks);
+  if (destPath === '-') {
+    await new Promise((resolve, reject) => process.stdout.write(body, (err) => (err ? reject(err) : resolve())));
+    console.error(`Downloaded r2://${BUCKET_NAME}/${key} (${body.length} bytes) -> stdout`);
+    return;
+  }
+  fs.writeFileSync(destPath, body);
   console.log(`Downloaded r2://${BUCKET_NAME}/${key} -> ${destPath}`);
 }
 
@@ -111,8 +142,8 @@ async function main() {
   const [, , cmd, ...args] = process.argv;
 
   if (cmd === 'upload') {
-    if (!args[0]) throw new Error('Usage: backup-r2.js upload <localFilePath>');
-    await upload(args[0]);
+    if (!args[0]) throw new Error('Usage: backup-r2.js upload <localFilePath> | upload - <name>');
+    await upload(args[0], args[1]);
   } else if (cmd === 'list') {
     const objects = await list();
     if (objects.length === 0) {

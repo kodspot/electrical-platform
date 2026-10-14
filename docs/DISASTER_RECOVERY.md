@@ -13,7 +13,23 @@
 4. **Uploads it offsite** to Cloudflare R2 under the `db-backups/` key prefix
    (`apps/api/scripts/backup-r2.js`) — see [ADR 0001](adr/0001-offsite-backup-storage.md)
    for why R2 was chosen.
-5. Prunes local and offsite copies older than 14 days.
+5. Prunes local and offsite copies older than 14 days. Both prunes run even if the upload
+   failed.
+
+**Where the offsite steps run:** the production host has no Node.js, so `backup-db.sh`
+runs the uploader **inside the app container**:
+`docker compose exec -T api node scripts/backup-r2.js upload - <name> < <archive>`.
+- **Credentials:** the container already has the R2 credentials (`env_file: .env`).
+- **The archive** is streamed through stdin, so the container never mounts or reads the
+  host's backup directory.
+- **Exit status:** if the upload fails, the job logs `offsite upload failed` (no secrets),
+  keeps the local archive, still prunes, and exits non-zero. If the dump fails, it exits
+  non-zero before uploading or pruning anything.
+- **Restores** stream the download the same way (`restore-db.sh --from-offsite`).
+- **Tests:** `infrastructure/tests/backup-db.test.sh` and `backup-r2-stdio.test.sh`, run
+  in CI.
+- **Before 2026-10-14** the script called host `node` and failed on a host without it;
+  the scripts were also committed without the executable bit.
 
 **A local-only backup does not survive losing the host it protects — this is exactly
 the failure mode the offsite step exists to close**, and it's the actual, motivating
@@ -34,11 +50,25 @@ external to this codebase, not a bug in `backup-r2.js` — the code was verified
 correct by exercising the exact same request shape the application's own working
 `lib/r2.js` uses.
 
-Once credentials are confirmed working, verify offsite upload independently:
+Once credentials are confirmed working, verify offsite upload independently, on the
+production host, from the repository directory:
 
 ```bash
-node apps/api/scripts/backup-r2.js list
+docker compose exec -T api node scripts/backup-r2.js list
 ```
+
+**One-time verification after the 2026-10-14 change (owner).** On the production host, run a
+real backup into a scratch directory, then confirm the new archive is listed offsite:
+
+```bash
+cd ~/electrical-platform && BACKUP_DIR=/tmp/kodspot-backup-check ./infrastructure/backup-db.sh; echo "exit=$?"
+docker compose exec -T api node scripts/backup-r2.js list | head -3
+```
+
+Expect `exit=0`, "Backup job finished successfully", and the newest `db-backups/kodspot_<today>_…`
+key at the top of the list. `exit=1` with `offsite upload failed` means the R2
+credentials are the problem (see the known blocker above); the local archive is still
+in `/tmp/kodspot-backup-check`. Afterwards, delete it: `rm -rf /tmp/kodspot-backup-check`.
 
 ## Restore runbook
 

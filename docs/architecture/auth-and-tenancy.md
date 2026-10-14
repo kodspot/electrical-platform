@@ -61,7 +61,13 @@ unauthenticated endpoints carry a **stricter per-IP limit** from `middleware/rat
   password/PIN reset and public complaint submission — so a shared secret or the one
   unauthenticated write surface can't be hammered.
 
-Both key off `req.ip` (honored correctly because `trustProxy` is set behind Caddy). This is
+Both key off `req.ip`, the client IP that Caddy passes in `X-Forwarded-For`; `trustProxy` is set.
+**Until 2026-10-14 this was wrong in production:** the Caddyfile set
+`header_up X-Forwarded-For {remote}`, and `{remote}` includes the client's port, so `req.ip`
+was `ip:port`. Each new TCP connection got a fresh rate-limit bucket, and the public-complaint
+IP hash rarely matched. Caddy's default now sends the bare client IP and ignores a
+client-supplied `X-Forwarded-For` (proven with a throwaway proxy; see `CHANGELOG.md`). Clients
+behind one shared NAT address (campus or office Wi-Fi) now share these per-IP buckets. This is
 defense-in-depth layered on top of the credential-recovery anti-enumeration measures
 (Charter §6) — the reset endpoints are both rate-limited *and* return identical
 generic responses regardless of whether the account exists.

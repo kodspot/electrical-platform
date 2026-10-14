@@ -48,6 +48,21 @@ logs: Caddy's error log records request URIs, and the public run log is the wron
 them, even redacted. To read them, SSH into the host and run
 `docker compose logs --tail 50 caddy`. The staging job prints nothing from Caddy. (C11)
 
+**Caddy config check (every deploy, production and staging).** The deploy script runs
+`docker compose down`, which removes every container, then `up -d`. So each deploy starts a
+fresh Caddy that reads the `infrastructure/Caddyfile` just pulled, through its single-file
+bind mount. After the API is healthy, the deploy then checks the running Caddy:
+1. `docker compose exec -T caddy caddy validate --config /etc/caddy/Caddyfile` must succeed.
+2. `docker compose exec -T caddy caddy adapt --config /etc/caddy/Caddyfile | grep -c REDACTED`
+   must be at least 1, which shows the credential log filter is live.
+
+If either check fails, the deploy fails. Neither Caddy's logs nor the adapted config are
+printed. The deployed commit is recorded in `~/.electrical-deployed-sha` (staging:
+`~/.electrical-staging-deployed-sha`), outside the repository. The next deploy uses it to note
+whether the Caddyfile changed. A manual `docker compose up -d` without `down` would **not**
+recreate Caddy: after changing the Caddyfile by hand, run
+`docker compose up -d --force-recreate --no-deps caddy`.
+
 **Secrets that reach the server only through the deploy job:** besides the long-standing
 ones, the deploy job passes `GIT_SHA` (`github.sha`), `IP_HASH_PEPPER`, `QA_INGEST_TOKEN` and
 `GH_ACTIONS_DISPATCH_TOKEN` through the SSH step's `env`/`envs:` and the `.env` it writes.

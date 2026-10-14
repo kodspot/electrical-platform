@@ -1,15 +1,16 @@
 #!/bin/sh
-# Interim local quality gate ahead of WP4's CI pipeline (Engineering Charter §14).
-# Not active until a developer opts in — see .githooks/README.md.
+# Local quality gate before a push: the same `npm run ci` the CI "Lint & Test" job runs
+# (lint + the full test suite + repository/package/migration/doc checks).
+# Opt-in only: git config core.hooksPath .githooks   (see .githooks/README.md)
+#
+# DB-backed tests need a disposable loopback database named *_ci/*_test/*_e2e in
+# DATABASE_URL; without one they skip, and npm run ci reports that rather than passing silently.
 set -e
 
 REPO_ROOT="$(git rev-parse --show-toplevel)"
 cd "$REPO_ROOT/apps/api"
 
-echo "[pre-push] Linting apps/api..."
-npm run lint
+echo "[pre-push] Running npm run ci in apps/api..."
+npm run ci
 
-echo "[pre-push] Running apps/api test suite..."
-npm test
-
-echo "[pre-push] Lint and tests passed."
+echo "[pre-push] npm run ci passed."

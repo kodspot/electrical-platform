@@ -57,8 +57,9 @@ problem, that org updates it in its AI settings; if a global fallback key is use
 
 ## R2 / offsite-backup failure
 
-**Symptom:** image uploads fail, or `node apps/api/scripts/backup-r2.js list` returns
-`403 Access Denied`.
+**Symptom:** image uploads fail, the backup log shows `offsite upload failed`, or
+`docker compose exec -T api node scripts/backup-r2.js list` (on the host, from the repository
+directory) returns `403 Access Denied`.
 
 **Diagnose:** because the application's image uploads and the backup script share the same
 R2 credentials, a `403` on one implies the other is affected too. This exact failure is a
@@ -67,7 +68,9 @@ R2 credentials, a `403` on one implies the other is affected too. This exact fai
 
 **Act:** verify the R2 API token's bucket-scoped read/write permissions in the Cloudflare
 dashboard and confirm `R2_ACCOUNT_ID` / `R2_ACCESS_KEY_ID` / `R2_SECRET_ACCESS_KEY` in the
-production `.env` are current. Re-test with `backup-r2.js list`. Full backup/restore
+production `.env` are current. Re-test with
+`docker compose exec -T api node scripts/backup-r2.js list`. The host has no Node.js, so
+the backup tooling always runs inside the app container. Full backup/restore
 procedure: [`DISASTER_RECOVERY.md`](DISASTER_RECOVERY.md).
 
 ## Scheduler stuck or duplicated across instances

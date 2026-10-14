@@ -241,4 +241,27 @@ jobs:
               fi
             done
 
+            # Caddy reads infrastructure/Caddyfile through a single-file bind mount. The
+            # `docker compose -p electrical-staging down` above removes every container, so `up -d` always starts a
+            # fresh Caddy that reads the file just pulled. These checks prove that the running
+            # Caddy has a valid config with the credential log filter live, and fail the deploy
+            # otherwise. Caddy's logs and the adapted config are never printed (public run log).
+            echo "=== CADDY CONFIG CHECK ==="
+            PREV_SHA=$(cat ~/.electrical-staging-deployed-sha 2>/dev/null || echo none)
+            if [ "$PREV_SHA" = "none" ] || ! git diff --quiet "$PREV_SHA" HEAD -- infrastructure/Caddyfile 2>/dev/null; then
+              echo "Caddyfile changed since the last recorded deploy (or none recorded): Caddy was recreated by down/up"
+            fi
+            if ! docker compose -p electrical-staging exec -T caddy caddy validate --config /etc/caddy/Caddyfile > /dev/null 2>&1; then
+              echo "❌ The running Caddy config is invalid"
+              exit 1
+            fi
+            REDACTED_COUNT=$(docker compose -p electrical-staging exec -T caddy caddy adapt --config /etc/caddy/Caddyfile 2>/dev/null | grep -c REDACTED || true)
+            if [ "${REDACTED_COUNT:-0}" -lt 1 ]; then
+              echo "❌ The Caddy credential log filter is not live (REDACTED count: ${REDACTED_COUNT:-0})"
+              exit 1
+            fi
+            echo "✅ Caddy config valid; credential log filter live (REDACTED count: ${REDACTED_COUNT})"
+            git rev-parse HEAD > ~/.electrical-staging-deployed-sha
+            echo "Deployed commit recorded in ~/.electrical-staging-deployed-sha"
+
             echo "✅ STAGING DEPLOYMENT SUCCESSFUL"

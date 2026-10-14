@@ -7,7 +7,8 @@
 #   docker compose -f docker-compose.dev.yml up -d
 #
 # Credentials default to the values in .env.dev.example; override via .env if needed.
-# Bound to 127.0.0.1 only — never exposed off the developer's machine.
+# Bound to 127.0.0.1:5433 only — never exposed off the developer's machine, and on a different
+# host port from the production compose (127.0.0.1:5432), so the two can never be confused.
 
 services:
   db:
@@ -19,7 +20,7 @@ services:
       POSTGRES_PASSWORD: ${DB_PASSWORD:-electrical}
       POSTGRES_DB: ${DB_NAME:-electrical}
     ports:
-      - "127.0.0.1:5432:5432"
+      - "127.0.0.1:5433:5432"
     volumes:
       - postgres-data-dev:/var/lib/postgresql/data
     healthcheck:
