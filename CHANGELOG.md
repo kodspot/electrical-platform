@@ -24,6 +24,22 @@ see `docs/DEPLOYMENT.md` for how a change reaches production.
 
 ### 2026-10-14
 
+- **`[PR-B]` Local pre-push gate and CLAUDE.md refresh.**
+  - **Pre-push hook:** `.githooks/pre-push` now runs `npm run ci` in `apps/api`, the same
+    gate as CI's Lint & Test (previously only lint and tests). It is still opt-in:
+    `git config core.hooksPath .githooks`.
+  - **`CLAUDE.md`** stays a map that links rather than duplicates. It now adds:
+    - the root commands (`ci`, `doctor`, `seed`, `scenario`, `bug:*`, `release:check`,
+      `e2e`, `e2e:ui`);
+    - plan mode for non-trivial work, and test-first for bug fixes;
+    - no Redis, queue or broker without an ADR (ADR 0002);
+    - vanilla JS with no bundler;
+    - modules as the extension mechanism;
+    - the tenant contract: a server-derived `orgId`, and cross-org requests answer 404;
+    - the bug-registry obligation;
+    - the clean-copy test rule;
+    - the finding-ID convention (`PRA-07/Cn`, `EP/Cn`, `Fn`, `BUG-nnnn`).
+
 - **`[PR-B]` First Linux visual baselines.**
   - **Source:** 16 images from the authorized `update_snapshots` run on `main` (run
     38522159509), each reviewed by eye: right page, fixed test data only, dynamic regions
