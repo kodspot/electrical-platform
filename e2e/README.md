@@ -87,7 +87,13 @@ screenshots don't depend on the per-run seed.
 
 **Visual (`toHaveScreenshot`, `support/visual.js`)**
 - **What's masked:** times, dates and relative times; `<canvas>`; and per-page dynamic
-  regions such as the dashboard charts and the Quality page's live CI and trend.
+  regions such as the dashboard charts and the Quality page's trend.
+- **What's fixed instead of masked:** content that depends on "now" or on a live feed gets a
+  fixed input, which is preferred over hiding it.
+  - **admin-dashboard:** the page clock is frozen (`page.clock.setFixedTime`), so the
+    date picker always shows the same date.
+  - **superadmin-quality:** `/api/superadmin/qa/ci-status` is answered with a fixed
+    response (`page.route`), so the Live CI list renders three known runs at a fixed height.
 - **Where baselines live:** `tests/__screenshots__/<platform>/<project>/<page>.png`.
 - **Only Linux baselines are ever committed.** The Windows and macOS directories are
   git-ignored.

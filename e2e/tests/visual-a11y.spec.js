@@ -64,18 +64,38 @@ async function signInElectrician(page, v) {
   }, { token, worker, slug: SLUG });
 }
 
+// Pages whose content depends on "now" or on a live external feed are made deterministic by
+// fixing their input, not by hiding it:
+//  - the admin dashboard's date picker defaults to the browser's today → freeze the page clock;
+//  - the Quality page's Live CI list comes from GitHub (via /api/superadmin/qa/ci-status) →
+//    answer that request with a fixed response, so the panel renders real, stable content.
+const FROZEN_NOW = new Date('2026-01-15T10:00:00+05:30');
+const CI_STATUS_STUB = {
+  state: 'ok',
+  cached: false,
+  dispatchEnabled: false,
+  fetchedAt: '2026-01-15T04:30:00.000Z',
+  runs: [
+    { id: 3, name: 'Deploy to Production', branch: 'main', event: 'push', status: 'completed', conclusion: 'success', created_at: '2026-01-15T04:00:00Z', updated_at: '2026-01-15T04:05:00Z', html_url: 'https://github.com/kodspot/electrical-platform/actions/runs/3', head_sha: 'aaaaaaa1111111' },
+    { id: 2, name: 'E2E', branch: 'main', event: 'schedule', status: 'completed', conclusion: 'success', created_at: '2026-01-14T21:30:00Z', updated_at: '2026-01-14T21:33:00Z', html_url: 'https://github.com/kodspot/electrical-platform/actions/runs/2', head_sha: 'bbbbbbb2222222' },
+    { id: 1, name: 'Deploy to Production', branch: 'fix-branch', event: 'pull_request', status: 'completed', conclusion: 'failure', created_at: '2026-01-14T10:00:00Z', updated_at: '2026-01-14T10:04:00Z', html_url: 'https://github.com/kodspot/electrical-platform/actions/runs/1', head_sha: 'ccccccc3333333' }
+  ]
+};
+const freezeClock = (page) => page.clock.setFixedTime(FROZEN_NOW);
+const stubCiStatus = (page) => page.route('**/api/superadmin/qa/ci-status', (route) => route.fulfill({ json: CI_STATUS_STUB }));
+
 // [name, how to get there, page-specific dynamic regions to mask]
 const PAGES = [
   ['admin-login', async (page) => page.goto(orgPage(SLUG, 'admin-login')), []],
   ['supervisor-login', async (page) => page.goto(orgPage(SLUG, 'supervisor-login')), []],
   ['electrician-login', async (page) => page.goto(orgPage(SLUG, 'electrician-login')), []],
-  ['admin-dashboard', async (page, v) => { await signIn(page, 'admin', v.admin, SLUG); await page.goto(orgPage(SLUG, 'admin-dashboard')); }, ['svg']],
+  ['admin-dashboard', async (page, v) => { await freezeClock(page); await signIn(page, 'admin', v.admin, SLUG); await page.goto(orgPage(SLUG, 'admin-dashboard')); }, ['svg']],
   ['admin-tickets', async (page, v) => { await signIn(page, 'admin', v.admin, SLUG); await page.goto(orgPage(SLUG, 'admin-tickets')); }, []],
   ['admin-locations', async (page, v) => { await signIn(page, 'admin', v.admin, SLUG); await page.goto(orgPage(SLUG, 'admin-locations')); }, []],
   ['admin-qr-print', async (page, v) => { await signIn(page, 'admin', v.admin, SLUG); await page.goto(orgPage(SLUG, 'admin-qr-print')); }, []],
   ['guest-complaint', async (page) => page.goto(`/s/${QR}`), []],
   ['electrician-my-work', async (page, v) => { await signInElectrician(page, v); await page.goto(orgPage(SLUG, 'electrician-my-work')); }, []],
-  ['superadmin-quality', async (page, v) => { await signIn(page, 'superadmin', v.superAdmin); await page.goto('/superadmin-quality'); }, ['#ciList', '#ciUpdated', '#trendChart']]
+  ['superadmin-quality', async (page, v) => { await stubCiStatus(page); await signIn(page, 'superadmin', v.superAdmin); await page.goto('/superadmin-quality'); }, ['#trendChart']]
 ];
 
 test.describe('C7 — design and accessibility', () => {

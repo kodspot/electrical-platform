@@ -22,6 +22,17 @@ has been git-tagged yet, so everything below is grouped under **Unreleased**.
 Complete and merged into the working tree as of this writing, pending its next deploy —
 see `docs/DEPLOYMENT.md` for how a change reaches production.
 
+### 2026-10-14 (visual baselines)
+
+- **`[E2E]` All 20 visual baselines.** The two pages rejected in PR B now have deterministic
+  inputs:
+  - **admin-dashboard:** the browser clock is frozen to 2026-01-15, so its date picker no
+    longer shows today.
+  - **superadmin-quality:** the Live CI feed (`/api/superadmin/qa/ci-status`) is stubbed
+    with three fixed runs, so the list has a fixed height and real content instead of a mask.
+  - **Result:** their four Linux baselines (desktop and mobile) were generated in CI on this
+    branch and reviewed. The 16 existing baselines are unchanged.
+
 ### 2026-10-14 (F13)
 
 - **User-visible (Release Notes), admin:** permanently deleting a supervisor who still has
