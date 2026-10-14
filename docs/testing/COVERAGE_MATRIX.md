@@ -40,7 +40,7 @@ staging host (`docs/DEPLOYMENT.md`).
 |---|---|---|---|---|---|---|
 | In-app, user (admin or supervisor) | **Observable**: tests assert rows (e.g. `notification-channel-unification.test.js`) | Observable in principle (`services/sse.js` `pushNotification`); **MISSING**, no test opens `/api/notifications/stream` | n/a | n/a | n/a | **NOT APPLICABLE**: no queue exists |
 | In-app, worker (electrician) | Observable; **MISSING** for the public-complaint path (`notifyWorkers`) | Observable in principle via `/api/notifications/worker-stream`; **MISSING** | n/a | n/a | n/a | **NOT APPLICABLE** |
-| Email (`lib/email.js`) | n/a | n/a | Observable only by stubbing `nodemailer`/`getSesTransporter`; **MISSING**. Tests only assert that `notify()` never rejects with no transport. | **NOT TESTABLE** by this suite: needs a real SMTP endpoint, and outbound SES is blanked by the test guard | **NOT TESTABLE** | **NOT APPLICABLE**. `pool: true` is connection pooling, not a queue. |
+| Email (`lib/email.js`) | n/a | n/a | Covered by stubbing `nodemailer.createTransport` (2026-10-14, `test/lib-email.test.js`): the SMTP transport config, the message built by nodemailer's real `jsonTransport` (layout, subject suffix, escaped body), a send failure returning `false`, `verify()` OK/failure code, not configured, and the transporter being built once. | **NOT TESTABLE** by this suite: needs a real SMTP endpoint, and outbound SES is blanked by the test guard | **NOT TESTABLE** | **NOT APPLICABLE**. `pool: true` is connection pooling, not a queue. |
 | SMS / push | **NOT APPLICABLE**: neither exists (F6) | — | — | — | — | — |
 
 ## Workflows and modules

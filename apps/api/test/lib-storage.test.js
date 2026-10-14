@@ -77,10 +77,47 @@ describe('lib/r2 — local storage driver (M1)', () => {
     );
   });
 
+  it('re-encodes a large image to WebP within 800×800, keeping the aspect ratio (sharp 0.35)', async () => {
+    const big = await sharp({ create: { width: 1600, height: 1200, channels: 3, background: { r: 10, g: 120, b: 200 } } }).jpeg().toBuffer();
+    const url = await uploadToR2(big, 'image/jpeg', 'org-abc');
+    assert.match(url, /\.webp$/);
+    const meta = await sharp(fs.readFileSync(path.join(TMP_ROOT, url.slice('/images/'.length)))).metadata();
+    assert.strictEqual(meta.format, 'webp');
+    assert.deepStrictEqual([meta.width, meta.height], [800, 600]);
+  });
+
+  it('never enlarges a small image', async () => {
+    const url = await uploadToR2(pngBuffer, 'image/png', 'org-abc');
+    const meta = await sharp(fs.readFileSync(path.join(TMP_ROOT, url.slice('/images/'.length)))).metadata();
+    assert.deepStrictEqual([meta.format, meta.width, meta.height], ['webp', 10, 10]);
+  });
+
   it('refuses a key that escapes the storage root (path traversal defense-in-depth)', async () => {
     await assert.rejects(
       getFromR2('uploads/../../../../etc/passwd'),
       (err) => { assert.strictEqual(err.name, 'InvalidKey'); return true; }
     );
+  });
+});
+
+describe('validateImageBuffer — magic-byte check before any image reaches sharp', () => {
+  const { validateImageBuffer } = require('../src/errors');
+  const jpeg = Buffer.from([0xFF, 0xD8, 0xFF, 0xE0, 0, 0]);
+  const png = Buffer.from([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]);
+  const webp = Buffer.from('RIFF\0\0\0\0WEBP', 'latin1');
+  const gif = Buffer.from('GIF89a', 'latin1');
+
+  it('accepts JPEG, PNG and WebP whose bytes match the declared type', () => {
+    assert.strictEqual(validateImageBuffer(jpeg, 'image/jpeg'), true);
+    assert.strictEqual(validateImageBuffer(png, 'image/png'), true);
+    assert.strictEqual(validateImageBuffer(webp, 'image/webp'), true);
+  });
+
+  it('rejects a declared type whose bytes do not match, an unsupported type, and an empty buffer', () => {
+    assert.strictEqual(validateImageBuffer(gif, 'image/png'), false);
+    assert.strictEqual(validateImageBuffer(png, 'image/jpeg'), false);
+    assert.strictEqual(validateImageBuffer(gif, 'image/gif'), false);
+    assert.strictEqual(validateImageBuffer(Buffer.from('<svg/>'), 'image/svg+xml'), false);
+    assert.strictEqual(validateImageBuffer(Buffer.alloc(0), 'image/png'), false);
   });
 });

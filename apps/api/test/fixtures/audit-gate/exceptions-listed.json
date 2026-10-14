@@ -1,0 +1,6 @@
+{
+  "exceptions": [
+    { "ghsa": "GHSA-aaaa-bbbb-cccc", "package": "examplepkg", "severity": "high", "reason": "test", "owner": "kishan", "expires": "2026-11-13" },
+    { "ghsa": "GHSA-gggg-hhhh-iiii", "package": "childpkg", "severity": "critical", "reason": "test", "owner": "kishan", "expires": "2026-11-13" }
+  ]
+}

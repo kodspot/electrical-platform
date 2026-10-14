@@ -22,6 +22,49 @@ has been git-tagged yet, so everything below is grouped under **Unreleased**.
 Complete and merged into the working tree as of this writing, pending its next deploy —
 see `docs/DEPLOYMENT.md` for how a change reaches production.
 
+### 2026-10-14
+
+- **`[PR-A]` GitHub Actions bumped to their current majors** in `deploy.yml`,
+  `deploy-staging.yml` and `e2e.yml`: `actions/checkout` v4 → v7, `actions/setup-node`
+  v4 → v7, `actions/upload-artifact` v4 → v7.
+  - **What changed, from the release notes:**
+    - all three run on Node 24 (runner ≥ 2.327.1);
+    - checkout v6 keeps the persisted credentials in a separate file, and v7 refuses to check
+      out fork code for `pull_request_target`/`workflow_run` (not used here);
+    - setup-node v5 auto-caches when `package.json` has `packageManager` (ours has none,
+      and `cache: npm` stays explicit), v6 limits that to npm, and v7 adds cache outputs and
+      drops the dummy `NODE_AUTH_TOKEN`;
+    - upload-artifact v7 adds an `archive` input (default `true`).
+  - **No input changes are needed** in our workflows. `appleboy/ssh-action` is unchanged.
+
+- **`[PR-A]` Dependency audit gate (closes PRA-07/C1; [ADR 0007](docs/adr/0007-dependency-audit-gate.md)).**
+  - **The step:** a new "Dependency audit gate" step in the deploy workflow's Lint & Test
+    job runs `apps/api/scripts/audit-gate.js` after CI validation.
+  - **What it checks:** it fails on any high or critical `npm audit --omit=dev` advisory
+    not listed in `.github/audit-exceptions.json`, and on any exception past its
+    `expires` date. A registry or network error only warns.
+  - **The 16 current exceptions:**
+    - the Fastify 4 chain (`fastify` ×5, `find-my-way`, `@fastify/static`), expiring
+      2026-12-13: they need Fastify 5, and runtime reachability is assessed per advisory;
+    - `tar` ×9, expiring 2026-11-13: install-time only, via bcrypt 5's `node-pre-gyp`,
+      and fixed by moving to bcrypt 6.
+  - **Tests:** `test/audit-gate.test.js` (14) with fixtures for a clean report, an
+    unlisted high, a listed advisory, an expired exception, a registry error, and the
+    committed file's expiry windows.
+
+- **`[PR-A]` Runtime dependency security fixes.**
+  - **What changed:**
+    - `npm audit fix` (never `--force`) took `proxy-addr` to 2.0.8, `fast-uri` to 2.4.7/3.1.8, `@fastify/busboy` to 3.2.3, and also patched `fast-xml-parser` (via the AWS SDK) and `minimatch`/`brace-expansion`.
+    - `nodemailer` went from 6.x to **10.0.11** and `sharp` from 0.33 to **0.35.5**. Both are the oldest releases that fix every advisory and have been published for at least two weeks. Both need Node ≥ 20(.9); production runs `node:20-alpine`.
+    - `email.js` and `r2.js` needed no change: nodemailer's breaking changes (SES SDK transport, remote-content TLS, TypeScript build) and sharp's (Node 18 dropped, AVIF tuning, removed deprecated options) don't touch SMTP sending or `resize` → `webp`.
+    - `fastify`, the `@fastify/*` direct versions, prisma and Node are unchanged.
+  - **Result:** runtime advisories went from 14 (3 critical, 10 high, 1 moderate) to 5 (1 critical, 4 high). What remains is the Fastify 4 chain (`fastify`, `find-my-way`, `@fastify/static`), which needs Fastify 5, and `tar` via bcrypt 5's install-time `node-pre-gyp`, which is not loaded at runtime. These are listed with expiry dates in `.github/audit-exceptions.json`.
+  - **Tests:**
+    - `test/lib-email.test.js` covers sending through nodemailer's real `jsonTransport`, the failure path, `verify()` and not-configured.
+    - `test/lib-storage.test.js` checks that 1600×1200 becomes an 800×600 WebP, that small images are never enlarged, and the `validateImageBuffer` magic-byte cases.
+    - `test/integration/upload-validation.test.js` checks, on the public complaint route, that a wrong type gets 400, mismatched magic bytes get 400, and a file over 5 MB gets 413.
+    - Also checked in a throwaway `node:20-alpine` container: `npm ci --omit=dev`, and sharp 0.35.5 producing an 800×600 WebP.
+
 ### 2026-10-13
 
 - **User-visible (Release Notes):** Electricians can now see complaint and proof photos;
