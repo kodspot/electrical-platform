@@ -24,6 +24,20 @@ see `docs/DEPLOYMENT.md` for how a change reaches production.
 
 ### 2026-10-14
 
+- **`[PR-B]` First Linux visual baselines.**
+  - **Source:** 16 images from the authorized `update_snapshots` run on `main` (run
+    38522159509), each reviewed by eye: right page, fixed test data only, dynamic regions
+    masked. They are committed under `e2e/tests/__screenshots__/linux/`.
+  - **Accepted (desktop and mobile):** admin-login, supervisor-login, electrician-login,
+    admin-tickets, admin-locations, admin-qr-print, guest-complaint, electrician-my-work.
+  - **Rejected, 4 images:**
+    - **admin-dashboard** (×2): the date picker shows today's date. An `<input>` value is
+      not a text node, so the date mask misses it.
+    - **superadmin-quality** (×2): the masked Live CI list lists live GitHub runs, so its
+      height, and with it the page size, changes from run to run.
+  - **Until those masks are fixed in `e2e/support/visual.js`**, the four rejected views
+    keep reporting "no baseline" and don't fail.
+
 - **`[PR-B]` The local dev database moved to `127.0.0.1:5433`** (`docker-compose.dev.yml`), so it
   never shares a host port with the production compose (`127.0.0.1:5432`).
   - **Updated:** `.env.dev.example` (`DATABASE_URL`), `apps/api/README.md` and
