@@ -24,8 +24,9 @@ Commands: `npm run bug:list` · `npm run bug:run -- <ID>` · `npm run bug:valida
 | BUG-0006 | CRITICAL | FIXED | ele | Body-less POST/PATCH from the browser was rejected (electricians could not pick up tickets) | `test/integration/bug-regressions.test.js` |
 | BUG-0007 | HIGH | FIXED | ele | Password and PIN reset links from email opened no page ("Organization not found") | `test/integration/bug-regressions.test.js` |
 | BUG-0008 | CRITICAL | FIXED | ele | Electrician photo loads opened the database circuit breaker (whole platform 503 for 30 s) | `test/integration/bug-regressions.test.js` |
+| BUG-0009 | MEDIUM | FIXED | ele | Permanently deleting a supervisor who created tickets failed with a server error | `test/integration/bug-regressions.test.js` |
 
-Count: 8 bug scenario(s).
+Count: 9 bug scenario(s).
 
 ## BUG-0001 — Admin could set a ticket to RESOLVED_PENDING_VERIFY directly
 
@@ -170,4 +171,22 @@ Count: 8 bug scenario(s).
 1. Sign in as an electrician and GET /api/images/uploads/<orgId>/<file>?token=<worker token> five times.
 2. Make any unrelated request, e.g. an admin listing locations.
 3. Broken: 503 (database breaker OPEN). Fixed: 200, breaker CLOSED.
+
+## BUG-0009 — Permanently deleting a supervisor who created tickets failed with a server error
+
+- **Severity:** MEDIUM · **Status:** FIXED · **Module:** ele · **Category:** admin-workflow
+- **Origin:** F13 schema-drift diagnosis (2026-10-14), fixed in PR #9
+- **Introduced:** pre-audit · **Fixed:** 2026-10-14
+- **Description:** DELETE /supervisors/:id/permanent only checked inspection history. Ticket.createdById (and four other references to a user) are ON DELETE RESTRICT in the database, so deleting a supervisor who had created a ticket, marked attendance, been on a duty roster or logged an asset event/failure failed on the foreign key — a 500 instead of a clear 409.
+- **Root cause:** The route pre-checked only electricalInspection; the schema declared Ticket.createdBy without onDelete (Prisma default SetNull) while the migrations created RESTRICT, so the gap was invisible from the schema.
+- **Expected behavior:** A deactivated supervisor referenced by any RESTRICT foreign key is refused with 409 and the counts; one with no history is deleted (200).
+- **Broken behavior:** 500 (foreign-key violation from prisma.user.delete).
+- **Scenario dependencies:** —
+- **Regression test:** `test/integration/bug-regressions.test.js`
+
+**Reproduction steps:**
+
+1. Create an org with an admin, a deactivated supervisor, and a ticket created by that supervisor.
+2. As the admin, DELETE /api/supervisors/:id/permanent.
+3. Broken: 500. Fixed: 409 { ticketsCreated: 1 } and the supervisor remains.
 

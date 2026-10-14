@@ -343,11 +343,26 @@ async function supervisorRoutes(fastify, opts) {
       return reply.code(400).send({ error: 'Supervisor must be deactivated before permanent deletion' });
     }
 
-    const recordCount = await prisma.electricalInspection.count({ where: { supervisorId: id } });
-    if (recordCount > 0) {
+    // Every reference to a user that the database declares ON DELETE RESTRICT would make the
+    // delete below fail on the foreign key (a 500). Check them all first and answer 409 with
+    // the counts, the same shape as the inspection check always had. [F13, BUG-0009]
+    const [electricalInspections, ticketsCreated, attendanceMarked, dutyRosters, assetEventsLogged, assetFailuresLogged] = await Promise.all([
+      prisma.electricalInspection.count({ where: { supervisorId: id } }),
+      prisma.ticket.count({ where: { createdById: id } }),
+      prisma.attendance.count({ where: { markedById: id } }),
+      prisma.dutyRoster.count({ where: { supervisorId: id } }),
+      prisma.assetEvent.count({ where: { loggedById: id } }),
+      prisma.assetFailure.count({ where: { loggedById: id } })
+    ]);
+    const blocking = { electricalInspections, ticketsCreated, attendanceMarked, dutyRosters, assetEventsLogged, assetFailuresLogged };
+    const parts = [
+      [electricalInspections, 'inspection records'], [ticketsCreated, 'tickets created'], [attendanceMarked, 'attendance records marked'],
+      [dutyRosters, 'duty roster entries'], [assetEventsLogged, 'asset events logged'], [assetFailuresLogged, 'asset failures logged']
+    ].filter(([n]) => n > 0).map(([n, what]) => `${n} ${what}`);
+    if (parts.length) {
       return reply.code(409).send({
-        error: 'Cannot permanently delete supervisor with ' + recordCount + ' inspection records. They will remain archived.',
-        electricalInspections: recordCount
+        error: 'Cannot permanently delete supervisor with ' + parts.join(', ') + '. They will remain archived.',
+        ...blocking
       });
     }
 

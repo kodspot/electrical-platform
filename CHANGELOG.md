@@ -22,6 +22,39 @@ has been git-tagged yet, so everything below is grouped under **Unreleased**.
 Complete and merged into the working tree as of this writing, pending its next deploy —
 see `docs/DEPLOYMENT.md` for how a change reaches production.
 
+### 2026-10-14 (F13)
+
+- **User-visible (Release Notes), admin:** permanently deleting a supervisor who still has
+  history (tickets created, attendance marked, duty rosters, asset events or failures,
+  inspections) now explains which records keep them, instead of failing with a server error.
+- **`[F13]` Schema and migration drift resolved.** The decision: the database's current shape
+  is the truth.
+  - **`schema.prisma` now declares:**
+    - `Ticket.createdBy` `onDelete: Restrict`;
+    - `@@index([sourceIp, createdAt])`, `([slaDeadlineAt, status])` and
+      `([orgId, status, verifiedAt])` on Ticket;
+    - `@default(now())` on `updatedAt` for ModuleDefinition, OrgModuleActivation and
+      SupervisorAssignment;
+    - `@default([])` on `InspectionTemplate.locationTypes`.
+
+    No database change for any of these.
+  - **One migration**, `20261014000000_f13_module_defaults`: the `Organization.enabledModules`
+    and `Ticket.module` defaults go from `'hk'` (a module that no longer exists) to `'ele'`.
+    Defaults only; no rows are updated.
+  - **Proof:** on a fresh database, `migrate deploy` then `migrate diff` in both directions
+    leaves only the four Prisma 5 join-table primary-key/unique-index statements. Those are a
+    known artifact, resolved at the Prisma 6 upgrade.
+  - **Drift gate:** `ci-validate` now runs `scripts/schema-drift.js`. It diffs the migrated CI
+    database against the schema and fails on any statement outside that four-statement
+    allowlist (`test/schema-drift.test.js`). It is skipped locally without a database and
+    required under `CI=true`.
+  - **BUG-0009:** `DELETE /supervisors/:id/permanent` checked only inspections, so any of the
+    other five RESTRICT references made it fail with a 500. It now pre-checks all six and
+    answers 409 with the counts (`test/integration/supervisor-delete-guard.test.js`; red on
+    the old code, 4 failures with 500).
+  - **Docs:** `data-model.md`, `DEPLOYMENT.md` (the owner confirms `prisma migrate status` on
+    the host before merging a migration), `COVERAGE_MATRIX` (F13 resolved).
+
 ### 2026-10-14
 
 - **`[PR-B]` Caddyfile: `caddy fmt`, and the forwarded-header bug fixed.**

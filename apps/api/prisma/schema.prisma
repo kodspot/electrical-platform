@@ -77,7 +77,7 @@ model ModuleDefinition {
   orgActivations OrgModuleActivation[]
 
   createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  updatedAt DateTime @default(now()) @updatedAt // F13: the database has this default (migrations); declared so schema = database
 
   @@index([isActive, sortOrder])
 }
@@ -117,7 +117,7 @@ model OrgModuleActivation {
   note String?
 
   createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  updatedAt DateTime @default(now()) @updatedAt // F13: the database has this default (migrations); declared so schema = database
 
   @@unique([orgId, moduleId])
   @@index([orgId, isActive])
@@ -251,7 +251,9 @@ model Ticket {
   locationId   String
   location     Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
   createdById  String?
-  createdBy    User?    @relation("TicketCreatedBy", fields: [createdById], references: [id])
+  // F13: RESTRICT, as the database has it: a user who created tickets cannot be hard-deleted
+  // (routes/supervisors.js pre-checks and answers 409).
+  createdBy    User?    @relation("TicketCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
   assignedToId String?
   assignedTo   User?    @relation("TicketAssignedTo", fields: [assignedToId], references: [id])
 
@@ -303,6 +305,10 @@ model Ticket {
   @@index([orgId, createdAt])
   @@index([orgId, source])
   @@index([orgId, module, status])
+  // F13: created by migration 20260426000000_phase1_sla_verify_provenance, now declared.
+  @@index([sourceIp, createdAt]) // public-complaint duplicate scoring (routes/public.js)
+  @@index([slaDeadlineAt, status])
+  @@index([orgId, status, verifiedAt])
 }
 
 model ComplaintCategory {
@@ -574,7 +580,7 @@ model SupervisorAssignment {
   coverChildren Boolean @default(true)
 
   createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  updatedAt DateTime @default(now()) @updatedAt // F13: the database has this default (migrations); declared so schema = database
 
   @@unique([supervisorId, locationId])
   @@index([orgId])
@@ -899,7 +905,7 @@ model InspectionTemplate {
 
   name          String // e.g. "Standard Room Inspection", "MCB Panel Deep Check"
   description   String?
-  locationTypes String[] // Empty = all types; otherwise filter e.g. ["ROOM","WARD"]
+  locationTypes String[] @default([]) // Empty = all types; otherwise filter e.g. ["ROOM","WARD"]. F13: DB default declared
   isDefault     Boolean  @default(false) // One default per org — auto-selected when no specific match
   isActive      Boolean  @default(true)
   version       Int      @default(1) // Incremented on edit so historical inspections keep old snapshot
