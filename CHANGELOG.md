@@ -22,6 +22,21 @@ has been git-tagged yet, so everything below is grouped under **Unreleased**.
 Complete and merged into the working tree as of this writing, pending its next deploy —
 see `docs/DEPLOYMENT.md` for how a change reaches production.
 
+### 2026-10-14
+
+- **`[PR-A]` Runtime dependency security fixes.**
+  - **What changed:**
+    - `npm audit fix` (never `--force`) took `proxy-addr` to 2.0.8, `fast-uri` to 2.4.7/3.1.8, `@fastify/busboy` to 3.2.3, and also patched `fast-xml-parser` (via the AWS SDK) and `minimatch`/`brace-expansion`.
+    - `nodemailer` went from 6.x to **10.0.11** and `sharp` from 0.33 to **0.35.5**. Both are the oldest releases that fix every advisory and have been published for at least two weeks. Both need Node ≥ 20(.9); production runs `node:20-alpine`.
+    - `email.js` and `r2.js` needed no change: nodemailer's breaking changes (SES SDK transport, remote-content TLS, TypeScript build) and sharp's (Node 18 dropped, AVIF tuning, removed deprecated options) don't touch SMTP sending or `resize` → `webp`.
+    - `fastify`, the `@fastify/*` direct versions, prisma and Node are unchanged.
+  - **Result:** runtime advisories went from 14 (3 critical, 10 high, 1 moderate) to 5 (1 critical, 4 high). What remains is the Fastify 4 chain (`fastify`, `find-my-way`, `@fastify/static`), which needs Fastify 5, and `tar` via bcrypt 5's install-time `node-pre-gyp`, which is not loaded at runtime. These are listed with expiry dates in `.github/audit-exceptions.json`.
+  - **Tests:**
+    - `test/lib-email.test.js` covers sending through nodemailer's real `jsonTransport`, the failure path, `verify()` and not-configured.
+    - `test/lib-storage.test.js` checks that 1600×1200 becomes an 800×600 WebP, that small images are never enlarged, and the `validateImageBuffer` magic-byte cases.
+    - `test/integration/upload-validation.test.js` checks, on the public complaint route, that a wrong type gets 400, mismatched magic bytes get 400, and a file over 5 MB gets 413.
+    - Also checked in a throwaway `node:20-alpine` container: `npm ci --omit=dev`, and sharp 0.35.5 producing an 800×600 WebP.
+
 ### 2026-10-13
 
 - **User-visible (Release Notes):** Electricians can now see complaint and proof photos;

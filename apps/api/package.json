@@ -39,11 +39,11 @@
     "dotenv": "^17.3.1",
     "fastify": "^4.26.0",
     "jsonwebtoken": "^9.0.2",
-    "nodemailer": "^6.9.8",
+    "nodemailer": "^10.0.11",
     "pdfkit": "^0.18.0",
     "prisma": "^5.9.0",
     "qrcode": "^1.5.4",
-    "sharp": "^0.33.2",
+    "sharp": "^0.35.5",
     "zod": "^3.22.4"
   },
   "devDependencies": {
