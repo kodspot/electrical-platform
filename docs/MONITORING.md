@@ -125,6 +125,11 @@ request).
   `/review/<token>`, and the proxied request still returned the upstream's 200.
 - **Deploy log:** the production deploy job prints only `docker compose ps caddy`, never
   Caddy's logs. Read those on the host.
+- **Forwarded headers:** Caddy's defaults set `X-Forwarded-For` (the bare client IP; a
+  client-supplied value is ignored) and `X-Forwarded-Proto`. The API (`trustProxy`) uses
+  them for `request.ip`, rate-limit keys and the public-complaint IP hash. Never set XFF to
+  `{remote}`: it includes the client port (the bug fixed on 2026-10-14). `X-Real-IP {remote}`
+  is still sent; the app doesn't read it.
 - **Deploy check:** every deploy (production and staging) fails unless the running Caddy
   passes `caddy validate` and its adapted config contains `REDACTED`. That shows the filter
   is live in the container, not just in the file. See `docs/DEPLOYMENT.md`.

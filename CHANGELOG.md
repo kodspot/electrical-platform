@@ -24,6 +24,28 @@ see `docs/DEPLOYMENT.md` for how a change reaches production.
 
 ### 2026-10-14
 
+- **`[PR-B]` Caddyfile: `caddy fmt`, and the forwarded-header bug fixed.**
+  - **Formatting:** `caddy fmt --overwrite` changed indentation only; the adapted JSON is
+    byte-identical.
+  - **Header lines:** removed the redundant `header_up X-Forwarded-For {remote}` and
+    `X-Forwarded-Proto {scheme}`; kept `Host` and `X-Real-IP`.
+  - **Proof** (throwaway `caddy:2-alpine` plus a fastify echo with `trustProxy: true`):
+    - **Before:** `request.ip` was `172.23.0.1:42262`, because `{remote}` includes the
+      client port.
+    - **After:** `request.ip` is `172.23.0.1`.
+    - **Unchanged:** `request.protocol` stays `https`, a client-supplied `X-Forwarded-For`
+      is ignored both before and after, the token canary after a 502 stays 0, and
+      `caddy validate` passes.
+  - **Effects, a one-time change** (also in `docs/architecture/auth-and-tenancy.md`):
+    - **Rate limits:** every per-IP rate limit (global, login, reset, public complaint,
+      review, pages, QA ingest, super-admin checks and dispatch) was effectively per TCP
+      connection and is now per client IP, as designed. That is stricter, and users behind
+      one shared NAT address now share a bucket.
+    - **Spam scoring:** the public-complaint IP hash (`public.js:282`) was taken over
+      `ip:port`, so duplicate scoring rarely triggered. It works now; its window is 30
+      minutes.
+    - **Logs** show the bare IP.
+
 - **`[PR-B]` Local pre-push gate and CLAUDE.md refresh.**
   - **Pre-push hook:** `.githooks/pre-push` now runs `npm run ci` in `apps/api`, the same
     gate as CI's Lint & Test (previously only lint and tests). It is still opt-in:
