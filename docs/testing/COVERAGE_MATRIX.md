@@ -140,6 +140,19 @@ Open questions for the owner, not fixes. Each was checked against the code on 20
 - **F8 — RESOLVED 2026-10-13 (WP-H).** `employeeId` is required (trimmed, non-empty) on `POST /api/workers` and `POST /api/superadmin/organizations/:orgId/workers`, and can't be cleared through either PATCH route. Both worker forms mark it required. Existing workers are not modified. Tests: `approved-fixes.test.js` › "POST /api/workers without an employeeId … is rejected with 400", "create with employeeId → admin sets PIN 123456 → worker-login succeeds", "PATCH /api/workers/:id cannot clear employeeId", "the super-admin worker routes enforce the same rule"; bug registry BUG-0005. *Original finding:* `POST /api/workers` takes no PIN (schema `workers.js:93-96`); the PIN is set separately via `PATCH /api/workers/:id/pin` (`workers.js:487-491`, exactly 6 digits). `employeeId` is optional on creation (`workers.js:94`) but required by worker login (`worker-auth.js:119`), which also refuses a worker with no `pinHash` (`:143`). A worker created without an employeeId cannot log in until an admin edits one in.
 - **F9 — REFUTED in part.** `test/README.md` said `POST /tickets/:id/resolve` is uncovered because it needs R2. The gap is still real: no test calls `POST /api/tickets/:id/resolve`, and the only worker-resolve test asserts a cross-org 404 (`tenant-isolation-worker-auth.test.js`: "POST /api/worker/tickets/:id/resolve rejects another org's ticket"). But the reason is stale: `STORAGE_DRIVER=local` (`lib/r2.js`, covered by `lib-storage.test.js`) now allows a proof-photo upload with no cloud credentials. The README is corrected accordingly.
 - **F10 — CONFIRMED.** `enum UserRole { SUPER_ADMIN ADMIN SUPERVISOR }` (`schema.prisma:399-403`) plus the separate `Worker` model (electricians, PIN login). There is no authenticated requester/student role: guests use the public routes unauthenticated, identified only by optional `guestName`/`guestPhone`.
+- **F13 — RESOLVED 2026-10-14 (PR #9). Schema and migration drift.** The schema now follows the
+  database:
+  - `Ticket.createdBy` is `onDelete: Restrict`;
+  - the three migration-only Ticket indexes are declared;
+  - the `updatedAt` and `locationTypes` defaults are declared.
+
+  One migration changes the `Organization.enabledModules` and `Ticket.module` defaults from
+  `'hk'` to `'ele'`. Defaults only; no rows change.
+  - **Diff now:** `migrate diff` in both directions leaves only the four Prisma 5 join-table
+    statements, allowlisted until Prisma 6.
+  - **Gate:** `scripts/schema-drift.js` in `ci-validate` (`test/schema-drift.test.js`).
+  - **Found along the way:** the supervisor permanent delete hit the RESTRICT foreign keys
+    with a 500, now a 409 (BUG-0009, `test/integration/supervisor-delete-guard.test.js`).
 - **F11 — other contradictions noticed.**
   - **Internal tickets never ring electricians.** `tickets.js` has no `getAssignedWorkerIds`/`notifyWorkers` call, unlike public complaints (W1). Only the auto-assigned supervisor is notified (`tickets.js:176-184`).
   - **SLA rules differ by source.** Public complaints get a fixed 24h SLA (`public.js:373`); internal tickets use `getSlaDeadline(priority)` (`tickets.js:27`, `:171`).

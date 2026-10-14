@@ -100,6 +100,25 @@ everywhere authentication or page-serving happens (see
   §6). Encrypted fields include worker/user Aadhaar and blood group.
 - **Permanent deletes are dependency-guarded** — a worker or supervisor with inspection
   history is blocked (`409`) rather than silently disconnected (`[WP17]`).
+- **A user who is referenced cannot be hard-deleted.** Six foreign keys to `User` are
+  `ON DELETE RESTRICT`: `Ticket.createdById`, `Attendance.markedById`, `DutyRoster.supervisorId`,
+  `AssetEvent.loggedById`, `AssetFailure.loggedById` and `ElectricalInspection.supervisorId`.
+  The schema declares `Ticket.createdBy` with `onDelete: Restrict` to match. `DELETE
+  /supervisors/:id/permanent` pre-checks all six and answers `409` with the counts (F13,
+  BUG-0009); it never lets the database reject the delete (which was a `500`).
+  `assignedTo`, `verifiedBy` and `resolvedBy` are `SET NULL`; notifications and supervisor
+  assignments cascade.
+- **Ticket indexes beyond the obvious ones:** `(sourceIp, createdAt)` serves public-complaint
+  duplicate scoring, and `(slaDeadlineAt, status)` and `(orgId, status, verifiedAt)` are kept
+  for SLA and verification queries. Migration `20260426000000_phase1_sla_verify_provenance`
+  created them; the schema has declared them since F13.
+- **The schema and the migrations must agree (drift gate).** `npm run ci` (`ci-validate` →
+  `scripts/schema-drift.js`) diffs the migrated CI database against `schema.prisma` and fails
+  on any difference. The only exception is an allowlist of four implicit many-to-many
+  join-table statements (`_ElectricalInspectionToWorker`, `_TicketResolvedWorkers`): Prisma 5
+  models those with a unique index while the database has a primary key. **Remove that
+  allowlist at the Prisma 6 upgrade.** A schema change therefore always ships with its
+  migration.
 
 ## Related
 
