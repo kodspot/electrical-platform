@@ -45,6 +45,7 @@ Amendment Log is the lightweight record for everything below that bar.
 | [0004](0004-resilience-as-shared-primitives.md) | Resilience baked into shared primitives | Accepted |
 | [0005](0005-qa-telemetry-in-production.md) | QA telemetry in the production DB, token-authenticated ingest, outbound GitHub calls | Proposed |
 | [0006](0006-browser-e2e-with-playwright.md) | Browser end-to-end tests with Playwright in a separate `e2e/` package | Proposed |
+| [0007](0007-dependency-audit-gate.md) | A blocking dependency audit gate with expiring exceptions | Proposed |
 
 > ADRs 0002–0004 were backfilled to record foundational decisions the codebase already
 > embodies; they are dated to their authoring, and each notes that it documents a

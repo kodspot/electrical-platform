@@ -79,6 +79,13 @@ jobs:
         working-directory: apps/api
         run: npm run ci
 
+      # Runtime dependency audit: fails on any high/critical advisory not listed in
+      # .github/audit-exceptions.json and on any expired exception. A registry or
+      # network error only warns (scripts/audit-gate.js).
+      - name: Dependency audit gate
+        working-directory: apps/api
+        run: node scripts/audit-gate.js
+
       # Sends the already-scrubbed run summary to the super-admin Quality dashboard
       # (POST /api/qa/runs). Best-effort: it never fails the job, skips when the secrets or
       # the summary file are absent, and prints only the HTTP status — never the URL or

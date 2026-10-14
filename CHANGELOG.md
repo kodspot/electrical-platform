@@ -24,6 +24,21 @@ see `docs/DEPLOYMENT.md` for how a change reaches production.
 
 ### 2026-10-14
 
+- **`[PR-A]` Dependency audit gate (closes PRA-07/C1; [ADR 0007](docs/adr/0007-dependency-audit-gate.md)).**
+  - **The step:** a new "Dependency audit gate" step in the deploy workflow's Lint & Test
+    job runs `apps/api/scripts/audit-gate.js` after CI validation.
+  - **What it checks:** it fails on any high or critical `npm audit --omit=dev` advisory
+    not listed in `.github/audit-exceptions.json`, and on any exception past its
+    `expires` date. A registry or network error only warns.
+  - **The 16 current exceptions:**
+    - the Fastify 4 chain (`fastify` ×5, `find-my-way`, `@fastify/static`), expiring
+      2026-12-13: they need Fastify 5, and runtime reachability is assessed per advisory;
+    - `tar` ×9, expiring 2026-11-13: install-time only, via bcrypt 5's `node-pre-gyp`,
+      and fixed by moving to bcrypt 6.
+  - **Tests:** `test/audit-gate.test.js` (14) with fixtures for a clean report, an
+    unlisted high, a listed advisory, an expired exception, a registry error, and the
+    committed file's expiry windows.
+
 - **`[PR-A]` Runtime dependency security fixes.**
   - **What changed:**
     - `npm audit fix` (never `--force`) took `proxy-addr` to 2.0.8, `fast-uri` to 2.4.7/3.1.8, `@fastify/busboy` to 3.2.3, and also patched `fast-xml-parser` (via the AWS SDK) and `minimatch`/`brace-expansion`.

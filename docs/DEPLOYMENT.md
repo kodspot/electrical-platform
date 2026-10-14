@@ -13,6 +13,16 @@ every database-backed integration test — no tests are skipped in CI, since a d
 is always available there. (This doc deliberately doesn't cite a specific test count —
 it grows with nearly every change and a stale number here is worse than none.)
 
+**The test job then runs the dependency audit gate** (`apps/api/scripts/audit-gate.js`,
+[ADR 0007](adr/0007-dependency-audit-gate.md)):
+- **It fails on** any high or critical runtime advisory not listed in
+  [`.github/audit-exceptions.json`](../.github/audit-exceptions.json), and on any listed
+  exception past its `expires` date.
+- **It only warns** on a registry or network error, which never blocks a deploy.
+- **When it fails:** upgrade the package, or add a dated exception (`ghsa`, `package`,
+  `severity`, `reason` with reachability evidence, `owner`, `expires`). Fastify-chain
+  exceptions may last at most 60 days; all others at most 30.
+
 The **Deploy to Production** job only runs on a direct push to `main`, and only after
 the test job has passed (`needs: test`). It never runs for pull requests. It SSHes into
 the production AWS EC2 host, writes a fresh `.env` from GitHub Actions secrets, and
