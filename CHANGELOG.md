@@ -24,6 +24,19 @@ see `docs/DEPLOYMENT.md` for how a change reaches production.
 
 ### 2026-10-14
 
+- **`[PR-A]` GitHub Actions bumped to their current majors** in `deploy.yml`,
+  `deploy-staging.yml` and `e2e.yml`: `actions/checkout` v4 → v7, `actions/setup-node`
+  v4 → v7, `actions/upload-artifact` v4 → v7.
+  - **What changed, from the release notes:**
+    - all three run on Node 24 (runner ≥ 2.327.1);
+    - checkout v6 keeps the persisted credentials in a separate file, and v7 refuses to check
+      out fork code for `pull_request_target`/`workflow_run` (not used here);
+    - setup-node v5 auto-caches when `package.json` has `packageManager` (ours has none,
+      and `cache: npm` stays explicit), v6 limits that to npm, and v7 adds cache outputs and
+      drops the dummy `NODE_AUTH_TOKEN`;
+    - upload-artifact v7 adds an `archive` input (default `true`).
+  - **No input changes are needed** in our workflows. `appleboy/ssh-action` is unchanged.
+
 - **`[PR-A]` Dependency audit gate (closes PRA-07/C1; [ADR 0007](docs/adr/0007-dependency-audit-gate.md)).**
   - **The step:** a new "Dependency audit gate" step in the deploy workflow's Lint & Test
     job runs `apps/api/scripts/audit-gate.js` after CI validation.
