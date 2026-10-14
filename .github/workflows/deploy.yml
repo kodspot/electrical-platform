@@ -86,6 +86,12 @@ jobs:
         working-directory: apps/api
         run: node scripts/audit-gate.js
 
+      # Backup/restore scripts (plain bash, fake docker, stubbed S3 — no network).
+      - name: Backup script tests
+        run: |
+          bash infrastructure/tests/backup-db.test.sh
+          bash infrastructure/tests/backup-r2-stdio.test.sh
+
       # Sends the already-scrubbed run summary to the super-admin Quality dashboard
       # (POST /api/qa/runs). Best-effort: it never fails the job, skips when the secrets or
       # the summary file are absent, and prints only the HTTP status — never the URL or

@@ -24,6 +24,26 @@ see `docs/DEPLOYMENT.md` for how a change reaches production.
 
 ### 2026-10-14
 
+- **`[PR-B]` Backups run inside the app image.**
+  - **What was broken:** `infrastructure/backup-db.sh` and `restore-db.sh` called host
+    `node`, which the production host doesn't have, so the offsite upload, prune and
+    download could not run. The scripts were also committed without the executable bit,
+    which they need for the cron line.
+  - **Now:** both run `apps/api/scripts/backup-r2.js` through
+    `docker compose exec -T api node scripts/backup-r2.js ...`, streaming the archive
+    through stdin (`upload - <name>`) and stdout (`download … -`, `download-latest -`).
+    There is no compose change, and the container never reads the host backup directory.
+  - **`backup-r2.js`:** loads dotenv quietly, because dotenv 17's stdout banner would
+    otherwise corrupt the archive stream. It also validates the stdin archive name and
+    rejects empty input.
+  - **On failure:** pruning (local and offsite) still runs. The job logs
+    `offsite upload failed`, keeps the local archive, and exits non-zero. A dump failure
+    exits non-zero before any upload.
+  - **Tests:** `infrastructure/tests/backup-db.test.sh` (18 checks: success, upload
+    failure, dump failure) and `backup-r2-stdio.test.sh` (9 checks, stubbed S3), both run
+    in the deploy workflow's test job.
+  - **Docs:** DISASTER_RECOVERY and RUNBOOKS, including the one-time owner verification.
+
 - **`[PR-B]` Every deploy checks the running Caddy.**
   - **The checks:** after the API is healthy, both deploy scripts run `caddy validate` on the
     running container's config and require `caddy adapt … | grep -c REDACTED` to be at
