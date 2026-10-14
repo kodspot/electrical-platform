@@ -58,7 +58,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v7
         with:
-          node-version: "20"
+          node-version: "24"
           cache: "npm"
           cache-dependency-path: apps/api/package-lock.json
 
@@ -91,6 +91,33 @@ jobs:
         run: |
           bash infrastructure/tests/backup-db.test.sh
           bash infrastructure/tests/backup-r2-stdio.test.sh
+
+      # The production image itself: build it, start it against a fresh database on the CI
+      # Postgres with these placeholder secrets (NODE_ENV=production), let it apply every
+      # migration, require /health/ready = 200, then bootstrap the super-admin and sign in by
+      # email + password (bcrypt hash + compare inside the Alpine image), then stop it.
+      # Prints HTTP statuses only. [ADR 0008]
+      - name: Docker image smoke test
+        run: |
+          set -euo pipefail
+          docker build -t electrical-api:ci apps/api > /tmp/docker-build.log 2>&1 || { tail -40 /tmp/docker-build.log; exit 1; }
+          echo "image: $(docker run --rm --entrypoint node electrical-api:ci --version)"
+          PGPASSWORD=ci psql -h localhost -U ci -d electrical_ci -qc 'CREATE DATABASE electrical_smoke'
+          docker run -d --name api-smoke --network host             -e NODE_ENV=production -e PORT=3999 -e APP_URL=http://localhost:3999 -e STORAGE_DRIVER=local             -e DATABASE_URL=postgresql://ci:ci@localhost:5432/electrical_smoke             -e JWT_SECRET -e COOKIE_SECRET -e ADMIN_KEY -e DATA_ENCRYPTION_KEY             electrical-api:ci sh -c 'npx prisma migrate deploy && exec node index.js' > /dev/null
+          ready=000
+          for i in $(seq 1 45); do
+            ready=$(curl -s -o /dev/null -w '%{http_code}' http://localhost:3999/health/ready || true)
+            [ "$ready" = "200" ] && break
+            sleep 2
+          done
+          echo "/health/ready: $ready"
+          boot=$(curl -s -o /dev/null -w '%{http_code}' -H 'content-type: application/json'             -d "{\"adminKey\":\"$ADMIN_KEY\"}" http://localhost:3999/api/auth/bootstrap)
+          echo "bootstrap: $boot"
+          login=$(curl -s -o /dev/null -w '%{http_code}' -H 'content-type: application/json'             -d "{\"email\":\"superadmin@internal.kodspot\",\"password\":\"$ADMIN_KEY\"}" http://localhost:3999/api/auth/login)
+          echo "login (email + password): $login"
+          docker rm -f api-smoke > /dev/null
+          [ "$ready" = "200" ] && [ "$boot" = "200" ] && [ "$login" = "200" ] || { echo "Docker smoke test FAILED"; exit 1; }
+          echo "Docker smoke test passed"
 
       # Sends the already-scrubbed run summary to the super-admin Quality dashboard
       # (POST /api/qa/runs). Best-effort: it never fails the job, skips when the secrets or
@@ -126,6 +153,64 @@ jobs:
           }).then((r) => console.log('QA ingest HTTP status: ' + r.status))
             .catch((e) => console.log('QA ingest request failed: ' + e.name));
           JS
+
+  # The previous runtime, report-only, for one release after the Node 24 move (ADR 0008):
+  # the same gate on Node 22. It never blocks a merge or a deploy (continue-on-error, and the
+  # deploy job needs only "test").
+  test-node22:
+    name: Lint & Test (Node 22, report-only)
+    runs-on: ubuntu-latest
+    continue-on-error: true
+
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_USER: ci
+          POSTGRES_PASSWORD: ci
+          POSTGRES_DB: electrical_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U ci -d electrical_ci"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      NODE_ENV: test
+      DATABASE_URL: postgresql://ci:ci@localhost:5432/electrical_ci
+      JWT_SECRET: ci-only-placeholder-jwt-secret-000000
+      COOKIE_SECRET: ci-only-placeholder-cookie-secret
+      ADMIN_KEY: ci-only-placeholder-admin-key
+      DATA_ENCRYPTION_KEY: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+      R2_ACCOUNT_ID: ci-placeholder
+      R2_ACCESS_KEY_ID: ci-placeholder
+      R2_SECRET_ACCESS_KEY: ci-placeholder
+      R2_BUCKET_NAME: ci-placeholder
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: "22"
+          cache: "npm"
+          cache-dependency-path: apps/api/package-lock.json
+
+      - name: Install dependencies
+        working-directory: apps/api
+        run: npm ci
+
+      - name: Apply database migrations
+        working-directory: apps/api
+        run: npx prisma migrate deploy
+
+      - name: CI validation (Node 22)
+        working-directory: apps/api
+        run: npm run ci
 
   deploy:
     name: Deploy to Production
