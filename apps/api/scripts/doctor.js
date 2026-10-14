@@ -59,6 +59,10 @@ if (fs.existsSync(path.join(API_DIR, 'node_modules'))) ok('apps/api/node_modules
 else bad('dependencies not installed', 'npm run setup');
 
 // 6. Database reachable + migrations applied (read-only; connects, does not mutate)
+if (isLocalDb(env.DATABASE_URL || '') && /:5432\//.test(env.DATABASE_URL || '')) {
+  // docker-compose.dev.yml moved to 5433 (5432 is the production compose's port).
+  warn('DATABASE_URL uses port 5432, but the dev database (docker-compose.dev.yml) listens on 127.0.0.1:5433 — copy DATABASE_URL from .env.dev.example');
+}
 if (isLocalDb(env.DATABASE_URL || '')) {
   try {
     execFileSync(NPX, ['prisma', 'migrate', 'status', '--schema', 'prisma/schema.prisma'], {
@@ -70,7 +74,7 @@ if (isLocalDb(env.DATABASE_URL || '')) {
     if (/not yet been applied|pending|following migration/i.test(out)) {
       bad('database reachable but migrations are pending', 'npm run setup (or: npm --prefix apps/api run db:deploy)');
     } else {
-      bad(`database not reachable at ${dbHostSafe(env.DATABASE_URL)}`, 'docker compose -f docker-compose.dev.yml up -d');
+      bad(`database not reachable at ${dbHostSafe(env.DATABASE_URL)}`, 'docker compose -f docker-compose.dev.yml up -d   (Postgres on 127.0.0.1:5433)');
     }
   }
 } else {

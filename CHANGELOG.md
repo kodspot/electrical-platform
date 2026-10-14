@@ -24,6 +24,15 @@ see `docs/DEPLOYMENT.md` for how a change reaches production.
 
 ### 2026-10-14
 
+- **`[PR-B]` The local dev database moved to `127.0.0.1:5433`** (`docker-compose.dev.yml`), so it
+  never shares a host port with the production compose (`127.0.0.1:5432`).
+  - **Updated:** `.env.dev.example` (`DATABASE_URL`), `apps/api/README.md` and
+    `apps/api/test/README.md`. `npm run doctor` now warns when a local `DATABASE_URL`
+    still uses 5432.
+  - **Existing dev setups:** update `DATABASE_URL` in your `.env` to port 5433, then run
+    `docker compose -f docker-compose.dev.yml up -d` to rebind. The data volume is
+    unchanged.
+
 - **`[PR-B]` Backups run inside the app image.**
   - **What was broken:** `infrastructure/backup-db.sh` and `restore-db.sh` called host
     `node`, which the production host doesn't have, so the offsite upload, prune and
