@@ -8,7 +8,7 @@ The app runs entirely on your machine — the only external dependency is Postgr
 
 ```
 cp .env.dev.example .env                        # local config: STORAGE_DRIVER=local, localhost DB
-docker compose -f docker-compose.dev.yml up -d  # PostgreSQL on 127.0.0.1:5432
+docker compose -f docker-compose.dev.yml up -d  # PostgreSQL on 127.0.0.1:5433
 npm run setup                                   # install deps, apply migrations, generate client
 npm run seed                                    # load the demo organization + realistic data
 npm run dev                                     # start the app (auto-reload) on http://localhost:3000
@@ -56,8 +56,8 @@ npm test
 
 ```
 docker exec electrical-db-dev createdb -U electrical electrical_test
-DATABASE_URL=postgresql://electrical:electrical@127.0.0.1:5432/electrical_test npx prisma migrate deploy
-DATABASE_URL=postgresql://electrical:electrical@127.0.0.1:5432/electrical_test npm test
+DATABASE_URL=postgresql://electrical:electrical@127.0.0.1:5433/electrical_test npx prisma migrate deploy
+DATABASE_URL=postgresql://electrical:electrical@127.0.0.1:5433/electrical_test npm test
 ```
 
 Without a reachable database the DB-backed tests skip, and the run says `NOT EXECUTED: N tests — this is not a pass`. Set `QA_STRICT=1` to make that fail the run; under `CI=true` it always fails. See [`test/README.md`](test/README.md) for the tiers and the guard's exact rules, and [`docs/testing/COVERAGE_MATRIX.md`](../../docs/testing/COVERAGE_MATRIX.md) for what is and is not covered.

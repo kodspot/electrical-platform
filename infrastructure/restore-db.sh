@@ -67,11 +67,17 @@ DB_NAME="${DB_NAME:-kodspot}"
 
 # ── Resolve the backup file, downloading from R2 first if requested ──
 if [ -n "${FROM_OFFSITE}" ]; then
+  # The host has no Node.js: download inside the app container, streamed to stdout.
   BACKUP_FILE="/tmp/restore-drill-$(date +%s).sql.gz"
   if [ -n "${OFFSITE_KEY}" ]; then
-    node "${SCRIPT_DIR}/apps/api/scripts/backup-r2.js" download "${OFFSITE_KEY}" "${BACKUP_FILE}"
+    (cd "${SCRIPT_DIR}" && docker compose exec -T api node scripts/backup-r2.js download "${OFFSITE_KEY}" -) > "${BACKUP_FILE}"
   else
-    node "${SCRIPT_DIR}/apps/api/scripts/backup-r2.js" download-latest "${BACKUP_FILE}"
+    (cd "${SCRIPT_DIR}" && docker compose exec -T api node scripts/backup-r2.js download-latest -) > "${BACKUP_FILE}"
+  fi
+  if [ ! -s "${BACKUP_FILE}" ]; then
+    echo "ERROR: offsite download failed or was empty"
+    rm -f "${BACKUP_FILE}"
+    exit 1
   fi
 fi
 

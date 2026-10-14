@@ -24,6 +24,100 @@ see `docs/DEPLOYMENT.md` for how a change reaches production.
 
 ### 2026-10-14
 
+- **`[PR-B]` Caddyfile: `caddy fmt`, and the forwarded-header bug fixed.**
+  - **Formatting:** `caddy fmt --overwrite` changed indentation only; the adapted JSON is
+    byte-identical.
+  - **Header lines:** removed the redundant `header_up X-Forwarded-For {remote}` and
+    `X-Forwarded-Proto {scheme}`; kept `Host` and `X-Real-IP`.
+  - **Proof** (throwaway `caddy:2-alpine` plus a fastify echo with `trustProxy: true`):
+    - **Before:** `request.ip` was `172.23.0.1:42262`, because `{remote}` includes the
+      client port.
+    - **After:** `request.ip` is `172.23.0.1`.
+    - **Unchanged:** `request.protocol` stays `https`, a client-supplied `X-Forwarded-For`
+      is ignored both before and after, the token canary after a 502 stays 0, and
+      `caddy validate` passes.
+  - **Effects, a one-time change** (also in `docs/architecture/auth-and-tenancy.md`):
+    - **Rate limits:** every per-IP rate limit (global, login, reset, public complaint,
+      review, pages, QA ingest, super-admin checks and dispatch) was effectively per TCP
+      connection and is now per client IP, as designed. That is stricter, and users behind
+      one shared NAT address now share a bucket.
+    - **Spam scoring:** the public-complaint IP hash (`public.js:282`) was taken over
+      `ip:port`, so duplicate scoring rarely triggered. It works now; its window is 30
+      minutes.
+    - **Logs** show the bare IP.
+
+- **`[PR-B]` Local pre-push gate and CLAUDE.md refresh.**
+  - **Pre-push hook:** `.githooks/pre-push` now runs `npm run ci` in `apps/api`, the same
+    gate as CI's Lint & Test (previously only lint and tests). It is still opt-in:
+    `git config core.hooksPath .githooks`.
+  - **`CLAUDE.md`** stays a map that links rather than duplicates. It now adds:
+    - the root commands (`ci`, `doctor`, `seed`, `scenario`, `bug:*`, `release:check`,
+      `e2e`, `e2e:ui`);
+    - plan mode for non-trivial work, and test-first for bug fixes;
+    - no Redis, queue or broker without an ADR (ADR 0002);
+    - vanilla JS with no bundler;
+    - modules as the extension mechanism;
+    - the tenant contract: a server-derived `orgId`, and cross-org requests answer 404;
+    - the bug-registry obligation;
+    - the clean-copy test rule;
+    - the finding-ID convention (`PRA-07/Cn`, `EP/Cn`, `Fn`, `BUG-nnnn`).
+
+- **`[PR-B]` First Linux visual baselines.**
+  - **Source:** 16 images from the authorized `update_snapshots` run on `main` (run
+    38522159509), each reviewed by eye: right page, fixed test data only, dynamic regions
+    masked. They are committed under `e2e/tests/__screenshots__/linux/`.
+  - **Accepted (desktop and mobile):** admin-login, supervisor-login, electrician-login,
+    admin-tickets, admin-locations, admin-qr-print, guest-complaint, electrician-my-work.
+  - **Rejected, 4 images:**
+    - **admin-dashboard** (×2): the date picker shows today's date. An `<input>` value is
+      not a text node, so the date mask misses it.
+    - **superadmin-quality** (×2): the masked Live CI list lists live GitHub runs, so its
+      height, and with it the page size, changes from run to run.
+  - **Until those masks are fixed in `e2e/support/visual.js`**, the four rejected views
+    keep reporting "no baseline" and don't fail.
+
+- **`[PR-B]` The local dev database moved to `127.0.0.1:5433`** (`docker-compose.dev.yml`), so it
+  never shares a host port with the production compose (`127.0.0.1:5432`).
+  - **Updated:** `.env.dev.example` (`DATABASE_URL`), `apps/api/README.md` and
+    `apps/api/test/README.md`. `npm run doctor` now warns when a local `DATABASE_URL`
+    still uses 5432.
+  - **Existing dev setups:** update `DATABASE_URL` in your `.env` to port 5433, then run
+    `docker compose -f docker-compose.dev.yml up -d` to rebind. The data volume is
+    unchanged.
+
+- **`[PR-B]` Backups run inside the app image.**
+  - **What was broken:** `infrastructure/backup-db.sh` and `restore-db.sh` called host
+    `node`, which the production host doesn't have, so the offsite upload, prune and
+    download could not run. The scripts were also committed without the executable bit,
+    which they need for the cron line.
+  - **Now:** both run `apps/api/scripts/backup-r2.js` through
+    `docker compose exec -T api node scripts/backup-r2.js ...`, streaming the archive
+    through stdin (`upload - <name>`) and stdout (`download … -`, `download-latest -`).
+    There is no compose change, and the container never reads the host backup directory.
+  - **`backup-r2.js`:** loads dotenv quietly, because dotenv 17's stdout banner would
+    otherwise corrupt the archive stream. It also validates the stdin archive name and
+    rejects empty input.
+  - **On failure:** pruning (local and offsite) still runs. The job logs
+    `offsite upload failed`, keeps the local archive, and exits non-zero. A dump failure
+    exits non-zero before any upload.
+  - **Tests:** `infrastructure/tests/backup-db.test.sh` (18 checks: success, upload
+    failure, dump failure) and `backup-r2-stdio.test.sh` (9 checks, stubbed S3), both run
+    in the deploy workflow's test job.
+  - **Docs:** DISASTER_RECOVERY and RUNBOOKS, including the one-time owner verification.
+
+- **`[PR-B]` Every deploy checks the running Caddy.**
+  - **The checks:** after the API is healthy, both deploy scripts run `caddy validate` on the
+    running container's config and require `caddy adapt … | grep -c REDACTED` to be at
+    least 1, which shows the C11 credential log filter is live. Either failure fails the
+    deploy. Caddy's logs and config are never printed.
+  - **Recorded commit:** the deployed commit is written to `~/.electrical-deployed-sha` (or
+    `~/.electrical-staging-deployed-sha`) outside the repo, and the next deploy uses it to
+    note whether the Caddyfile changed.
+  - **Correction:** the 2026-10-13 report said the filter was not live because deploys never
+    recreate Caddy. That was wrong. Both deploys run `docker compose down` before
+    `up -d`, which recreates Caddy every time. The filter has most likely been live since
+    PR #3 deployed, and these checks now prove it on every deploy.
+
 - **`[PR-A]` GitHub Actions bumped to their current majors** in `deploy.yml`,
   `deploy-staging.yml` and `e2e.yml`: `actions/checkout` v4 → v7, `actions/setup-node`
   v4 → v7, `actions/upload-artifact` v4 → v7.

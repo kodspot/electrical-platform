@@ -22,7 +22,7 @@ npm run ci                                      # lint + tests + repository chec
 DB-backed tests need a **disposable, loopback** Postgres whose database name ends in `_ci`, `_test` or `_e2e`, passed explicitly:
 
 ```
-DATABASE_URL=postgresql://<user>:<password>@127.0.0.1:5432/electrical_test npm test
+DATABASE_URL=postgresql://<user>:<password>@127.0.0.1:5433/electrical_test npm test   # 5433 = docker-compose.dev.yml
 ```
 
 Run `npx prisma migrate deploy` against it first. The app also needs its usual required variables (`JWT_SECRET`, `COOKIE_SECRET`, `ADMIN_KEY`, `DATA_ENCRYPTION_KEY`); the guard always replaces `R2_*` with placeholders. The `app-smoke` tier boots the whole app, so it needs these even without a reachable database.
