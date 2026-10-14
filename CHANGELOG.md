@@ -22,6 +22,35 @@ has been git-tagged yet, so everything below is grouped under **Unreleased**.
 Complete and merged into the working tree as of this writing, pending its next deploy —
 see `docs/DEPLOYMENT.md` for how a change reaches production.
 
+### 2026-10-14 (runtime)
+
+- **User-visible (Release Notes):** none intended. The same pages and API run on a newer,
+  long-term-supported runtime. One fix ships with it: old bookmark links of the form
+  `/{org}/{page}` redirect again (they would have failed on the new framework).
+- **`[RUNTIME]` Node 24, Fastify 5, bcrypt 6** ([ADR 0008](docs/adr/0008-runtime-upgrade-node24-fastify5.md)).
+  - **Runtime:** `node:24-alpine`, `engines >=24`, and CI, staging and e2e on Node 24. A
+    report-only Node 22 job runs for one release.
+  - **Packages:** fastify 4.29 → **5.12.5**; `@fastify/cookie` 11.1.2, `cors` 11.3.0,
+    `helmet` 13.1.1, `multipart` 10.1.2, `rate-limit` 11.2.0, `static` 10.1.5; bcrypt
+    5.1.1 → **6.0.0**. Each is the newest release at least 14 days old.
+  - **Fastify 5 breaking changes:** all 22 are reviewed in ADR 0008. Code changes:
+    - `reply.redirect(url, 301)` (`routes/pages.js:214`); the v4 argument order returned a
+      500;
+    - nothing else: empty-body DELETEs are already handled by the F14 parser, and
+      `request.hostname` dropping the port only affects logs.
+  - **New tests:**
+    - `fastify5-compat` (12): the redirect (red on the old call), all 9 browser DELETE call
+      sites with an empty JSON body, SSE over a real socket, and `hostname`/`host`;
+    - `bcrypt-compat` (5): three bcrypt-5.1.1 hashes verify under bcrypt 6;
+    - `bcrypt-compat-login`: a bcrypt-5 stored password signs in through the API.
+  - **Audit:** runtime `npm audit` shows 0 vulnerabilities, and `.github/audit-exceptions.json`
+    is empty (16 → 0).
+  - **CI image smoke test:** build the production image, then run it against a fresh
+    database (migrations applied in the image) and check `/health/ready` 200, bootstrap 200
+    and an email-and-password login 200.
+  - **Docs:** ADR 0008, the release-notes draft `docs/releases/v1.0.0-draft.md` (Charter §18;
+    not tagged), DEPLOYMENT, the architecture overview, and the Charter §22 table.
+
 ### 2026-10-14 (visual baselines)
 
 - **`[E2E]` All 20 visual baselines.** The two pages rejected in PR B now have deterministic

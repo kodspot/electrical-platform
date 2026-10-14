@@ -35,7 +35,7 @@ the Charter §5 before proposing structural change.
 | Object storage | **Cloudflare R2** (S3 API) | images + offsite backups, `apps/api/src/lib/r2.js` |
 | Email | **SES over SMTP (nodemailer)** | optional, `apps/api/src/lib/email.js` |
 | AI | **Azure OpenAI / Gemini** | optional per-org, `apps/api/src/lib/ai-provider.js` |
-| Runtime | **Node 20 in Docker** | `apps/api/Dockerfile`, non-root |
+| Runtime | **Node 24 in Docker** (Fastify 5) | `apps/api/Dockerfile`, non-root; [ADR 0008](../adr/0008-runtime-upgrade-node24-fastify5.md) |
 
 The three runtime services (`db`, `api`, `caddy`) are defined in `docker-compose.yml`. See
 [operations](../README.md#operations--run-recover-scale) for how it deploys.

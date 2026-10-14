@@ -77,6 +77,8 @@ Engineering understanding, not code duplication. Each links to the code it descr
 - [`SCALING.md`](SCALING.md) — connection-pool sizing and scaling guidance.
 
 ### Decisions & History
+- [`releases/`](releases/) — release notes; [`v1.0.0-draft.md`](releases/v1.0.0-draft.md) is the
+  draft for the first tagged release (not yet tagged).
 - [`adr/`](adr/) — Architecture Decision Records; see [`adr/README.md`](adr/README.md) for
   the index and process. Foundational: modular monolith, shared-DB tenancy, resilience
   primitives, offsite backup storage.

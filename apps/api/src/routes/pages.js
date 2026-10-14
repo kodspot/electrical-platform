@@ -211,7 +211,8 @@ self.addEventListener('fetch', (event) => {
       const org = await validateOrg(orgSlug);
       if (!org) return reply.code(404).send({ error: 'Organization not found' });
       // Default module is ele for backward compatibility
-      return reply.redirect(301, `/${orgSlug}/ele/${page}`);
+      // Fastify 5 signature: redirect(url, code). The v4 form (code, url) now throws. [ADR 0008]
+      return reply.redirect(`/${orgSlug}/ele/${page}`, 301);
     });
   }
 

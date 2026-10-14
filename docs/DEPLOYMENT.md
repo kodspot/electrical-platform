@@ -63,6 +63,13 @@ whether the Caddyfile changed. A manual `docker compose up -d` without `down` wo
 recreate Caddy: after changing the Caddyfile by hand, run
 `docker compose up -d --force-recreate --no-deps caddy`.
 
+**The image is smoke-tested in CI before anything deploys** (ADR 0008). The Lint & Test job
+builds `apps/api/Dockerfile` (Node 24), starts it with `NODE_ENV=production` against a fresh
+database on the CI Postgres, and lets it run every migration. It then requires
+`/health/ready` = 200, bootstraps the super-admin and signs in by email and password, and
+stops it. Only HTTP statuses are printed. A report-only "Lint & Test (Node 22)" job runs the
+same gate on the previous runtime for one release; it never blocks a deploy.
+
 **Before merging a change that adds a migration** (for example F13's
 `20261014000000_f13_module_defaults`), the owner confirms on the production host that the
 database is up to date with the migrations already on `main`:
