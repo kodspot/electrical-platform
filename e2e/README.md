@@ -66,6 +66,13 @@ Codegen points at your **dev** server and dev data. Use what it records as a sta
     guest complaint, electrician, supervisor, internal ticket), and the steps that happen
     on a phone open their own Pixel 7 context. J7 holds the negative cases (role, tenant,
     wrong PIN, invalid complaint).
+  - **BUG-0010 (in `journeys.spec.js`):** "electrician nav links work after module sync" and
+    "supervisor nav links work after module sync".
+    - **They wait** for `/api/auth/worker-me` (`/api/auth/me`) and the module sync, then
+      assert every nav `href` is `/{org}/ele/{page}`.
+    - **They click through the nav,** asserting a 200 at each target and the page heading.
+    - **A link for a disabled module stays hidden.**
+    - **Why:** the other journeys navigate with `page.goto`, so they never clicked the nav.
   - `*.mobile.spec.js`: phone-only journeys, run in `chromium-mobile` only. For example,
     J8 is the worker PIN reset from the emailed link.
   - `visual-a11y.spec.js`: the design and accessibility checks (below), in both projects.

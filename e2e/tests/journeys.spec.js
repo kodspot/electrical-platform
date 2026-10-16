@@ -291,3 +291,109 @@ test.describe('J7 — negative cases', () => {
     expect(await db().ticket.count({ where: { locationId: room.id } })).toBe(0);
   });
 });
+
+// BUG-0010: the electrician/supervisor nav links were rewritten twice — once when the page
+// initialised and again after /auth/worker-me (/auth/me) returned — and the second pass
+// prefixed an already-prefixed link: /{org}/ele/{org}/ele/{page}, a 404 in production. The
+// journeys above navigate with page.goto, so they never clicked the nav. These tests wait for
+// that module sync to finish, then check every href and click through the links.
+test.describe('BUG-0010 — role nav links after module sync', () => {
+  let s;
+  test.beforeAll(() => { s = seed(); });
+
+  // The sync's last step (setEnabledModules, then the nav rewrite, in one synchronous block)
+  // writes localStorage.enabledModules. The init script removes it on every page load, so it
+  // reappearing means this page's sync — and its nav rewrite — has run. No fixed sleep.
+  const clearEnabledModules = (page) => page.addInitScript(() => localStorage.removeItem('enabledModules'));
+  async function syncDone(page, sync) {
+    await sync;
+    await expect.poll(() => page.evaluate(() => localStorage.getItem('enabledModules'))).not.toBeNull();
+  }
+  const meResponse = (page, mePath) => page.waitForResponse((r) => new URL(r.url()).pathname === mePath && r.status() === 200);
+
+  // No href may carry the org twice, and the visible links are exactly /{slug}/ele/{page}.
+  async function expectNavHrefs(page, slug, pages) {
+    const links = await page.$$eval('#sv-nav a[href]', (as) => as.map((a) => ({ href: a.getAttribute('href'), hidden: a.style.display === 'none' })));
+    const doubled = links.filter((l) => l.href.split(`/${slug}/`).length > 2);
+    expect(doubled, `nav hrefs carry the org twice: ${doubled.map((l) => l.href).join(', ')}`).toEqual([]);
+    expect(links.filter((l) => !l.hidden).map((l) => l.href).sort()).toEqual(pages.map((p) => `/${slug}/ele/${p}`).sort());
+  }
+
+  // Click a nav link by its label: the document response must be 200 at /{slug}/ele/{page}.
+  // `landsOn`: a page that sends you on by design (supervisor-electrical without a scanned
+  // location goes back to supervisor-scan); the click itself must still be a 200 at the link.
+  async function clickNav(page, slug, label, pageName, mePath, landmark, landsOn = pageName) {
+    const target = `/${slug}/ele/${pageName}`;
+    const landing = `/${slug}/ele/${landsOn}`;
+    const sync = meResponse(page, mePath);
+    const [doc] = await Promise.all([
+      page.waitForResponse((r) => r.request().isNavigationRequest() && r.request().resourceType() === 'document'),
+      page.locator('#sv-nav').getByRole('link', { name: label, exact: true }).click()
+    ]);
+    expect(new URL(doc.url()).pathname, `${label} navigated to ${new URL(doc.url()).pathname}`).toBe(target);
+    expect(doc.status(), `${label} answered ${doc.status()}`).toBe(200);
+    await expect.poll(() => new URL(page.url()).pathname).toBe(landing);
+    await expect(page.getByRole('heading', { name: landmark })).toBeVisible();
+    await syncDone(page, sync);
+  }
+
+  test('electrician nav links work after module sync (BUG-0010)', async ({ page }) => {
+    const slug = s.orgA.slug;
+    const login = await page.request.post('/api/auth/worker-login', {
+      data: { orgSlug: slug, employeeId: s.workers.elecFloor.employeeId, pin: s.workers.elecFloor.pin }
+    });
+    expect(login.status()).toBe(200);
+    const { token, worker } = await login.json();
+    await page.addInitScript(({ token, worker, slug }) => {
+      localStorage.setItem('elec_token', token);
+      localStorage.setItem('elec_user', JSON.stringify(worker || {}));
+      localStorage.setItem('orgSlug', slug);
+    }, { token, worker, slug });
+    await clearEnabledModules(page);
+
+    const ME = '/api/auth/worker-me';
+    const NAV = ['electrician-scan', 'electrician-tickets', 'electrician-my-work'];
+    const sync = meResponse(page, ME);
+    await page.goto(orgPage(slug, 'electrician-scan'));
+    await syncDone(page, sync);
+    await expectNavHrefs(page, slug, NAV);
+
+    await clickNav(page, slug, 'Tickets', 'electrician-tickets', ME, 'Electrician Work Queue');
+    await expectNavHrefs(page, slug, NAV);
+    await clickNav(page, slug, 'My Work', 'electrician-my-work', ME, 'My Work — Last 30 Days');
+    await expectNavHrefs(page, slug, NAV);
+    await clickNav(page, slug, 'Scan', 'electrician-scan', ME, 'Scan Location QR');
+    await expectNavHrefs(page, slug, NAV);
+  });
+
+  test('supervisor nav links work after module sync (BUG-0010)', async ({ page }) => {
+    const slug = s.orgA.slug;
+    await signIn(page, 'supervisor', s.supNear, slug);
+    await clearEnabledModules(page);
+
+    const ME = '/api/auth/me';
+    // The scan and electrical pages also link Electrical; tickets and attendance do not.
+    const NAV = ['supervisor-scan', 'supervisor-electrical', 'supervisor-tickets', 'supervisor-attendance'];
+    const NAV_SHORT = ['supervisor-scan', 'supervisor-tickets', 'supervisor-attendance'];
+    const sync = meResponse(page, ME);
+    await page.goto(orgPage(slug, 'supervisor-scan'));
+    await syncDone(page, sync);
+    await expectNavHrefs(page, slug, NAV);
+
+    await clickNav(page, slug, 'Electrical', 'supervisor-electrical', ME, 'Scan Location QR', 'supervisor-scan');
+    await expectNavHrefs(page, slug, NAV);
+    await clickNav(page, slug, 'Tickets', 'supervisor-tickets', ME, 'My Tickets');
+    await expectNavHrefs(page, slug, NAV_SHORT);
+    await clickNav(page, slug, 'Attendance', 'supervisor-attendance', ME, 'Attendance');
+    await expectNavHrefs(page, slug, NAV_SHORT);
+    await clickNav(page, slug, 'Scan', 'supervisor-scan', ME, 'Scan Location QR');
+    await expectNavHrefs(page, slug, NAV);
+
+    // A link for a module the org has not enabled (assets) stays hidden after the sync.
+    const assetsSync = meResponse(page, ME);
+    await page.goto(orgPage(slug, 'supervisor-assets'));
+    await syncDone(page, assetsSync);
+    await expect(page.locator('#sv-nav a[data-mod="asset"]')).toBeHidden();
+    await expectNavHrefs(page, slug, NAV_SHORT);
+  });
+});

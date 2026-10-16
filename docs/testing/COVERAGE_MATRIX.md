@@ -118,6 +118,7 @@ Playwright against the real app on a disposable `_e2e` database ([ADR 0006](../a
 | J6 | Internal ticket | shows in the admin list and in the assigned supervisor's list |
 | J7 | Negative cases | electrician blocked from admin pages/APIs; org B cannot see org A's ticket; wrong PIN; invalid complaint creates nothing |
 | J8 | Worker PIN reset from the email link (Pixel 7) | F12 page; token removed from the address bar; new PIN signs in; link single-use |
+| BUG-0010 (×2) | Electrician and supervisor nav after the module sync | every nav href is `/{org}/ele/{page}` (never the org twice); clicking Tickets / My Work / Scan (supervisor: Electrical / Tickets / Attendance / Scan) answers 200 at that URL and renders the page; a disabled-module link stays hidden |
 | Design/a11y | 10 pages × desktop + mobile | screenshot vs Linux baseline ("no baseline" until generated); axe fails only on critical |
 
 ## UNKNOWN rows (could not be settled by this inventory)

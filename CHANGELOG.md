@@ -22,6 +22,30 @@ has been git-tagged yet, so everything below is grouped under **Unreleased**.
 Complete and merged into the working tree as of this writing, pending its next deploy —
 see `docs/DEPLOYMENT.md` for how a change reaches production.
 
+### 2026-10-16 (BUG-0010)
+
+- **User-visible (Release Notes):** the navigation links in the electrician and supervisor
+  apps (Tickets, My Work, Scan, Attendance, …) work again. They had started leading to a
+  "not found" page.
+- **`[BUG-0010]` Role nav links were double-prefixed.**
+  - **What was broken:** `_applyRoleNavScope` in `public/js/app.js` rewrote `#sv-nav` twice:
+    at init (`initElectrician` / `initSupervisor`), and again after `/auth/worker-me`
+    (`/auth/me`) returned (`_syncEnabledModulesFor*`). The second pass re-read the already
+    rewritten `href`, so links became `/{org}/{mod}/{org}/{mod}/{page}` and answered 404.
+    It was present since `530bbd5` (2026-07-24).
+  - **Fix:** the first pass stores the original page in `data-page`, and every pass builds
+    from it. The `data-mod` hide/show logic is unchanged.
+  - **Tests:**
+    - **e2e:** "electrician nav links work after module sync (BUG-0010)" and "supervisor nav
+      links work after module sync (BUG-0010)" (`e2e/tests/journeys.spec.js`).
+    - **Registry:** BUG-0010 (`scenarios/bugs/bug-0010-role-nav-double-prefix.js`) runs the
+      real `app.js` in a Node `vm` with a stub DOM: init, then sync, then init again.
+    - **Red first:** both e2e tests and BUG-0010 failed on the old code with the doubled
+      `href`.
+  - **Docs:** `e2e/README.md`, `COVERAGE_MATRIX` (journeys table), the generated bug
+    registry. Charter §22: no API, architecture, data-model, deployment, environment or ADR
+    change is triggered, because this is a frontend bug fix only.
+
 ### 2026-10-14 (runtime)
 
 - **User-visible (Release Notes):** none intended. The same pages and API run on a newer,
