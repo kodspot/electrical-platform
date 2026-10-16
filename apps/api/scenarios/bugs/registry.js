@@ -17,7 +17,8 @@ const BUGS_LIST = [
   require('./bug-0006-empty-json-body-rejected'),
   require('./bug-0007-reset-links-open-no-page'),
   require('./bug-0008-worker-photos-open-db-breaker'),
-  require('./bug-0009-supervisor-delete-fk-error')
+  require('./bug-0009-supervisor-delete-fk-error'),
+  require('./bug-0010-role-nav-double-prefix')
 ];
 
 const BUGS = Object.fromEntries(BUGS_LIST.map((b) => [b.id, b]));

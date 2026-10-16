@@ -25,8 +25,9 @@ Commands: `npm run bug:list` · `npm run bug:run -- <ID>` · `npm run bug:valida
 | BUG-0007 | HIGH | FIXED | ele | Password and PIN reset links from email opened no page ("Organization not found") | `test/integration/bug-regressions.test.js` |
 | BUG-0008 | CRITICAL | FIXED | ele | Electrician photo loads opened the database circuit breaker (whole platform 503 for 30 s) | `test/integration/bug-regressions.test.js` |
 | BUG-0009 | MEDIUM | FIXED | ele | Permanently deleting a supervisor who created tickets failed with a server error | `test/integration/bug-regressions.test.js` |
+| BUG-0010 | HIGH | FIXED | ele | Electrician and supervisor nav links were double-prefixed (/{org}/{mod}/{org}/{mod}/{page} → 404) | `test/integration/bug-regressions.test.js; e2e/tests/journeys.spec.js › "electrician nav links work after module sync (BUG-0010)" and "supervisor nav links work after module sync (BUG-0010)"` |
 
-Count: 9 bug scenario(s).
+Count: 10 bug scenario(s).
 
 ## BUG-0001 — Admin could set a ticket to RESOLVED_PENDING_VERIFY directly
 
@@ -189,4 +190,22 @@ Count: 9 bug scenario(s).
 1. Create an org with an admin, a deactivated supervisor, and a ticket created by that supervisor.
 2. As the admin, DELETE /api/supervisors/:id/permanent.
 3. Broken: 500. Fixed: 409 { ticketsCreated: 1 } and the supervisor remains.
+
+## BUG-0010 — Electrician and supervisor nav links were double-prefixed (/{org}/{mod}/{org}/{mod}/{page} → 404)
+
+- **Severity:** HIGH · **Status:** FIXED · **Module:** ele · **Category:** navigation
+- **Origin:** Production report (GET /jnmc/ele/jnmc/ele/electrician-tickets 404), fixed 2026-10-16
+- **Introduced:** 2026-07-24 (530bbd5) · **Fixed:** 2026-10-16
+- **Description:** public/js/app.js rewrote the role nav links twice: _applyRoleNavScope ran when the page initialised (initElectrician/initSupervisor) and again after /auth/worker-me (/auth/me) returned (_syncEnabledModulesFor*). The second pass read the already-rewritten href and prefixed it again, so Tickets, My Work and Scan pointed at e.g. /jnmc/ele/jnmc/ele/electrician-tickets and answered 404.
+- **Root cause:** _applyRoleNavScope derived the page from getAttribute("href") on every call, which after the first call is already /{org}/{mod}/{page}; stripping only the leading "/" and calling orgPath() again doubled the prefix. E2E never clicked the nav (it navigates with page.goto), so it never saw the result.
+- **Expected behavior:** However many times the nav is rewritten, every link is /{org}/{mod}/{page}; links for disabled modules (data-mod) stay hidden.
+- **Broken behavior:** After the module sync, links were /{org}/{mod}/{org}/{mod}/{page} and navigating answered 404.
+- **Scenario dependencies:** —
+- **Regression test:** `test/integration/bug-regressions.test.js; e2e/tests/journeys.spec.js › "electrician nav links work after module sync (BUG-0010)" and "supervisor nav links work after module sync (BUG-0010)"`
+
+**Reproduction steps:**
+
+1. Sign in as an electrician (or supervisor) and open electrician-scan (supervisor-scan).
+2. Wait for /api/auth/worker-me (/api/auth/me) to complete, then click Tickets.
+3. Broken: 404 at /{org}/ele/{org}/ele/electrician-tickets. Fixed: 200 at /{org}/ele/electrician-tickets.
 

@@ -407,7 +407,14 @@ window.App = (function () {
         continue;
       }
       links[i].style.display = '';
-      var page = links[i].getAttribute('href').replace(/^\//, '');
+      // Idempotent: this runs at init and again after the module sync. Remember the page from
+      // the original href on the first pass and always build from it — re-reading href would
+      // prefix an already-prefixed link (/{org}/{mod}/{org}/{mod}/page). [BUG-0010]
+      var page = links[i].getAttribute('data-page');
+      if (page === null) {
+        page = (links[i].getAttribute('href') || '').replace(/^\//, '');
+        links[i].setAttribute('data-page', page);
+      }
       if (page) links[i].href = orgPath(page);
     }
   }
