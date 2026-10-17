@@ -72,16 +72,18 @@
 <body>
 <nav class="topbar">
   <div class="topbar-left">
-    <a class="topbar-brand" href="/">Kodspot</a>
-    <div id="topbar-nav"></div>
+    <button class="nav-toggle" id="nav-toggle" aria-label="Menu"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"/></svg></button>
+    <span class="topbar-brand">Kodspot</span>
+    <div class="topbar-nav" id="topbar-nav"></div>
   </div>
   <div class="topbar-right">
     <span class="topbar-user" id="userName"></span>
-    <button class="btn btn-sm btn-ghost" id="logoutBtn">Logout</button>
+    <button class="btn btn-sm btn-ghost" onclick="App.logout()">Logout</button>
   </div>
 </nav>
+<div class="sa-banner" id="sa-banner"></div>
 
-<main class="main-content">
+<main class="container">
   <div class="page-title">
     <h1>🔴 Asset Failures</h1>
     <div style="display:flex;gap:.5rem">
@@ -102,19 +104,19 @@
   <div class="f-filters">
     <div class="f-filter-row">
       <input class="form-input" style="flex:2;min-width:140px" id="fSearch" placeholder="Search asset, title…" oninput="debounceSearch()">
-      <select class="form-select" style="flex:1;min-width:100px" id="fSeverity" onchange="loadFailures(1)">
+      <select class="form-select" style="flex:1;min-width:100px" id="fSeverity" aria-label="Filter by severity" onchange="loadFailures(1)">
         <option value="">All Severity</option>
         <option value="LOW">Low</option><option value="MEDIUM">Medium</option>
         <option value="HIGH">High</option><option value="CRITICAL">Critical</option>
       </select>
-      <select class="form-select" style="flex:1;min-width:100px" id="fFStatus" onchange="loadFailures(1)">
+      <select class="form-select" style="flex:1;min-width:100px" id="fFStatus" aria-label="Filter by status" onchange="loadFailures(1)">
         <option value="">All Status</option>
         <option value="OPEN">Open</option><option value="ACKNOWLEDGED">Acknowledged</option>
         <option value="IN_PROGRESS">In Progress</option><option value="RESOLVED">Resolved</option><option value="CLOSED">Closed</option>
       </select>
       <input class="form-input" style="flex:0 0 130px" id="fFrom" type="date" title="From" onchange="loadFailures(1)">
       <input class="form-input" style="flex:0 0 130px" id="fTo" type="date" title="To" onchange="loadFailures(1)">
-      <select class="form-select" style="flex:1;min-width:90px" id="fSort" onchange="loadFailures(1)">
+      <select class="form-select" style="flex:1;min-width:90px" id="fSort" aria-label="Sort failures" onchange="loadFailures(1)">
         <option value="">Newest</option><option value="severity">By Severity</option>
         <option value="oldest">Oldest</option><option value="status">By Status</option>
       </select>

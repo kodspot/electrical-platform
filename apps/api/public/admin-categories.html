@@ -48,14 +48,14 @@
 
   <div class="cg-toolbar">
     <div class="cg-toolbar-left">
-      <select class="form-select" id="filterModule" onchange="loadCategories()">
+      <select class="form-select" id="filterModule" aria-label="Filter by module" onchange="loadCategories()">
         <option value="">All Modules</option>
         <option value="ele">Electrical</option>
         <option value="civil">Civil</option>
         <option value="asset">Asset</option>
         <option value="complaints">Complaints</option>
       </select>
-      <select class="form-select" id="filterScope" onchange="loadCategories()">
+      <select class="form-select" id="filterScope" aria-label="Filter by scope" onchange="loadCategories()">
         <option value="">All Scopes</option>
         <option value="global">Org-wide</option>
       </select>

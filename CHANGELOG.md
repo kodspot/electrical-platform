@@ -22,6 +22,41 @@ has been git-tagged yet, so everything below is grouped under **Unreleased**.
 Complete and merged into the working tree as of this writing, pending its next deploy —
 see `docs/DEPLOYMENT.md` for how a change reaches production.
 
+### 2026-10-18 (UI fixes found by the tester)
+
+- **User-visible (Release Notes):** every admin page has the same working menu. Analytics shows
+  numbers instead of "undefined". Filters are announced by screen readers, and the "All
+  modules" link is readable. Details in the Release Notes draft.
+- **`[BUG-0012]` admin-analytics showed "undefined".**
+  - **Cause:** the page read `summary.totalRecords` / `flaggedRecords` and
+    `locationBreakdown[].cleaned`, names `GET /api/analytics/report` doesn't send.
+  - **Fix:** it now uses `totalInspections` / `flaggedInspections` / `inspections`. Expected
+    and Completion show "—" (the API sends no schedule data). Frontend only.
+  - **Tests:** registry BUG-0012 compares the fields the page renders with the real API
+    response; the explorer's new `rawValue` check catches any visible "undefined" or "NaN".
+- **`[BUG-0013]` Admin pages without the shared admin shell.**
+  - **The pages:**
+    - assets, electrical and failures had an unstyled nav (links run together, F17's
+      1030 px-wide phone page), `<main class="main-content">` (defined nowhere), and a Logout
+      button with no handler;
+    - predictions had no topbar at all;
+    - alerts had no phone menu button.
+  - **Fix:** the same topbar, menu button and container as the other admin pages.
+  - **Tests:** registry BUG-0013 (every admin page has the shell); the explorer's new `nav`
+    check (≥ 5 nav links; the link texts don't run together on desktop).
+- **`[BUG-0014]` admin-alerts was always dark.**
+  - **Fix:** the hard-coded `data-theme="dark"` is removed.
+  - **Test:** registry BUG-0014.
+- **`[F16]` 22 filter controls on 7 pages had no accessible name.** They now have `aria-label`.
+- **`[F17]` Phone overflow on 3 admin pages:** fixed by BUG-0013.
+- **`[F18]` "← All modules" on the module home was blue on blue** (contrast 1.0).
+  - **Fix:** it is now `var(--primary-light)`.
+  - **Test:** `e2e/tests/ui-fixes.spec.js` computes the WCAG ratio against every gradient stop.
+    axe can't judge text on a gradient.
+- **Explorer allow-list:** 10 entries → **0**. The removed entries are gone, not loosened.
+- **Docs:** `e2e/README.md` (the `rawValue` and `nav` checks, empty allow-list),
+  `COVERAGE_MATRIX` (F16, F17 resolved; F18), the bug registry doc, the Release Notes draft.
+
 ### 2026-10-18 (CI speed)
 
 - **User-visible (Release Notes):** a deploy now interrupts the site for the restart only, about

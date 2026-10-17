@@ -97,9 +97,21 @@
 </style>
 </head>
 <body>
+<nav class="topbar">
+  <div class="topbar-left">
+    <button class="nav-toggle" id="nav-toggle" aria-label="Menu"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"/></svg></button>
+    <span class="topbar-brand">Kodspot</span>
+    <div class="topbar-nav" id="topbar-nav"></div>
+  </div>
+  <div class="topbar-right">
+    <span class="topbar-user" id="userName"></span>
+    <button class="btn btn-sm btn-ghost" onclick="App.logout()">Logout</button>
+  </div>
+</nav>
+<div class="sa-banner" id="sa-banner"></div>
+
 <div class="layout">
-  <nav class="sidebar" id="sidebar"></nav>
-  <main class="main-content" id="content">
+  <main class="container" id="content">
     <div class="pred-header">
       <div class="pred-title">
         <h1>🔮 Predictive Maintenance</h1>

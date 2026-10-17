@@ -84,16 +84,18 @@
 <body>
 <nav class="topbar">
   <div class="topbar-left">
-    <a class="topbar-brand" href="/">Kodspot</a>
-    <div id="topbar-nav"></div>
+    <button class="nav-toggle" id="nav-toggle" aria-label="Menu"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"/></svg></button>
+    <span class="topbar-brand">Kodspot</span>
+    <div class="topbar-nav" id="topbar-nav"></div>
   </div>
   <div class="topbar-right">
     <span class="topbar-user" id="userName"></span>
-    <button class="btn btn-sm btn-ghost" id="logoutBtn">Logout</button>
+    <button class="btn btn-sm btn-ghost" onclick="App.logout()">Logout</button>
   </div>
 </nav>
+<div class="sa-banner" id="sa-banner"></div>
 
-<main class="main-content">
+<main class="container">
   <div class="page-title">
     <h1>⚡ Electrical Inspections</h1>
   </div>
@@ -110,33 +112,33 @@
   <div class="ei-filters">
     <div class="ei-filter-row">
       <input class="form-input ei-search" id="eiSearch" placeholder="Search by location…" oninput="debounceSearch()">
-      <select class="form-select ei-filter-sel" id="filterShift" onchange="loadRecords(1)">
+      <select class="form-select ei-filter-sel" id="filterShift" aria-label="Filter by shift" onchange="loadRecords(1)">
         <option value="">All Shifts</option>
         <option value="MORNING">Morning</option><option value="AFTERNOON">Afternoon</option>
         <option value="NIGHT">Night</option><option value="GENERAL">General</option>
       </select>
-      <select class="form-select ei-filter-sel" id="filterStatus" onchange="loadRecords(1)">
+      <select class="form-select ei-filter-sel" id="filterStatus" aria-label="Filter by status" onchange="loadRecords(1)">
         <option value="">All Status</option>
         <option value="SUBMITTED">Submitted</option><option value="FLAGGED">Flagged</option>
       </select>
-      <select class="form-select ei-filter-sel" id="filterFaults" onchange="loadRecords(1)">
+      <select class="form-select ei-filter-sel" id="filterFaults" aria-label="Filter by faults" onchange="loadRecords(1)">
         <option value="">All Records</option>
         <option value="true">With Faults</option>
         <option value="false">No Faults</option>
       </select>
     </div>
     <div class="ei-filter-row">
-      <select class="form-select ei-filter-sel" id="filterLocation" onchange="loadRecords(1)">
+      <select class="form-select ei-filter-sel" id="filterLocation" aria-label="Filter by location" onchange="loadRecords(1)">
         <option value="">All Locations</option>
       </select>
-      <select class="form-select ei-filter-sel" id="filterLate" onchange="loadRecords(1)">
+      <select class="form-select ei-filter-sel" id="filterLate" aria-label="Filter by timeliness" onchange="loadRecords(1)">
         <option value="">All</option>
         <option value="true">Late Only</option>
         <option value="false">On Time Only</option>
       </select>
       <input class="form-input ei-date-input" id="filterFrom" type="date" title="From" onchange="loadRecords(1)">
       <input class="form-input ei-date-input" id="filterTo" type="date" title="To" onchange="loadRecords(1)">
-      <select class="form-select ei-filter-sel" id="filterSort" onchange="loadRecords(1)">
+      <select class="form-select ei-filter-sel" id="filterSort" aria-label="Sort inspections" onchange="loadRecords(1)">
         <option value="newest">Newest</option><option value="oldest">Oldest</option>
         <option value="location">By Location</option><option value="faults">Most Faults</option>
       </select>

@@ -27,8 +27,11 @@ Commands: `npm run bug:list` · `npm run bug:run -- <ID>` · `npm run bug:valida
 | BUG-0009 | MEDIUM | FIXED | ele | Permanently deleting a supervisor who created tickets failed with a server error | `test/integration/bug-regressions.test.js` |
 | BUG-0010 | HIGH | FIXED | ele | Electrician and supervisor nav links were double-prefixed (/{org}/{mod}/{org}/{mod}/{page} → 404) | `test/integration/bug-regressions.test.js; e2e/tests/journeys.spec.js › "electrician nav links work after module sync (BUG-0010)" and "supervisor nav links work after module sync (BUG-0010)"` |
 | BUG-0011 | HIGH | FIXED | ele | A role nav link hidden until the module sync came back double-prefixed (supervisor Assets → 404) | `test/integration/bug-regressions.test.js; e2e/tests/explorer.spec.js › "supervisor › supervisor-assets" and "supervisor › supervisor-electrical"` |
+| BUG-0012 | MEDIUM | FIXED | ele | Admin analytics showed "undefined" for inspection records, flagged records and the location breakdown | `test/integration/bug-regressions.test.js; e2e/tests/explorer.spec.js › rawValue check (admin › admin-analytics)` |
+| BUG-0013 | MEDIUM | FIXED | ele | Four admin pages had no working admin nav (assets, electrical, failures: run-together links and a too-wide page on phones; predictions: none at all) | `test/integration/bug-regressions.test.js; e2e/tests/explorer.spec.js › nav and overflow checks (admin pages)` |
+| BUG-0014 | LOW | FIXED | ele | The admin Alerts page was always dark, unlike every other admin page | `test/integration/bug-regressions.test.js; e2e visual baseline admin-alerts` |
 
-Count: 11 bug scenario(s).
+Count: 14 bug scenario(s).
 
 ## BUG-0001 — Admin could set a ticket to RESOLVED_PENDING_VERIFY directly
 
@@ -227,4 +230,56 @@ Count: 11 bug scenario(s).
 1. Org with the assets module on. Sign in as a supervisor in a browser with no localStorage.enabledModules.
 2. Open /{org}/ele/supervisor-assets and wait for /api/auth/me.
 3. Broken: the Assets link is /{org}/ele/{org}/ele/supervisor-assets. Fixed: /{org}/ele/supervisor-assets.
+
+## BUG-0012 — Admin analytics showed "undefined" for inspection records, flagged records and the location breakdown
+
+- **Severity:** MEDIUM · **Status:** FIXED · **Module:** ele · **Category:** ui
+- **Origin:** QA-2 visual baselines (2026-10-17); fixed 2026-10-18
+- **Introduced:** pre-audit · **Fixed:** 2026-10-18
+- **Description:** admin-analytics.html read summary.totalRecords / flaggedRecords and locationBreakdown[].cleaned / expected / completionRate, names the API (GET /api/analytics/report) does not send — it sends totalInspections, flaggedInspections and inspections. The cards and the table printed "undefined" and "undefined%". Found by the QA-2 visual baselines.
+- **Root cause:** The analytics page kept the field names of an older report shape; the API had been renamed (inspections) and never sent per-location schedule data.
+- **Expected behavior:** Every field the page renders unguarded exists in the API response; Expected and Completion show "—" when the API sends no schedule data.
+- **Broken behavior:** Inspection Records, Flagged Records, Inspected and Expected showed "undefined"; Completion showed "undefined%".
+- **Scenario dependencies:** —
+- **Regression test:** `test/integration/bug-regressions.test.js; e2e/tests/explorer.spec.js › rawValue check (admin › admin-analytics)`
+
+**Reproduction steps:**
+
+1. Sign in as an admin of an org with a location and no inspections.
+2. Open /{org}/ele/admin-analytics.
+3. Broken: "undefined" in the first two cards and the Location Breakdown. Fixed: 0 and "—".
+
+## BUG-0013 — Four admin pages had no working admin nav (assets, electrical, failures: run-together links and a too-wide page on phones; predictions: none at all)
+
+- **Severity:** MEDIUM · **Status:** FIXED · **Module:** ele · **Category:** ui
+- **Origin:** QA-2 visual baselines and the explorer (F17), 2026-10-17; fixed 2026-10-18
+- **Introduced:** pre-audit · **Fixed:** 2026-10-18
+- **Description:** admin-assets, admin-electrical and admin-failures rendered #topbar-nav without the topbar-nav class (an unstyled row of touching links, about 1030 px wide on a phone — F17) and used <main class="main-content">, a class defined nowhere. admin-predictions had a <nav class="sidebar"> and no topbar, so no navigation. admin-alerts had no #nav-toggle, so its nav could not be opened on a phone. Found by the QA-2 visual baselines.
+- **Root cause:** These pages were built outside the shared admin page shell (topbar markup + container) that the other admin pages and App.initAdmin rely on.
+- **Expected behavior:** Every admin page has the shared shell: <div class="topbar-nav" id="topbar-nav">, the #nav-toggle menu button, and the shared layout classes.
+- **Broken behavior:** Nav links ran together and the page overflowed on a phone (assets, electrical, failures); no nav at all (predictions); no phone menu (alerts).
+- **Scenario dependencies:** —
+- **Regression test:** `test/integration/bug-regressions.test.js; e2e/tests/explorer.spec.js › nav and overflow checks (admin pages)`
+
+**Reproduction steps:**
+
+1. Sign in as an admin and open /{org}/ele/admin-assets (or electrical, failures, predictions, alerts).
+2. Broken: the nav links touch / are missing, and on a phone the page scrolls sideways. Fixed: the same nav as admin-tickets.
+
+## BUG-0014 — The admin Alerts page was always dark, unlike every other admin page
+
+- **Severity:** LOW · **Status:** FIXED · **Module:** ele · **Category:** ui
+- **Origin:** QA-2 visual baselines (2026-10-17); fixed 2026-10-18
+- **Introduced:** pre-audit · **Fixed:** 2026-10-18
+- **Description:** admin-alerts.html hard-coded <html data-theme="dark">, so the page switched to the dark token set while the rest of the admin app is light. Its own styles already used the design tokens. Found by the QA-2 visual baselines.
+- **Root cause:** A data-theme="dark" attribute left on the page's <html> element.
+- **Expected behavior:** No admin page forces a theme on <html>; they all use the admin design tokens.
+- **Broken behavior:** admin-alerts rendered in the dark theme.
+- **Scenario dependencies:** —
+- **Regression test:** `test/integration/bug-regressions.test.js; e2e visual baseline admin-alerts`
+
+**Reproduction steps:**
+
+1. Sign in as an admin and open /{org}/ele/admin-alerts.
+2. Broken: a dark page. Fixed: the light admin theme.
 

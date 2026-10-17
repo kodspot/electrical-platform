@@ -20,6 +20,9 @@
 //   slug       no link carries the org slug twice (BUG-0010)
 //   overflow   phone only: no horizontal scroll
 //   axe        no critical accessibility violation (pages opened directly)
+//   rawValue   no visible "undefined" or "NaN" (a field the page reads but never gets; BUG-0012)
+//   nav        admin pages: the admin nav is there (≥ 5 links) and, on desktop, no two links
+//              touch on one line (an unstyled nav; BUG-0013)
 // And a forbidden matrix: each role opening another role's pages lands on a login page (or,
 // for the super-admin on admin pages, its own dashboard) — never on the page.
 //
@@ -103,16 +106,35 @@ async function visit(page, buf, ctx, url, { axe }) {
   }
   await settle(page).catch(() => fail('loading', `${name}: a skeleton, spinner or "Loading…" stayed on screen`));
 
-  const facts = await page.evaluate((slug) => {
+  const adminPage = ctx.role === 'admin' && ctx.roleOf(name) === 'admin';
+  const facts = await page.evaluate(({ slug, adminPage }) => {
     const text = document.body ? document.body.innerText : '';
+    const raw = text.match(/[^\n]{0,30}\b(undefined|NaN)\b[^\n]{0,30}/);
+    let nav = null;
+    if (adminPage) {
+      const links = [...document.querySelectorAll('#topbar-nav a')];
+      // The extent of each link's TEXT (padding excluded): on a styled nav neighbouring texts are
+      // well apart; on an unstyled one they run together ("DashboardAnalyticsLocations").
+      const texts = links.map((a) => { const r = document.createRange(); r.selectNodeContents(a); return r.getBoundingClientRect(); })
+        .filter((r) => r.width > 0);
+      let touching = 0;
+      for (let i = 1; i < texts.length; i++) {
+        const a = texts[i - 1], b = texts[i];
+        if (Math.abs(a.top - b.top) < 4 && b.left - a.right < 4) touching++;
+      }
+      nav = { links: links.length, touching };
+    }
     const m = text.match(/[^\n]{0,40}\b(not found|Route (GET|POST|PUT|PATCH|DELETE):)[^\n]{0,40}/i);
     const broken = [...document.images].filter((i) => i.getAttribute('src') && i.complete && i.naturalWidth === 0).map((i) => i.src);
     const doubled = [...document.querySelectorAll('a[href]')].map((a) => a.href)
       .filter((h) => { try { return new URL(h).pathname.split(`/${slug}/`).length > 2; } catch { return false; } });
     const el = document.documentElement;
-    return { notFound: m ? m[0] : null, broken, doubled, overflow: el.scrollWidth - el.clientWidth };
-  }, ctx.slug);
+    return { notFound: m ? m[0] : null, raw: raw ? raw[0] : null, nav, broken, doubled, overflow: el.scrollWidth - el.clientWidth };
+  }, { slug: ctx.slug, adminPage });
   if (facts.notFound) fail('errorText', facts.notFound);
+  if (facts.raw) fail('rawValue', facts.raw);
+  if (facts.nav && facts.nav.links < 5) fail('nav', `${name}: the admin nav has ${facts.nav.links} link(s)`);
+  if (facts.nav && !ctx.phone && facts.nav.touching) fail('nav', `${name}: ${facts.nav.touching} pair(s) of nav links touch (unstyled nav)`);
   for (const src of facts.broken) fail('images', redact(src));
   if (facts.doubled.length) fail('slug', `${facts.doubled.length} link(s), e.g. ${redact(facts.doubled[0])}`);
   if (ctx.phone && facts.overflow > 1) fail('overflow', `${name}: ${facts.overflow}px wider than the viewport`);

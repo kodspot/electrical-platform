@@ -134,9 +134,9 @@
       </div>
 
       <div class="att-filters">
-        <select id="dailyFloor" onchange="loadDaily()"><option value="">All Locations</option></select>
-        <input type="date" id="dailyDate" onchange="onDailyFilterChange()">
-        <select id="dailyShift" onchange="onDailyFilterChange()"><option value="">Loading…</option></select>
+        <select id="dailyFloor" aria-label="Filter by location" onchange="loadDaily()"><option value="">All Locations</option></select>
+        <input type="date" id="dailyDate" aria-label="Date" onchange="onDailyFilterChange()">
+        <select id="dailyShift" aria-label="Shift" onchange="onDailyFilterChange()"><option value="">Loading…</option></select>
       </div>
 
       <div class="att-scroll" id="dailyScroll">
