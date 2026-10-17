@@ -22,7 +22,7 @@ test('the Explorer, Design, Changes and Production tabs show their latest runs',
           journeys: [],
           pages: [
             { page: 'admin-login', project: 'chromium-desktop', status: 'passed', visual: 'compared', axe: { critical: 0, serious: 0 } },
-            { page: 'admin-tickets', project: 'chromium-mobile', status: 'failed', visual: 'diff', axe: { critical: 0, serious: 1 } }
+            { page: 'admin-tickets', project: 'chromium-mobile', status: 'failed', visual: 'diff', axe: { critical: 0, serious: 1 }, diffImages: 'visual-a11y-admin-tickets-chromium-mobile/admin-tickets-actual.png, visual-a11y-admin-tickets-chromium-mobile/admin-tickets-diff.png' }
           ],
           design: { ratchets: [{ name: 'colour literals', count: 120, baseline: 120, status: 'ok' }] },
           explorer: {
@@ -74,6 +74,7 @@ test('the Explorer, Design, Changes and Production tabs show their latest runs',
     const design = page.locator('#panelDesign');
     await expect(design.getByText('Visual differences: admin-tickets (chromium-mobile)')).toBeVisible();
     await expect(design.getByRole('link', { name: 'e2e-traces artifact' })).toHaveAttribute('href', /actions\/runs\/7#artifacts$/);
+    await expect(design.locator('tr', { hasText: 'admin-tickets-diff.png' })).toContainText('chromium-mobile');
     await expect(design.locator('tr', { hasText: 'colour literals' })).toContainText('120');
 
     await page.getByRole('tab', { name: 'Changes' }).click();

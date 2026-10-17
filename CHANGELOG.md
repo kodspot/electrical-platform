@@ -47,12 +47,14 @@ see `docs/DEPLOYMENT.md` for how a change reaches production.
     and `public/css/**`; 811 today. Checked by `ci-validate` (`npm run ci`).
   - **Colour contrast:** axe `color-contrast` nodes over every page view. Checked by
     `e2e.yml` after the suite.
-  - **Summary:** `e2e-summary.json` gains `pages[].axeRules` / `known` and
-    `design.ratchets` (shown on the Quality page's Design tab).
+  - **Summary:** `e2e-summary.json` gains `pages[].axeRules` / `known` / `diffImages` and
+    `design.ratchets`. The Quality page's Design tab shows the ratchets and, for a page whose
+    screenshot differs, where its actual and diff images are inside the `e2e-traces` artifact.
   - **Tests:** `test/design-ratchet.test.js` (passes at the baseline, fails at +1, lowers
     with `--update` and never raises; the token/selector exclusions; the contrast sum).
-- **Docs:** `e2e/README.md` (design checks, ratchets), `COVERAGE_MATRIX`. Charter §22: no
-  API, architecture, data-model, deployment, environment or ADR change is triggered.
+- **Docs:** `e2e/README.md` (design checks, ratchets), `docs/testing/TESTING.md`,
+  `COVERAGE_MATRIX`. Charter §22: no API, architecture, data-model, deployment, environment or
+  ADR change is triggered.
 
 ### 2026-10-17 (QA-2 production smoke, Quality tabs)
 
