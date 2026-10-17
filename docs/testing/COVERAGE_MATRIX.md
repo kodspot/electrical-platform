@@ -120,6 +120,19 @@ Playwright against the real app on a disposable `_e2e` database ([ADR 0006](../a
 | J8 | Worker PIN reset from the email link (Pixel 7) | F12 page; token removed from the address bar; new PIN signs in; link single-use |
 | BUG-0010 (×2) | Electrician and supervisor nav after the module sync | every nav href is `/{org}/ele/{page}` (never the org twice); clicking Tickets / My Work / Scan (supervisor: Electrical / Tickets / Attendance / Scan) answers 200 at that URL and renders the page; a disabled-module link stays hidden |
 | Design/a11y | 10 pages × desktop + mobile | screenshot vs Linux baseline ("no baseline" until generated); axe fails only on critical |
+| Explorer (`explorer.spec.js`, 2026-10-17) | every page × the role that may open it × desktop + mobile; one hop through every link and tab | 200, no login bounce, sync done, nothing stuck loading, no request ≥ 400, no console error, no "not found", no broken image, no slug twice in a link (BUG-0010/BUG-0011), no phone overflow, axe critical 0; forbidden pages redirect. Allow-listed: F16, F17 |
+
+**Explorer coverage (role × page, each on desktop and Pixel 7).** The page list is the route
+table (`pages.js` `MODULE_PAGES` + `STATIC_PAGES`); a page added there is explored
+automatically.
+
+| Role | Pages opened and explored | Other roles' pages checked as forbidden |
+|---|---|---|
+| guest | 15: index, org home, module home, the 4 logins, privacy, terms, reset-password, worker-reset-pin, `/s/:code`, `/scan/:code`, `/review/:token`, offline | 27 (all role pages) |
+| admin | 17 (every `admin-*` page but the login) | 10 |
+| supervisor | 5 (scan, tickets, attendance, electrical with a location, assets) | 22 |
+| electrician | 3 (tickets, scan, my-work) | 24 |
+| superadmin | 2 (dashboard, quality) | 25 |
 
 ## UNKNOWN rows (could not be settled by this inventory)
 
@@ -154,6 +167,14 @@ Open questions for the owner, not fixes. Each was checked against the code on 20
   - **Gate:** `scripts/schema-drift.js` in `ci-validate` (`test/schema-drift.test.js`).
   - **Found along the way:** the supervisor permanent delete hit the RESTRICT foreign keys
     with a 500, now a 409 (BUG-0009, `test/integration/supervisor-delete-guard.test.js`).
+- **F16 — CONFIRMED 2026-10-17 (explorer). Critical accessibility violations on 7 pages the
+  design suite did not cover.** Form controls without an accessible name: axe `select-name`
+  (filter `<select>`s) and `label` (inputs). Pages: admin-analytics, admin-attendance,
+  admin-categories, admin-assets, admin-failures, admin-electrical, supervisor-attendance.
+  Allow-listed per page in `e2e/explorer-allowlist.json`, to be fixed in a later design pass.
+- **F17 — CONFIRMED 2026-10-17 (explorer). Horizontal scroll on a phone.** admin-assets,
+  admin-electrical and admin-failures are 617 px wider than the Pixel 7 viewport. Allow-listed
+  per page.
 - **F11 — other contradictions noticed.**
   - **Internal tickets never ring electricians.** `tickets.js` has no `getAssignedWorkerIds`/`notifyWorkers` call, unlike public complaints (W1). Only the auto-assigned supervisor is notified (`tickets.js:176-184`).
   - **SLA rules differ by source.** Public complaints get a fixed 24h SLA (`public.js:373`); internal tickets use `getSlaDeadline(priority)` (`tickets.js:27`, `:171`).

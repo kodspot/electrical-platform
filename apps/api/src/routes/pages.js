@@ -20,6 +20,26 @@ const MODULE_PAGES = [
   'electrician-login', 'electrician-tickets', 'electrician-scan', 'electrician-my-work'
 ];
 
+// Pages outside an org: one route each, served as-is. Exported with MODULE_PAGES as the single
+// list of the app's pages (the e2e explorer opens every one of them as every role).
+const STATIC_PAGES = [
+  { path: '/', file: 'index.html' },
+  { path: '/superadmin-login', file: 'superadmin-login.html' },
+  { path: '/superadmin-dashboard', file: 'superadmin-dashboard.html' },
+  { path: '/superadmin-quality', file: 'superadmin-quality.html' },
+  // Reset pages opened from emailed links (/reset-password?token=…, /worker-reset-pin?token=…).
+  // Registered explicitly so they are never matched as an org slug by /:orgSlug. [F12]
+  { path: '/reset-password', file: 'reset-password.html' },
+  { path: '/worker-reset-pin', file: 'worker-reset-pin.html' },
+  { path: '/privacy', file: 'privacy.html' },
+  { path: '/terms', file: 'terms.html' },
+  // QR scan short URL
+  { path: '/s/:code', file: 'scan.html' },
+  { path: '/scan/:code', file: 'scan.html' },
+  // Public review page (token-based, no auth)
+  { path: '/review/:token', file: 'review.html' }
+];
+
 // Module metadata for dynamic manifests
 const MODULE_META = {
   ele:        { name: 'Kodspot Electrical',   short: 'Electrical',  color: '#d97706', desc: 'Electrical inspection & maintenance' },
@@ -51,24 +71,7 @@ async function pageRoutes(fastify) {
   var STATIC_DIRS = new Set(['css', 'js', '.well-known']);
 
   // ── Static pages ──
-  fastify.get('/', sendPage('index.html'));
-  fastify.get('/superadmin-login', sendPage('superadmin-login.html'));
-  fastify.get('/superadmin-dashboard', sendPage('superadmin-dashboard.html'));
-  fastify.get('/superadmin-quality', sendPage('superadmin-quality.html'));
-
-  // Reset pages opened from emailed links (/reset-password?token=…, /worker-reset-pin?token=…).
-  // Registered explicitly so they are never matched as an org slug by /:orgSlug. [F12]
-  fastify.get('/reset-password', sendPage('reset-password.html'));
-  fastify.get('/worker-reset-pin', sendPage('worker-reset-pin.html'));
-  fastify.get('/privacy', sendPage('privacy.html'));
-  fastify.get('/terms', sendPage('terms.html'));
-
-  // QR scan short URL
-  fastify.get('/s/:code', sendPage('scan.html'));
-  fastify.get('/scan/:code', sendPage('scan.html'));
-
-  // Public review page (token-based, no auth)
-  fastify.get('/review/:token', sendPage('review.html'));
+  for (const { path, file } of STATIC_PAGES) fastify.get(path, sendPage(file));
 
   // ── Org landing page: /{org} ──
   fastify.get('/:orgSlug', async (request, reply) => {
@@ -233,3 +236,5 @@ self.addEventListener('fetch', (event) => {
 }
 
 module.exports = pageRoutes;
+module.exports.MODULE_PAGES = MODULE_PAGES;
+module.exports.STATIC_PAGES = STATIC_PAGES;

@@ -75,10 +75,90 @@ Codegen points at your **dev** server and dev data. Use what it records as a sta
     - **Why:** the other journeys navigate with `page.goto`, so they never clicked the nav.
   - `*.mobile.spec.js`: phone-only journeys, run in `chromium-mobile` only. For example,
     J8 is the worker PIN reset from the emailed link.
+  - `explorer.spec.js`: the explorer, an automated manual tester (below), in both projects.
   - `visual-a11y.spec.js`: the design and accessibility checks (below), in both projects.
 - **Every journey checks two things:** what the user sees, and the database or API state
   behind it (through the app's own Prisma client). There are no fixed sleeps, only
   auto-waiting locators and `expect.poll`.
+
+## The explorer (`tests/explorer.spec.js`)
+
+It does what a manual tester does after every change: open every page as every role, click
+every link, and look for anything broken. It runs in both projects (desktop and Pixel 7).
+
+**Which pages, as which role**
+- **The page list is the route table**, not a hand-typed list: `apps/api/src/routes/pages.js`
+  exports `MODULE_PAGES` and `STATIC_PAGES`, and `support/explorer.js` adds the org home,
+  module home and `offline.html`. One test fails if a `public/*.html` file is served by no
+  route.
+- **The role comes from the name:** `admin-*` admin, `supervisor-*` supervisor,
+  `electrician-*` electrician, `superadmin-*` super-admin; `*-login` and everything else is a
+  guest page.
+- **The explorer org** (`global-setup.js`) has the assets module on, so the asset pages and
+  their nav links exist. It has one admin, supervisor and electrician, a QR room, an open
+  ticket, a resolved ticket with a pending review link, an asset with a failure, and a
+  default inspection template. The super-admin is the seed's. `supervisor-electrical` is
+  opened with a location (without one it sends the user to the scan page, by design).
+
+**What happens on each page**
+1. **Open it** signed in as the role, and wait for the auth/module sync
+   (`localStorage.enabledModules`, which an init script clears on every load — the BUG-0010
+   technique).
+2. **Click its `[role=tab]` controls** in place.
+3. **Follow every visible same-origin link** one hop (a collapsed phone menu counts as
+   visible). Each target is followed once per role and project. Logout links are skipped,
+   and `/api/…` links are fetched rather than opened. **It never clicks a button**, so it
+   never submits, deletes or signs out.
+
+**Checks on every page and every followed link**
+
+| Check | Fails when |
+|---|---|
+| `document` | the page does not answer 200 |
+| `landed` | a signed-in role ends up on a login page |
+| `sync` | the module sync did not finish |
+| `loading` | a skeleton, spinner or "Loading…" stays on screen |
+| `requests` | a same-origin request answers ≥ 400 or fails |
+| `console` | a console error or an uncaught exception |
+| `errorText` | "not found" / "Route GET … not found" on the page |
+| `images` | a broken `<img>` |
+| `slug` | a link carries the org slug twice (BUG-0010, BUG-0011) |
+| `overflow` | phone only: the page is wider than the viewport |
+| `axe` | a critical accessibility violation (pages opened directly) |
+
+Two things are deliberately not findings:
+- **An empty `throw ''` when the visit was redirected.** The pages stop their own script
+  with `location.href = …; throw ''` (24 pages). Anywhere else it is reported.
+- **The CSP error axe causes.** axe-core fetches cross-origin stylesheets itself, which the
+  app's `connect-src 'self'` rightly blocks, so console errors are collected before axe runs.
+
+**The forbidden matrix.** For each role, every page of the other roles must send the user
+to a login page (the super-admin, on admin pages, to its own dashboard), never show the page.
+These tests block `/api/**`: the redirect is decided in the browser, and blocking keeps ~100
+login-page loads off the per-address rate limits.
+
+**The allow-list (`explorer-allowlist.json`)**
+- **What it is:** pre-existing findings that are reported but don't fail the run. Each entry
+  is `{ role, page, check, match?, finding, reason }`, where `finding` is the id in
+  `docs/testing/COVERAGE_MATRIX.md`.
+- **It may only shrink.** Fix the defect, delete the entry. Never add one to make a new
+  failure go away; a new finding is a bug to fix.
+- **"Remove me":** `scripts/summarize.js` prints an entry that matched nothing on pages that
+  were explored.
+- **BUG-0010 / BUG-0011** (the org slug twice in a link) are never listed.
+- **Today:** F16 (critical axe `label` / `select-name` on 7 pages) and F17 (phone overflow on
+  admin-assets, admin-electrical and admin-failures).
+
+**Results.** Every visit is an `explorer` annotation. `scripts/summarize.js` turns them
+into `explorer` in `e2e-summary.json`:
+- `desktop` / `mobile`: one row per role × page, `{ role, page, status, failed, allowed,
+  links, linkFailures, tabs }`;
+- `forbidden`: per project and role, how many pages were checked and which were shown;
+- `allowlist`: the entry count and the unused entries.
+
+**Rate limits.** The explorer adds one admin and one supervisor API login to a run
+(`/api/auth/login` allows 10 per 15 minutes per address; the run uses 9). The electrician
+login is cached for the run (`workerLogin()`).
 
 ## Design and accessibility checks (`tests/visual-a11y.spec.js`)
 

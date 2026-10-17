@@ -26,8 +26,9 @@ Commands: `npm run bug:list` · `npm run bug:run -- <ID>` · `npm run bug:valida
 | BUG-0008 | CRITICAL | FIXED | ele | Electrician photo loads opened the database circuit breaker (whole platform 503 for 30 s) | `test/integration/bug-regressions.test.js` |
 | BUG-0009 | MEDIUM | FIXED | ele | Permanently deleting a supervisor who created tickets failed with a server error | `test/integration/bug-regressions.test.js` |
 | BUG-0010 | HIGH | FIXED | ele | Electrician and supervisor nav links were double-prefixed (/{org}/{mod}/{org}/{mod}/{page} → 404) | `test/integration/bug-regressions.test.js; e2e/tests/journeys.spec.js › "electrician nav links work after module sync (BUG-0010)" and "supervisor nav links work after module sync (BUG-0010)"` |
+| BUG-0011 | HIGH | FIXED | ele | A role nav link hidden until the module sync came back double-prefixed (supervisor Assets → 404) | `test/integration/bug-regressions.test.js; e2e/tests/explorer.spec.js › "supervisor › supervisor-assets" and "supervisor › supervisor-electrical"` |
 
-Count: 10 bug scenario(s).
+Count: 11 bug scenario(s).
 
 ## BUG-0001 — Admin could set a ticket to RESOLVED_PENDING_VERIFY directly
 
@@ -208,4 +209,22 @@ Count: 10 bug scenario(s).
 1. Sign in as an electrician (or supervisor) and open electrician-scan (supervisor-scan).
 2. Wait for /api/auth/worker-me (/api/auth/me) to complete, then click Tickets.
 3. Broken: 404 at /{org}/ele/{org}/ele/electrician-tickets. Fixed: 200 at /{org}/ele/electrician-tickets.
+
+## BUG-0011 — A role nav link hidden until the module sync came back double-prefixed (supervisor Assets → 404)
+
+- **Severity:** HIGH · **Status:** FIXED · **Module:** ele · **Category:** navigation
+- **Origin:** e2e explorer (QA-2), first run; fixed 2026-10-17
+- **Introduced:** 2026-07-24 (530bbd5); incompletely fixed by BUG-0010 (2026-10-16) · **Fixed:** 2026-10-17
+- **Description:** BUG-0010 made _applyRoleNavScope remember each link's page in data-page, but only for links it showed. A link for a module the browser did not yet know was enabled (no localStorage.enabledModules, e.g. a fresh sign-in) was hidden on the first pass without remembering its page; when /auth/me then reported the module, the second pass read the already-rewritten href and prefixed it again. supervisor-assets.html and supervisor-electrical.html also rewrote every #sv-nav href themselves after initSupervisor(), doubling all of them until the sync repaired the visible ones. Found by the e2e explorer: the Assets link on supervisor-assets pointed at /{org}/ele/{org}/ele/supervisor-assets (404).
+- **Root cause:** _applyRoleNavScope skipped the data-page capture for links it hid, so a hidden-then-shown link fell back to re-reading its href; and two supervisor pages repeated the nav rewrite inline from getAttribute("href").
+- **Expected behavior:** Every role nav link is /{org}/{mod}/{page} after init and after the module sync, whether or not it was hidden at first; no page rewrites #sv-nav hrefs itself.
+- **Broken behavior:** On supervisor-assets the Assets link became /{org}/ele/{org}/ele/supervisor-assets (404); on supervisor-assets and supervisor-electrical every nav link was double-prefixed until /auth/me answered.
+- **Scenario dependencies:** —
+- **Regression test:** `test/integration/bug-regressions.test.js; e2e/tests/explorer.spec.js › "supervisor › supervisor-assets" and "supervisor › supervisor-electrical"`
+
+**Reproduction steps:**
+
+1. Org with the assets module on. Sign in as a supervisor in a browser with no localStorage.enabledModules.
+2. Open /{org}/ele/supervisor-assets and wait for /api/auth/me.
+3. Broken: the Assets link is /{org}/ele/{org}/ele/supervisor-assets. Fixed: /{org}/ele/supervisor-assets.
 
