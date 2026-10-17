@@ -83,16 +83,18 @@
 <body>
 <nav class="topbar">
   <div class="topbar-left">
-    <a class="topbar-brand" href="/">Kodspot</a>
-    <div id="topbar-nav"></div>
+    <button class="nav-toggle" id="nav-toggle" aria-label="Menu"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"/></svg></button>
+    <span class="topbar-brand">Kodspot</span>
+    <div class="topbar-nav" id="topbar-nav"></div>
   </div>
   <div class="topbar-right">
     <span class="topbar-user" id="userName"></span>
-    <button class="btn btn-sm btn-ghost" id="logoutBtn">Logout</button>
+    <button class="btn btn-sm btn-ghost" onclick="App.logout()">Logout</button>
   </div>
 </nav>
+<div class="sa-banner" id="sa-banner"></div>
 
-<main class="main-content">
+<main class="container">
   <div class="page-title">
     <h1>🔧 Asset Management</h1>
     <div class="page-actions">
@@ -114,14 +116,14 @@
   <div class="a-filters">
     <div class="a-filter-row">
       <input class="form-input" style="flex:2;min-width:140px" id="fSearch" placeholder="Search code, name, serial…" oninput="debounceSearch()">
-      <select class="form-select" style="flex:1;min-width:110px" id="fCategory" onchange="loadAssets(1)"><option value="">All Categories</option></select>
-      <select class="form-select" style="flex:1;min-width:110px" id="fStatus" onchange="loadAssets(1)">
+      <select class="form-select" style="flex:1;min-width:110px" id="fCategory" aria-label="Filter by category" onchange="loadAssets(1)"><option value="">All Categories</option></select>
+      <select class="form-select" style="flex:1;min-width:110px" id="fStatus" aria-label="Filter by status" onchange="loadAssets(1)">
         <option value="">All Status</option>
         <option value="OPERATIONAL">Operational</option><option value="FAULTY">Faulty</option>
         <option value="UNDER_MAINTENANCE">Under Maintenance</option><option value="DECOMMISSIONED">Decommissioned</option>
       </select>
-      <select class="form-select" style="flex:1;min-width:110px" id="fLocation" onchange="loadAssets(1)"><option value="">All Locations</option></select>
-      <select class="form-select" style="flex:1;min-width:100px" id="fSort" onchange="loadAssets(1)">
+      <select class="form-select" style="flex:1;min-width:110px" id="fLocation" aria-label="Filter by location" onchange="loadAssets(1)"><option value="">All Locations</option></select>
+      <select class="form-select" style="flex:1;min-width:100px" id="fSort" aria-label="Sort assets" onchange="loadAssets(1)">
         <option value="">Newest</option><option value="name">Name</option><option value="code">Code</option>
         <option value="category">Category</option><option value="status">Status</option>
         <option value="maintenance">Next Maint.</option>

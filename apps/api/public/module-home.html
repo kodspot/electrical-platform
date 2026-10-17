@@ -24,6 +24,8 @@
 .role-label{font-size:1rem;font-weight:600;color:var(--text)}
 .role-desc{font-size:.75rem;color:var(--text-muted);margin-top:.1rem}
 .mod-back{margin-top:1.25rem;font-size:.78rem}
+/* F18: readable on the blue gradient (was var(--primary), blue on blue). */
+.mod-back a{color:var(--primary-light)}
 .mod-install-hint{margin-top:1.5rem;padding:.75rem;background:rgba(255,255,255,.9);border:1px dashed rgba(255,255,255,.35);border-radius:var(--radius);font-size:.72rem;color:#334155}
 .mod-loading{padding:3rem 1rem;text-align:center;color:var(--text-muted)}
 </style>
@@ -122,7 +124,7 @@
         '</a>';
       }).join('') +
       '</div>' +
-      (modules.length > 1 ? '<div class="mod-back"><a href="/' + slug + '" style="color:var(--primary)">← All modules</a></div>' : '') +
+      (modules.length > 1 ? '<div class="mod-back"><a href="/' + slug + '">← All modules</a></div>' : '') +
       '<div class="mod-install-hint">💡 Tip: Use your browser\'s "Add to Home Screen" or "Install App" to install this as a standalone app on your device.</div>';
 
     document.getElementById('root').innerHTML = html;

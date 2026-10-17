@@ -19,7 +19,10 @@ const BUGS_LIST = [
   require('./bug-0008-worker-photos-open-db-breaker'),
   require('./bug-0009-supervisor-delete-fk-error'),
   require('./bug-0010-role-nav-double-prefix'),
-  require('./bug-0011-hidden-nav-link-double-prefix')
+  require('./bug-0011-hidden-nav-link-double-prefix'),
+  require('./bug-0012-analytics-undefined-fields'),
+  require('./bug-0013-admin-pages-without-admin-shell'),
+  require('./bug-0014-admin-alerts-forced-dark-theme')
 ];
 
 const BUGS = Object.fromEntries(BUGS_LIST.map((b) => [b.id, b]));

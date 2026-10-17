@@ -207,9 +207,9 @@
     <button class="period-btn" data-period="last30">Last 30 Days</button>
     <button class="period-btn" data-period="year">This Year</button>
     <div class="period-custom">
-      <input type="date" id="fromDate">
+      <input type="date" id="fromDate" aria-label="From date">
       <span class="period-label">to</span>
-      <input type="date" id="toDate">
+      <input type="date" id="toDate" aria-label="To date">
       <button class="period-btn" id="customBtn" data-period="custom">Go</button>
     </div>
     <div class="period-info">
@@ -389,7 +389,7 @@ async function loadReport(from, to) {
 
   renderSummary(data.summary);
   renderTrend(data.trend, data.period.days);
-  renderShifts(data.byShift, data.summary.totalRecords);
+  renderShifts(data.byShift, data.summary.totalInspections);
   renderShiftCompletion(data.shiftCompletion);
   renderShiftTrend(data.shiftTrend, data.period.days);
   loadHeatmap(from, to);
@@ -423,8 +423,8 @@ function renderSummary(s) {
   var compSub = s.overallCompletionRate != null ? (s.overallCompletionRate >= 80 ? 'On track ✓' : s.overallCompletionRate >= 50 ? 'Needs attention' : 'Behind schedule') : 'No schedules';
 
   $('sumGrid').innerHTML =
-    card('sc-clean', s.totalRecords, 'Inspection Records', s.changePercent, null) +
-    card('sc-flag', s.flaggedRecords, 'Flagged Records', null, flagSub) +
+    card('sc-clean', s.totalInspections, 'Inspection Records', s.changePercent, null) +
+    card('sc-flag', s.flaggedInspections, 'Flagged Records', null, flagSub) +
     card('sc-ticket', s.totalTickets, 'Tickets Raised', ticketChange, null) +
     card('sc-photo', s.totalImages, 'Photos Taken', null, null) +
     card('sc-comp', compVal, 'Completion Rate', null, compSub) +
@@ -729,7 +729,7 @@ function renderLocTable(locs) {
 
   // Only show locations with schedules or activity (unless searching)
   if (!_locSearch) {
-    var active = filtered.filter(function(l) { return l.hasSchedule || l.cleaned > 0 || l.tickets > 0; });
+    var active = filtered.filter(function(l) { return l.hasSchedule || l.inspections > 0 || l.tickets > 0; });
     if (active.length > 0) filtered = active;
   }
 
@@ -737,8 +737,8 @@ function renderLocTable(locs) {
   var sortFn;
   switch (_locSort) {
     case 'completion-desc': sortFn = function(a, b) { return (b.completionRate ?? -1) - (a.completionRate ?? -1); }; break;
-    case 'cleaned-desc': sortFn = function(a, b) { return b.cleaned - a.cleaned; }; break;
-    case 'tickets-desc': sortFn = function(a, b) { return b.tickets - a.tickets || b.cleaned - a.cleaned; }; break;
+    case 'cleaned-desc': sortFn = function(a, b) { return b.inspections - a.inspections; }; break;
+    case 'tickets-desc': sortFn = function(a, b) { return b.tickets - a.tickets || b.inspections - a.inspections; }; break;
     case 'name-asc': sortFn = function(a, b) { return a.name.localeCompare(b.name); }; break;
     default: sortFn = function(a, b) { return (a.completionRate ?? 999) - (b.completionRate ?? 999); };
   }
@@ -753,11 +753,11 @@ function renderLocTable(locs) {
   for (var i = 0; i < shown; i++) {
     var l = filtered[i];
     var rate = l.completionRate;
-    var color = rate === null ? '#cbd5e1' : rate >= 80 ? '#10b981' : rate >= 50 ? '#f59e0b' : '#ef4444';
-    var rateText = rate !== null ? rate + '%' : '—';
+    var color = rate == null ? '#cbd5e1' : rate >= 80 ? '#10b981' : rate >= 50 ? '#f59e0b' : '#ef4444';
+    var rateText = rate != null ? rate + '%' : '—';
     var parent = l.parentName ? esc(l.parentName) + ' → ' : '';
     html += '<tr><td>' + parent + esc(l.name) + '<br><span style="font-size:.65rem;color:var(--text-light)">' + l.type.replace('_',' ') + '</span></td>' +
-      '<td>' + l.cleaned + '</td><td>' + l.expected + '</td>' +
+      '<td>' + l.inspections + '</td><td>' + (l.expected != null ? l.expected : '—') + '</td>' +
       '<td><div class="comp-bar"><div class="comp-fill" style="width:' + (rate || 0) + '%;background:' + color + '"></div></div><span style="font-size:.72rem;font-weight:600;color:' + color + '">' + rateText + '</span></td>' +
       '<td>' + (l.tickets > 0 ? '<span style="color:var(--danger);font-weight:600">' + l.tickets + '</span>' : '0') + '</td></tr>';
   }

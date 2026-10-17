@@ -1,15 +1,4 @@
 {
   "$comment": "Pre-existing findings of tests/explorer.spec.js that are reported but do not fail it. Each entry: role, page ('*' = any), check, an optional 'match' substring of the finding's detail, the finding id it is tracked under (docs/testing/COVERAGE_MATRIX.md), and why. This list may only shrink: fix the defect, delete the entry. An entry that no longer reproduces is reported as 'remove me' by scripts/summarize.js. BUG-0010/BUG-0011 (an org slug twice in a link) are never listed here.",
-  "entries": [
-    { "role": "admin", "page": "admin-analytics", "check": "axe", "match": "label", "finding": "F16", "reason": "Form inputs without an accessible label (axe critical 'label'); pre-existing, found by the first explorer run 2026-10-17." },
-    { "role": "admin", "page": "admin-attendance", "check": "axe", "finding": "F16", "reason": "A filter <select> and an input without an accessible name (axe critical 'select-name', 'label'); pre-existing." },
-    { "role": "admin", "page": "admin-categories", "check": "axe", "match": "select-name", "finding": "F16", "reason": "Filter <select>s without an accessible name (axe critical 'select-name'); pre-existing." },
-    { "role": "admin", "page": "admin-assets", "check": "axe", "match": "select-name", "finding": "F16", "reason": "Filter <select>s without an accessible name (axe critical 'select-name'); pre-existing." },
-    { "role": "admin", "page": "admin-failures", "check": "axe", "match": "select-name", "finding": "F16", "reason": "Filter <select>s without an accessible name (axe critical 'select-name'); pre-existing." },
-    { "role": "admin", "page": "admin-electrical", "check": "axe", "match": "select-name", "finding": "F16", "reason": "Filter <select>s without an accessible name (axe critical 'select-name'); pre-existing." },
-    { "role": "supervisor", "page": "supervisor-attendance", "check": "axe", "finding": "F16", "reason": "A <select> and an input without an accessible name (axe critical 'select-name', 'label'); pre-existing." },
-    { "role": "admin", "page": "admin-assets", "check": "overflow", "finding": "F17", "reason": "On a phone the page is wider than the viewport (horizontal scroll); pre-existing." },
-    { "role": "admin", "page": "admin-electrical", "check": "overflow", "finding": "F17", "reason": "On a phone the page is wider than the viewport (horizontal scroll); pre-existing." },
-    { "role": "admin", "page": "admin-failures", "check": "overflow", "finding": "F17", "reason": "On a phone the page is wider than the viewport (horizontal scroll); pre-existing." }
-  ]
+  "entries": []
 }

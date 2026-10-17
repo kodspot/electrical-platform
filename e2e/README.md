@@ -125,6 +125,8 @@ every link, and look for anything broken. It runs in both projects (desktop and 
 | `slug` | a link carries the org slug twice (BUG-0010, BUG-0011) |
 | `overflow` | phone only: the page is wider than the viewport |
 | `axe` | a critical accessibility violation (pages opened directly) |
+| `rawValue` | "undefined" or "NaN" is visible: a field the page reads but never gets (BUG-0012) |
+| `nav` | admin pages: fewer than 5 nav links, or (desktop) two nav links touching on one line, an unstyled nav (BUG-0013) |
 
 Two things are deliberately not findings:
 - **An empty `throw ''` when the visit was redirected.** The pages stop their own script
@@ -146,8 +148,9 @@ login-page loads off the per-address rate limits.
 - **"Remove me":** `scripts/summarize.js` prints an entry that matched nothing on pages that
   were explored.
 - **BUG-0010 / BUG-0011** (the org slug twice in a link) are never listed.
-- **Today:** F16 (critical axe `label` / `select-name` on 7 pages) and F17 (phone overflow on
-  admin-assets, admin-electrical and admin-failures).
+- **Today: empty.** F16 (unlabelled controls on 7 pages) and F17 (phone overflow on
+  admin-assets, admin-electrical and admin-failures) were fixed on 2026-10-18 and their
+  entries deleted.
 
 **Results.** Every visit is an `explorer` annotation. `scripts/summarize.js` turns them
 into `explorer` in `e2e-summary.json`:
