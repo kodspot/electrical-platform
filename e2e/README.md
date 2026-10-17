@@ -162,65 +162,92 @@ login is cached for the run (`workerLogin()`).
 
 ## Design and accessibility checks (`tests/visual-a11y.spec.js`)
 
-There are 10 pages, each checked on desktop and on Pixel 7:
-- the admin, supervisor and electrician logins
-- the admin dashboard, tickets, locations and QR print pages
-- the guest complaint page (`/s/<code>`)
-- the electrician's My Work page
-- `/superadmin-quality`
+**Every page**, checked on desktop and on Pixel 7. The page list is the explorer's
+(`support/explorer.js`, from the route table), so a new page gets a screenshot check and an
+axe scan automatically: 42 pages, 84 page views.
 
-The pages show a dedicated "visual" org with fixed names, codes and tickets, so the
-screenshots don't depend on the per-run seed.
+The pages show a dedicated "visual" org (`e2e-visual`) with fixed names, codes, dates and
+data:
+- the assets module is on;
+- one admin, supervisor and electrician;
+- a QR room;
+- open, in-progress and resolved tickets (with a fixed review link);
+- an asset with a failure;
+- a default inspection template.
+
+Every fixture row is dated, and every page's clock is frozen, at 2026-01-15 10:00 IST. So
+the screenshots don't depend on the per-run seed or on the day the suite runs. The
+super-admin pages use the seed's super-admin, whose cached session keeps the run inside
+the login limit.
 
 **Visual (`toHaveScreenshot`, `support/visual.js`)**
-- **What's masked:** times, dates and relative times; `<canvas>`; and per-page dynamic
-  regions such as the dashboard charts and the Quality page's trend.
+- **What's masked:** times, dates and relative times; `<canvas>`; and per-page regions that
+  differ by run however the data is fixed:
+  - **admin-dashboard, admin-analytics:** the charts (`svg`);
+  - **super-admin pages:** the signed-in name and initials;
+  - **superadmin-dashboard:** the platform-wide numbers;
+  - **superadmin-quality:** the trend.
 - **What's fixed instead of masked:** content that depends on "now" or on a live feed gets a
   fixed input, which is preferred over hiding it.
-  - **admin-dashboard:** the page clock is frozen (`page.clock.setFixedTime`), so the
-    date picker always shows the same date.
-  - **superadmin-quality:** `/api/superadmin/qa/ci-status` is answered with a fixed
-    response (`page.route`), so the Live CI list renders three known runs at a fixed height.
-- **Where baselines live:** `tests/__screenshots__/<platform>/<project>/<page>.png`.
+  - **every page:** the page clock is frozen (`page.clock.setFixedTime`), and the fixtures
+    carry fixed dates;
+  - **superadmin-quality:** `/api/superadmin/qa/ci-status` is answered with three fixed runs
+    (`page.route`);
+  - **superadmin-dashboard:** the organization list (which would hold every e2e org of the
+    run) is answered with two fixed organizations.
+- **Where baselines live:** `tests/__screenshots__/<platform>/<project>/<page>.png`. The file
+  name is the explorer's page name, made file-safe (`scan (/scan/:code)` →
+  `scan-scan-code.png`).
 - **Only Linux baselines are ever committed.** The Windows and macOS directories are
   git-ignored.
 - **Until a baseline exists for the current platform**, the check records an annotation
   `no baseline: <page>`, attaches the masked screenshot, and does **not** fail.
+- **On a mismatch:** the `e2e-traces` artifact keeps the expected, actual and diff images,
+  and the Quality page's Design tab names the page and links to the artifact.
 - **Creating or refreshing baselines:**
-  1. Run the **E2E** workflow by hand with `update_snapshots` = `true`.
+  1. Run the **E2E** workflow by hand with `update_snapshots` = `true` on the branch.
   2. Download the `e2e-snapshots-linux` artifact.
-  3. Review the images.
-  4. Commit them under `e2e/tests/__screenshots__/linux/`.
+  3. Review every changed image.
+  4. Commit them under `e2e/tests/__screenshots__/linux/`, and only the ones the change
+     meant to alter.
+- **Checking a page is deterministic locally:** run the visual tests twice in one copy,
+  first with `--update-snapshots` (this writes git-ignored local baselines), then without.
+  The second run starts from a new database and must pass.
 
 **Accessibility (axe-core, WCAG 2.0/2.1 A + AA)**
-- It's report-only, and the test fails **only on critical violations**.
-- Counts per impact are recorded as an `axe` annotation, plus an attachment that holds rule
-  ids, help text and selectors only. Node HTML is left out on purpose: it could carry an
-  `?token=` image URL into a public artifact.
+- **It fails only on critical violations.** The exception is an F16 page: the explorer's
+  allow-list (`explorer-allowlist.json`, `axe`) has its critical findings, which are
+  reported as `axe-known`, not failed. The allow-list may only shrink.
+- **What's recorded:**
+  - counts per impact (`axe` annotation);
+  - nodes per rule (`axe-rules` annotation; the contrast ratchet sums these);
+  - an attachment with rule ids, help text and selectors only.
+- **Node HTML is left out on purpose:** it could carry an `?token=` image URL into a public
+  artifact.
+- **The summary** (`e2e-summary.json` `pages[]`) carries `axe`, `axeRules` and `known` per
+  page view.
 
-**Baseline counts (2026-10-13, after fixing the one critical finding).** The critical finding
-was `button-name` on the mobile menu button `#nav-toggle` on 11 admin pages, which now
-carries `aria-label="Menu"`. Cells show serious-violation nodes, desktop / mobile; critical
-is 0 everywhere:
+## Design ratchets (`apps/api/scripts/design-ratchet.js`, `design-baseline.json`)
 
-| Page | Serious |
-|---|---|
-| admin-login, supervisor-login, electrician-login | 0 / 0 |
-| admin-dashboard | 4 / 4 |
-| admin-tickets | 5 / 1 |
-| admin-locations | 3 / 3 |
-| admin-qr-print | 0 / 0 |
-| guest-complaint | 2 / 2 |
-| electrician-my-work | 1 / 1 |
-| superadmin-quality | 10 / 9 |
+Two counts that may only go down. A check fails only when its count is **worse** than the
+committed baseline. When it is lower, `--update` writes the lower number. Never raise a
+baseline to make a check pass.
 
-By rule, across both projects:
-- `color-contrast`: 24 nodes
-- `link-in-text-block`: 20 nodes
-- `scrollable-region-focusable`: 1 node
+| Ratchet | Counts | Runs in |
+|---|---|---|
+| **Colour literals** | hard-coded colours (hex, `rgb()`/`rgba()`, `hsl()`/`hsla()`) in `apps/api/public/**/*.html` and `public/css/**`. Not counted: design-token definitions (`:root { … }` and any `--name: …` custom property), selectors, `href="#"` and entities | `npm run ci` (ci-validate) |
+| **Colour contrast** | axe `color-contrast` nodes over every page and viewport of the run | `e2e.yml`, after the suite |
 
-These are known, report-only items for a later design pass. A new critical violation fails
-the suite.
+```
+cd apps/api
+node scripts/design-ratchet.js colours            # lists the files when it fails
+node scripts/design-ratchet.js colours --update   # after removing literals
+node scripts/design-ratchet.js contrast ../e2e/reports/e2e-summary.json [--update]
+```
+
+The current numbers are in `design-baseline.json`, and the Quality page's Design tab shows
+the latest run's. A partial run (`--grep`) records the contrast count as `partial`, because
+only a full run is comparable.
 
 ## Production smoke (`prod-smoke.config.js`, `tests-prod/`)
 
