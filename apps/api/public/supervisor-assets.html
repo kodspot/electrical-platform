@@ -173,7 +173,6 @@
 if (!App.initSupervisor()) throw '';
 App.initNotifications(App.supFetch, 'supervisor');
 var esc = App.esc, $ = App.$;
-document.querySelectorAll('#sv-nav a').forEach(function(a){ var pg = a.getAttribute('href').replace(/^\//, ''); a.href = App.orgPath(pg); });
 
 var selectedAsset = null;
 var currentEventType = null;

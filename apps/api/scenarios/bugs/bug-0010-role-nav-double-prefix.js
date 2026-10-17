@@ -4,72 +4,10 @@
  * BUG-0010 — a fixed defect, encoded as a reproducible scenario + regression.
  */
 
-const fs = require('fs');
-const path = require('path');
-const vm = require('vm');
+const { loadApp: load, visibleHrefs } = require('./support/app-vm');
 
-const APP_JS = path.join(__dirname, '..', '..', 'public', 'js', 'app.js');
 const SLUG = 'bug0010-org';
-
-// A link as a browser models it: assigning `href` stores exactly the assigned string as the
-// attribute (what getAttribute('href') returns next time).
-function fakeLink(attrs) {
-  const a = { attrs: { ...attrs }, style: { display: '' } };
-  a.getAttribute = (n) => (Object.prototype.hasOwnProperty.call(a.attrs, n) ? a.attrs[n] : null);
-  a.setAttribute = (n, v) => { a.attrs[n] = String(v); };
-  Object.defineProperty(a, 'href', { get: () => a.attrs.href, set: (v) => { a.attrs.href = String(v); } });
-  return a;
-}
-
-/**
- * Load the real public/js/app.js in a vm with a minimal DOM: one #sv-nav, a stubbed fetch that
- * answers /auth/worker-me and /auth/me, localStorage, no service worker. Returns the App
- * object, the nav links, and a helper that waits for the async module sync to finish.
- */
-function loadApp(pageName, navLinks) {
-  const store = new Map([
-    ['elec_token', 't'], ['elec_user', '{}'], ['sup_token', 't'], ['sup_user', '{}'], ['orgSlug', SLUG]
-  ]);
-  const localStorage = {
-    getItem: (k) => (store.has(k) ? store.get(k) : null),
-    setItem: (k, v) => { store.set(k, String(v)); },
-    removeItem: (k) => { store.delete(k); }
-  };
-  const links = navLinks.map(fakeLink);
-  const nav = { querySelectorAll: () => links };
-  const el = () => ({ style: {}, classList: { add() {}, remove() {}, toggle() {}, contains: () => false }, setAttribute() {}, appendChild() {}, addEventListener() {}, querySelector: () => null, querySelectorAll: () => [] });
-  const document = {
-    getElementById: (id) => (id === 'sv-nav' ? nav : null),
-    querySelector: () => null,
-    querySelectorAll: () => [],
-    createElement: el,
-    head: el(),
-    body: el(),
-    addEventListener() {}
-  };
-  let pending = 0;
-  const me = { org: { slug: SLUG, name: 'Bug 0010 Org', enabledModules: ['ele'] } };
-  const fetch = async () => {
-    pending++;
-    await new Promise((r) => setImmediate(r));
-    pending--;
-    return { ok: true, status: 200, json: async () => me };
-  };
-  const context = {
-    console, setTimeout, clearTimeout, setInterval, clearInterval, Promise, URLSearchParams, FormData, AbortController, AbortSignal,
-    document, localStorage, fetch,
-    location: { pathname: `/${SLUG}/ele/${pageName}`, search: '', href: '' },
-    navigator: {},
-    addEventListener() {}
-  };
-  context.window = context;
-  vm.createContext(context);
-  vm.runInContext(fs.readFileSync(APP_JS, 'utf8'), context, { filename: 'app.js' });
-  const settle = async () => { for (let i = 0; i < 50; i++) { await new Promise((r) => setImmediate(r)); if (!pending) await new Promise((r) => setImmediate(r)); } };
-  return { App: context.window.App, links, settle };
-}
-
-const visibleHrefs = (links) => links.filter((l) => l.style.display !== 'none').map((l) => l.attrs.href);
+const loadApp = (pageName, navLinks) => load(pageName, navLinks, { slug: SLUG, enabledModules: ['ele'] });
 
 module.exports = {
   id: 'BUG-0010',
