@@ -16,6 +16,8 @@ apps/api/reports/
 # baselines from any platform other than Linux (only CI-generated Linux baselines are kept).
 e2e/reports/
 e2e/test-results/
+e2e/blob-report/
+e2e/all-blob-reports/
 e2e/.auth/
 e2e/tests/__screenshots__/win32/
 e2e/tests/__screenshots__/darwin/

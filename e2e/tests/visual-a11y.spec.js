@@ -110,6 +110,9 @@ const fileName = (name) => `${name.replace(/[^\w-]+/g, '-').replace(/-+$/, '')}.
 const NAMES = pages({ slug: SLUG, qrCode: QR, locationId: 'LOC', reviewToken: REVIEW_TOKEN });
 
 test.describe('C7 — design and accessibility, every page', () => {
+  // Independent tests: lets the CI shards (e2e.yml) split this file. workers stays 1.
+  test.describe.configure({ mode: 'parallel' });
+
   let v;
   test.beforeAll(async () => { v = await visualFixture(); });
 

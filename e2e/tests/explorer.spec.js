@@ -171,6 +171,9 @@ function allowedBy(entries, role, page, f) {
 }
 
 test.describe('explorer', () => {
+  // Independent tests: lets the CI shards (e2e.yml) split this file. workers stays 1.
+  test.describe.configure({ mode: 'parallel' });
+
   test('every public/*.html page is reachable through the route table', () => {
     expect(unreachableFiles(NAMES), 'pages no route serves (add them to pages.js MODULE_PAGES/STATIC_PAGES)').toEqual([]);
   });
