@@ -97,7 +97,8 @@ function indexRepo(root) {
   for (const rel of walk(root, 'e2e/tests', /\.spec\.js$/)) {
     add(/explorer\.spec/.test(rel) ? 'explorer' : /visual/.test(rel) ? 'visual' : 'journey', rel);
   }
-  for (const rel of walk(root, `${API}/test`, /\.js$/)) add('unit', rel);
+  // Not this tool's own test: its fixtures mention route paths without testing them.
+  for (const rel of walk(root, `${API}/test`, /\.js$/)) if (!/\/change-impact\.test\.js$/.test(rel)) add('unit', rel);
   for (const rel of walk(root, `${API}/scenarios/bugs`, /^bug-\d+.*\.js$/)) add('bug', rel);
 
   return { pages, pageSource, routeFiles, requiredBy, tests };
@@ -171,6 +172,8 @@ function analyze(files, root = ROOT) {
     } else if (f === 'apps/api/prisma/schema.prisma') addItem('data', 'data model (schema.prisma)', f);
     else if ((m = /^apps\/api\/prisma\/migrations\/([^/]+)\//.exec(f))) addItem('data', `migration ${m[1]}`, f);
     else if (/^(e2e\/|apps\/api\/test\/|apps\/api\/scenarios\/)/.test(f)) other.push({ file: f, note: 'tests' });
+    else if (/^apps\/api\/scripts\//.test(f)) other.push({ file: f, note: 'tooling' });
+    else if (/^(infrastructure\/|docker-compose[\w.-]*\.ya?ml$|(apps\/api\/)?Dockerfile)/.test(f)) other.push({ file: f, note: 'deployment' });
     else if (/^\.github\//.test(f)) other.push({ file: f, note: 'CI' });
     else if (/^docs\/|\.md$/.test(f)) other.push({ file: f, note: 'docs' });
     else other.push({ file: f, note: 'not mapped' });

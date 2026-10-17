@@ -33,11 +33,12 @@ push.
 | `apps/api/src/routes/<f>.js` | its routes (as listed in [`routes.generated.md`](../reference/routes.generated.md)) and the pages whose code calls them |
 | `apps/api/src/{services,lib,middleware,plugins}/<f>.js` | the routes of every route file that requires it |
 | `apps/api/prisma/schema.prisma`, `prisma/migrations/<m>/` | the data model, that migration |
-| tests, `e2e/`, `.github/`, docs | listed under "Other files"; no runtime impact |
+| tests, `apps/api/scripts/` (tooling), `infrastructure/` and compose files (deployment), `.github/`, docs | listed under "Other files"; no runtime impact |
 
 **Coverage.** For each affected item it lists the tests that mention it: browser journeys,
-the explorer and the visual checks (`e2e/tests/`), the API suite (`apps/api/test/`), and
-the bug registry (`apps/api/scenarios/bugs/`).
+the explorer and the visual checks (`e2e/tests/`), the API suite (`apps/api/test/`, except
+this tool's own test, whose fixtures mention paths), and the bug registry
+(`apps/api/scenarios/bugs/`).
 - **A page** is covered when a spec names it. The explorer covers every page of the route
   table.
 - **A route** is covered when a test uses its path (`:id` matches any interpolated value).

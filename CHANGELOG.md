@@ -42,7 +42,7 @@ see `docs/DEPLOYMENT.md` for how a change reaches production.
   - **Where it goes:** one PR comment marked `<!-- change-impact -->`, updated in place on
     each push (`GITHUB_TOKEN`, `pull-requests: write`). Also the QA ingest as source
     `impact`, best-effort: it answers 400 until the ingest accepts that source (QA-2 PR 4).
-  - **Tests:** `test/change-impact.test.js`, 13 cases on a fixture repository (a page,
+  - **Tests:** `test/change-impact.test.js`, 14 cases on a fixture repository (a page,
     `app.js`, a stylesheet, a route file, shared code, prisma, an uncovered page and route
     → "not covered", the comment, the ingest summary, the CLI never failing).
 - **Docs:** new [`docs/testing/TESTING.md`](docs/testing/TESTING.md) (what runs when),

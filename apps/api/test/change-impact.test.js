@@ -73,10 +73,19 @@ describe('change-impact: mapping changed files', () => {
     assert.strictEqual(item(r, 'data', 'data model (schema.prisma)').covered, true);
   });
 
-  it('tests, CI and docs are listed with no runtime impact; unknown files are "not mapped"', () => {
-    const r = analyze(['e2e/tests/journeys.spec.js', '.github/workflows/x.yml', 'docs/a.md', 'Caddyfile'], root);
+  it('tests, tooling, deployment, CI and docs are listed with no runtime impact; unknown files are "not mapped"', () => {
+    const r = analyze(['e2e/tests/journeys.spec.js', 'apps/api/scripts/x.js', 'infrastructure/Caddyfile', 'docker-compose.yml', '.github/workflows/x.yml', 'docs/a.md', 'Makefile'], root);
     assert.strictEqual(r.items.length, 0);
-    assert.deepStrictEqual(r.other.map((o) => o.note), ['tests', 'CI', 'docs', 'not mapped']);
+    assert.deepStrictEqual(r.other.map((o) => o.note), ['tests', 'tooling', 'deployment', 'deployment', 'CI', 'docs', 'not mapped']);
+  });
+
+  it("this tool's own test never counts as coverage (its fixtures mention paths)", () => {
+    write('apps/api/test/change-impact.test.js', "routeRegex('/api/widgets/:id/zap').test('/api/widgets/1/zap')");
+    try {
+      assert.strictEqual(item(analyze(['apps/api/src/routes/widgets.js'], root), 'route', 'POST /api/widgets/:id/zap').covered, false);
+    } finally {
+      fs.rmSync(path.join(root, 'apps/api/test/change-impact.test.js'));
+    }
   });
 
   it('the explorer covers every page of the route table, named or not', () => {
