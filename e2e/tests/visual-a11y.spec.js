@@ -95,11 +95,14 @@ const isOrgList = (url) => new URL(url).pathname === '/api/superadmin/organizati
 
 // Regions that differ by run however the data is fixed: charts, and on the super-admin pages the
 // platform-wide numbers and the signed-in name and initials (the seed's super-admin is per run).
+// admin-predictions: its 12-week trend is labelled with weeks counted from the SERVER's date,
+// which the frozen page clock cannot fix.
 const MASKS = {
   'admin-dashboard': ['svg'],
   'admin-analytics': ['svg'],
-  'superadmin-dashboard': ['#userName', '.user-avatar', '#statsGrid', '#metricsGrid', '#orgBreakdown', '#trendChart'],
-  'superadmin-quality': ['#userName', '.user-avatar', '#trendChart']
+  'admin-predictions': ['.trend-bars'],
+  'superadmin-dashboard': ['#userName', '.user-avatar', '.user-menu-name', '#statsGrid', '#metricsGrid', '#orgBreakdown', '#trendChart'],
+  'superadmin-quality': ['#userName', '.user-avatar', '.user-menu-name', '#trendChart']
 };
 
 // The names of baseline files: the explorer's page names, made file-safe.

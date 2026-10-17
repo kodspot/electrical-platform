@@ -184,6 +184,7 @@ the login limit.
 - **What's masked:** times, dates and relative times; `<canvas>`; and per-page regions that
   differ by run however the data is fixed:
   - **admin-dashboard, admin-analytics:** the charts (`svg`);
+  - **admin-predictions:** the 12-week trend, whose week labels come from the server's date;
   - **super-admin pages:** the signed-in name and initials;
   - **superadmin-dashboard:** the platform-wide numbers;
   - **superadmin-quality:** the trend.
