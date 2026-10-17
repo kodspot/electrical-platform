@@ -74,12 +74,40 @@ module.exports = async function globalSetup() {
   // ── Super-admin (Quality page) ──
   const superAdmin = await user(null, 'SUPER_ADMIN', 'Super Admin');
 
+  // ── Explorer org: every page as every role (tests/explorer.spec.js) ──
+  // The assets module is on, so the asset pages and nav links exist here (org A keeps the
+  // default modules, for the BUG-0010 hidden-link check). Fixtures give each page real
+  // content: a QR room, an open ticket, a resolved ticket with a pending review link, an
+  // asset with a failure. Login budget: this adds one admin and one supervisor API login to
+  // the run (/api/auth/login allows 10 per 15 minutes per address; the run uses 9).
+  const orgX = await f.createTestOrg({ name: `E2E Explorer ${run}`, slug: `e2e-x-${run}`, enabledModules: ['ele', 'asset'] });
+  const adminX = await user(orgX.id, 'ADMIN', 'Admin X');
+  const blockX = await f.createTestLocation(orgX.id, { name: `E2E X Block ${run}`, type: 'BUILDING' });
+  const roomX = await f.createTestLocation(orgX.id, { name: `E2E X Room ${run}`, type: 'ROOM', parentId: blockX.id, qrCode: `EXPL${run}`.toUpperCase() });
+  const supX = await user(orgX.id, 'SUPERVISOR', 'Sup X');
+  await f.createTestSupervisorAssignment(orgX.id, supX.id, blockX.id, { coverChildren: true });
+  const elecX = await worker(orgX.id, 'Elec X');
+  await f.createTestWorkerAssignment(orgX.id, elecX.id, blockX.id, { coverChildren: true });
+  await f.createTestTicket(orgX.id, roomX.id, { title: `E2E X open ticket ${run}`, description: 'Explorer fixture' });
+  const reviewToken = crypto.randomBytes(32).toString('hex');
+  await f.createTestTicket(orgX.id, roomX.id, {
+    title: `E2E X resolved ticket ${run}`, status: 'RESOLVED', source: 'PUBLIC', resolvedAt: new Date(), resolvedNote: 'Fixed',
+    reviewToken, reviewStatus: 'PENDING', reviewExpiresAt: new Date(Date.now() + 7 * 86_400_000)
+  });
+  const assetX = await f.createTestAsset(orgX.id, roomX.id, { name: `E2E X Panel ${run}`, assetCode: `EXPL-A1-${run}` });
+  await f.createTestAssetFailure(orgX.id, assetX.id, adminX.id, { title: `E2E X tripping breaker ${run}` });
+  // A default inspection template, so supervisor-electrical resolves a real checklist.
+  await prisma.inspectionTemplate.create({
+    data: { orgId: orgX.id, name: `E2E X Standard ${run}`, isDefault: true, items: { create: [{ label: 'Lighting', checkKey: 'LIGHTING', sortOrder: 0 }, { label: 'MCB Panel', checkKey: 'MCB_PANEL', sortOrder: 1 }] } }
+  });
+
   const seed = {
     run,
     orgA: { id: orgA.id, slug: orgA.slug, name: orgA.name },
     orgB: { id: orgB.id, slug: orgB.slug, name: orgB.name },
     adminA, adminB, supFar, supNear, supOther, supB, superAdmin,
     workers: { elecFloor, elecBlock, elecElsewhere },
+    explorer: { org: { id: orgX.id, slug: orgX.slug }, admin: adminX, supervisor: supX, worker: elecX, qrCode: roomX.qrCode, locationId: roomX.id, reviewToken },
     locations: { building: building.id, floor: floor.id, otherFloor: otherFloor.id, locationB: locationB.id },
     names: { building: building.name, floor: floor.name }
   };

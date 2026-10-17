@@ -58,9 +58,83 @@ see `docs/DEPLOYMENT.md` for how a change reaches production.
     seeded runs, keyboard, axe).
   - **Visual:** the `superadmin-quality` baselines change deliberately (four more tab
     buttons) and are regenerated on this branch.
-- **Docs:** ADR 0009, `DEPLOYMENT.md`, `MONITORING.md`, `environment.md` and `.env.example`
+- **Docs:** ADR 0009, `docs/testing/TESTING.md` (the smoke and the tabs), `DEPLOYMENT.md`,
+  `MONITORING.md`, `environment.md` and `.env.example`
   (`PROD_SMOKE_ORG_SLUG`, a CI-only variable), `e2e/README.md`, and the `QaRun.source`
   comment in the schema (comment only: no migration).
+
+### 2026-10-17 (QA-2 change impact)
+
+- **User-visible (Release Notes):** none; this is developer tooling. Every pull request now
+  gets one comment listing what the change affects and what tests cover it.
+- **`[QA-2]` Change impact report on every PR** (`apps/api/scripts/change-impact.js`,
+  `.github/workflows/change-impact.yml`).
+  - **What it maps:**
+    - a page → that page;
+    - `public/js` / `public/css` → the pages that load it (`app.js`: all);
+    - a route file → its routes (checked against `routes.generated.md`) and the pages
+      calling them;
+    - shared server code → the routes of the route files that require it;
+    - `prisma/` → the data model and each migration.
+  - **Coverage:** for each item, the journeys, explorer and visual specs, API tests and bug
+    scenarios that mention it. An item none mentions is flagged **changed but not covered**.
+  - **Deterministic:** no AI, no network, Node built-ins only (no new dependency).
+  - **Report-only:** the job is `continue-on-error` and the script always exits 0.
+  - **Where it goes:** one PR comment marked `<!-- change-impact -->`, updated in place on
+    each push (`GITHUB_TOKEN`, `pull-requests: write`). Also the QA ingest as source
+    `impact`, best-effort: it answers 400 until the ingest accepts that source (QA-2 PR 4).
+  - **Tests:** `test/change-impact.test.js`, 14 cases on a fixture repository (a page,
+    `app.js`, a stylesheet, a route file, shared code, prisma, an uncovered page and route
+    → "not covered", the comment, the ingest summary, the CLI never failing).
+- **Docs:** new [`docs/testing/TESTING.md`](docs/testing/TESTING.md) (what runs when),
+  indexed in `docs/README.md`. Charter §22: no API, architecture, data-model, deployment,
+  environment or ADR change is triggered (a report-only CI job, no runtime change).
+
+### 2026-10-17 (QA-2 explorer, BUG-0011)
+
+- **User-visible (Release Notes):** on the supervisor Assets page, the Assets link in the
+  navigation works again (it led to a "not found" page). On the Assets and Electrical pages
+  every navigation link is right as soon as the page opens.
+- **`[QA-2]` Explorer: an automated manual tester** (`e2e/tests/explorer.spec.js`, both
+  projects).
+  - **What it does:** for every role (guest, admin, supervisor, electrician, super-admin) it
+    opens every page that role may open on a dedicated explorer org (assets module on).
+    It waits for the auth/module sync, follows every in-app link one hop, and clicks
+    `[role=tab]` controls. It never clicks a button.
+  - **Checks:** document 200, no login bounce, sync done, nothing stuck loading, no
+    same-origin request ≥ 400, no console error or uncaught exception, no "not found" text,
+    no broken image, no link with the org slug twice, no horizontal overflow on the phone,
+    axe critical = 0.
+  - **Forbidden matrix:** each role opening the other roles' pages is sent to a login page
+    (the super-admin to its dashboard), never shown the page.
+  - **Page list:** taken from the route table. `apps/api/src/routes/pages.js` now exports
+    `MODULE_PAGES` and a new `STATIC_PAGES` list. The static routes are registered from it;
+    the route index is unchanged (211 API + 76 page routes).
+  - **Allow-list:** `e2e/explorer-allowlist.json` holds pre-existing findings, shrink-only:
+    F16 (critical axe `label`/`select-name` on 7 pages) and F17 (phone overflow on 3 admin
+    pages). `scripts/summarize.js` reports entries that no longer reproduce ("remove me").
+  - **Results:** `e2e-summary.json` gains `explorer` (role × page rows per viewport, the
+    forbidden matrix, the allow-list state). The Quality page's tab for them comes later in
+    QA-2.
+  - **Red first:** on the pre-BUG-0010 `app.js` the explorer fails on the electrician and
+    supervisor pages (the slug appears twice in a link, and following it answers 404). On
+    this branch it passes 96/96.
+  - **Support:** a run-cached `workerLogin()` / `signInElectrician()` (`e2e/support/app.js`);
+    the explorer org and its fixtures in `global-setup.js`.
+- **`[BUG-0011]` A role nav link hidden until the module sync came back double-prefixed.**
+  - **What was broken:** BUG-0010's `data-page` was recorded only for links shown on the
+    first pass. Also, `supervisor-assets.html` and `supervisor-electrical.html` rewrote every
+    `#sv-nav` href themselves after `initSupervisor()`. On supervisor-assets, the Assets link
+    became `/{org}/ele/{org}/ele/supervisor-assets` (404). Found by the explorer's first run.
+  - **Fix:** `_applyRoleNavScope` records `data-page` before deciding visibility, and the two
+    redundant inline rewrites are removed.
+  - **Tests:** registry BUG-0011 (red first: the doubled Assets href, and the inline
+    rewrites), the explorer's supervisor pages.
+- **Docs:** `e2e/README.md`, `COVERAGE_MATRIX` (explorer row, role × page table, F16, F17),
+  the generated bug registry. The Release Notes draft gains the nav fixes for electricians
+  and supervisors (BUG-0010's line had been missed). Charter §22: no API, architecture,
+  data-model, deployment, environment or ADR change is triggered (test tooling and a
+  frontend fix; the route index regenerates unchanged).
 
 ### 2026-10-16 (BUG-0010)
 
