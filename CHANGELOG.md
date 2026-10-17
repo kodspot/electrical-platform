@@ -22,6 +22,33 @@ has been git-tagged yet, so everything below is grouped under **Unreleased**.
 Complete and merged into the working tree as of this writing, pending its next deploy —
 see `docs/DEPLOYMENT.md` for how a change reaches production.
 
+### 2026-10-17 (QA-2 change impact)
+
+- **User-visible (Release Notes):** none; this is developer tooling. Every pull request now
+  gets one comment listing what the change affects and what tests cover it.
+- **`[QA-2]` Change impact report on every PR** (`apps/api/scripts/change-impact.js`,
+  `.github/workflows/change-impact.yml`).
+  - **What it maps:**
+    - a page → that page;
+    - `public/js` / `public/css` → the pages that load it (`app.js`: all);
+    - a route file → its routes (checked against `routes.generated.md`) and the pages
+      calling them;
+    - shared server code → the routes of the route files that require it;
+    - `prisma/` → the data model and each migration.
+  - **Coverage:** for each item, the journeys, explorer and visual specs, API tests and bug
+    scenarios that mention it. An item none mentions is flagged **changed but not covered**.
+  - **Deterministic:** no AI, no network, Node built-ins only (no new dependency).
+  - **Report-only:** the job is `continue-on-error` and the script always exits 0.
+  - **Where it goes:** one PR comment marked `<!-- change-impact -->`, updated in place on
+    each push (`GITHUB_TOKEN`, `pull-requests: write`). Also the QA ingest as source
+    `impact`, best-effort: it answers 400 until the ingest accepts that source (QA-2 PR 4).
+  - **Tests:** `test/change-impact.test.js`, 12 cases on a fixture repository (a page,
+    `app.js`, a stylesheet, a route file, shared code, prisma, an uncovered page and route
+    → "not covered", the comment, the ingest summary, the CLI never failing).
+- **Docs:** new [`docs/testing/TESTING.md`](docs/testing/TESTING.md) (what runs when),
+  indexed in `docs/README.md`. Charter §22: no API, architecture, data-model, deployment,
+  environment or ADR change is triggered (a report-only CI job, no runtime change).
+
 ### 2026-10-16 (BUG-0010)
 
 - **User-visible (Release Notes):** the navigation links in the electrician and supervisor

@@ -1,0 +1,85 @@
+name: Change impact
+
+# For every pull request: which pages, API routes and data the change affects, and which
+# tests cover each (apps/api/scripts/change-impact.js — deterministic, no AI). Posted as ONE
+# comment on the PR, updated in place on every push, and sent to the QA ingest for the
+# Quality page. Report-only: this workflow never fails a PR.
+# This repository is public: the ingest token is passed only through env and never printed.
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+  pull-requests: write
+
+concurrency:
+  group: change-impact-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  impact:
+    name: change impact
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    continue-on-error: true
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: "24"
+
+      # No npm install: the script uses Node built-ins only.
+      - name: Compute the change impact
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: node apps/api/scripts/change-impact.js --base "$BASE_SHA" --head "$HEAD_SHA" --md impact.md --json impact.json
+
+      - name: Post or update the PR comment
+        if: ${{ hashFiles('impact.md') != '' }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          PR: ${{ github.event.pull_request.number }}
+        run: |
+          id=$(gh api "repos/$REPO/issues/$PR/comments" --paginate \
+            --jq '.[] | select(.user.login == "github-actions[bot]" and (.body | startswith("<!-- change-impact -->"))) | .id' | head -n 1)
+          if [ -n "$id" ]; then
+            gh api -X PATCH "repos/$REPO/issues/comments/$id" -F body=@impact.md > /dev/null && echo "Updated comment $id"
+          else
+            gh api -X POST "repos/$REPO/issues/$PR/comments" -F body=@impact.md > /dev/null && echo "Posted a new comment"
+          fi
+
+      - name: Send the report to the QA ingest (best-effort)
+        if: ${{ hashFiles('impact.json') != '' }}
+        env:
+          QA_INGEST_URL: ${{ secrets.QA_INGEST_URL }}
+          QA_INGEST_TOKEN: ${{ secrets.QA_INGEST_TOKEN }}
+          QA_SHA: ${{ github.event.pull_request.head.sha }}
+          QA_REF: ${{ github.head_ref }}
+          QA_EVENT: ${{ github.event_name }}
+          QA_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          if [ -z "$QA_INGEST_URL" ] || [ -z "$QA_INGEST_TOKEN" ]; then echo "QA ingest not configured; skipping."; exit 0; fi
+          node <<'JS'
+          const fs = require('fs');
+          const summary = JSON.parse(fs.readFileSync('impact.json', 'utf8'));
+          const body = {
+            source: 'impact', commitSha: process.env.QA_SHA, ref: process.env.QA_REF,
+            event: process.env.QA_EVENT, runUrl: process.env.QA_RUN_URL, nodeVersion: process.version, summary
+          };
+          fetch(process.env.QA_INGEST_URL, {
+            method: 'POST',
+            headers: { 'content-type': 'application/json', authorization: 'Bearer ' + process.env.QA_INGEST_TOKEN },
+            body: JSON.stringify(body),
+            signal: AbortSignal.timeout(15000)
+          }).then((r) => console.log('QA ingest HTTP status: ' + r.status))
+            .catch((e) => console.log('QA ingest request failed: ' + e.name));
+          JS
