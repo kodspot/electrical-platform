@@ -1,0 +1,151 @@
+name: Production smoke
+
+# A read-only, anonymous check of the live site (ADR 0009): health, every public and login page
+# of one organization in headless Chromium, static assets, security headers, http → https.
+#   - after every production deploy (deploy.yml › smoke calls this workflow);
+#   - nightly at 22:00 UTC (03:30 IST), after the e2e run;
+#   - by hand (Actions › Production smoke › Run workflow).
+# GET and HEAD only, enforced in e2e/tests-prod/prod-smoke.spec.js; the report lists every
+# method requested. It signs in nowhere and posts no form. The one POST this job makes is
+# its own result to the QA ingest (the existing telemetry path, ADR 0005), as the e2e workflow does.
+# This repository is public: secrets reach steps only through env and are never printed.
+#
+# Needs: secret APP_URL (already used by deploy.yml) and repository variable
+# PROD_SMOKE_ORG_SLUG (Settings › Secrets and variables › Actions › Variables).
+
+on:
+  workflow_call:
+    secrets:
+      APP_URL:
+        required: true
+      QA_INGEST_URL:
+        required: false
+      QA_INGEST_TOKEN:
+        required: false
+      ALERT_TELEGRAM_BOT_TOKEN:
+        required: false
+      ALERT_TELEGRAM_CHAT_ID:
+        required: false
+      ALERT_WEBHOOK_URL:
+        required: false
+  schedule:
+    - cron: "0 22 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: prod-smoke
+  cancel-in-progress: false
+
+jobs:
+  smoke:
+    name: production smoke (read-only)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      PROD_SMOKE_URL: ${{ secrets.APP_URL }}
+      PROD_SMOKE_ORG_SLUG: ${{ vars.PROD_SMOKE_ORG_SLUG }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Check the configuration
+        run: |
+          if [ -z "$PROD_SMOKE_URL" ]; then echo "::error::Secret APP_URL is not set."; exit 1; fi
+          if [ -z "$PROD_SMOKE_ORG_SLUG" ]; then echo "::error::Repository variable PROD_SMOKE_ORG_SLUG is not set (Settings › Secrets and variables › Actions › Variables)."; exit 1; fi
+          echo "Checking organization: $PROD_SMOKE_ORG_SLUG"
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: "24"
+          cache: "npm"
+          cache-dependency-path: e2e/package-lock.json
+
+      - name: Install the smoke runner
+        working-directory: e2e
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium
+
+      - name: Run the production smoke
+        working-directory: e2e
+        run: npx playwright test -c prod-smoke.config.js
+
+      - name: Summarize
+        if: ${{ always() }}
+        working-directory: e2e
+        run: |
+          if [ -f reports/prod-smoke-results.json ]; then node scripts/prod-smoke-summary.js; else echo "No report."; fi
+
+      - name: Upload the report
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: prod-smoke-report
+          path: e2e/reports/prod-smoke-*.json
+          retention-days: 7
+          if-no-files-found: ignore
+
+      - name: Send the result to the QA ingest (best-effort)
+        if: ${{ always() }}
+        working-directory: e2e
+        env:
+          QA_INGEST_URL: ${{ secrets.QA_INGEST_URL }}
+          QA_INGEST_TOKEN: ${{ secrets.QA_INGEST_TOKEN }}
+          QA_SHA: ${{ github.sha }}
+          QA_REF: ${{ github.ref_name }}
+          QA_EVENT: ${{ github.event_name }}
+          QA_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          if [ -z "$QA_INGEST_URL" ] || [ -z "$QA_INGEST_TOKEN" ]; then echo "QA ingest not configured; skipping."; exit 0; fi
+          if [ ! -f reports/prod-smoke-summary.json ]; then echo "No reports/prod-smoke-summary.json; skipping."; exit 0; fi
+          node <<'JS'
+          const fs = require('fs');
+          const summary = JSON.parse(fs.readFileSync('reports/prod-smoke-summary.json', 'utf8'));
+          const body = {
+            source: 'prod-smoke', commitSha: process.env.QA_SHA, ref: process.env.QA_REF,
+            event: process.env.QA_EVENT, runUrl: process.env.QA_RUN_URL, nodeVersion: process.version, summary
+          };
+          fetch(process.env.QA_INGEST_URL, {
+            method: 'POST',
+            headers: { 'content-type': 'application/json', authorization: 'Bearer ' + process.env.QA_INGEST_TOKEN },
+            body: JSON.stringify(body),
+            signal: AbortSignal.timeout(15000)
+          }).then((r) => console.log('QA ingest HTTP status: ' + r.status))
+            .catch((e) => console.log('QA ingest request failed: ' + e.name));
+          JS
+
+      # Status only: which run failed and where to look. No URL of the site, no secret.
+      - name: Alert on failure (when ALERT_* is configured)
+        if: ${{ failure() }}
+        env:
+          ALERT_TELEGRAM_BOT_TOKEN: ${{ secrets.ALERT_TELEGRAM_BOT_TOKEN }}
+          ALERT_TELEGRAM_CHAT_ID: ${{ secrets.ALERT_TELEGRAM_CHAT_ID }}
+          ALERT_WEBHOOK_URL: ${{ secrets.ALERT_WEBHOOK_URL }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          TRIGGER: ${{ github.event_name }}
+        run: |
+          if [ -z "$ALERT_TELEGRAM_BOT_TOKEN" ] && [ -z "$ALERT_WEBHOOK_URL" ]; then echo "No alert channel configured; the run is marked failed."; exit 0; fi
+          node <<'JS'
+          const text = `🚨 *Production smoke failed* (${process.env.TRIGGER})\nRun: ${process.env.RUN_URL}`;
+          const send = [];
+          if (process.env.ALERT_TELEGRAM_BOT_TOKEN && process.env.ALERT_TELEGRAM_CHAT_ID) {
+            send.push(fetch(`https://api.telegram.org/bot${process.env.ALERT_TELEGRAM_BOT_TOKEN}/sendMessage`, {
+              method: 'POST', headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ chat_id: process.env.ALERT_TELEGRAM_CHAT_ID, text, parse_mode: 'Markdown' }),
+              signal: AbortSignal.timeout(10000)
+            }).then((r) => console.log('Telegram alert HTTP status: ' + r.status)).catch((e) => console.log('Telegram alert failed: ' + e.name)));
+          }
+          if (process.env.ALERT_WEBHOOK_URL) {
+            send.push(fetch(process.env.ALERT_WEBHOOK_URL, {
+              method: 'POST', headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ text, event: 'prod_smoke_failed', runUrl: process.env.RUN_URL }),
+              signal: AbortSignal.timeout(10000)
+            }).then((r) => console.log('Webhook alert HTTP status: ' + r.status)).catch((e) => console.log('Webhook alert failed: ' + e.name)));
+          }
+          Promise.all(send);
+          JS

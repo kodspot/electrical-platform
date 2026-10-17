@@ -251,29 +251,181 @@
     }
   });
 
-  // ── Tabs: Unit & integration | End-to-end ──
-  var e2eLoaded = false;
-  function selectTab(which) {
-    var e2e = which === 'e2e';
-    $('tabUnit').setAttribute('aria-selected', String(!e2e));
-    $('tabE2e').setAttribute('aria-selected', String(e2e));
-    $('tabUnit').tabIndex = e2e ? -1 : 0;
-    $('tabE2e').tabIndex = e2e ? 0 : -1;
-    $('panelUnit').hidden = e2e;
-    $('panelE2e').hidden = !e2e;
-    if (e2e && !e2eLoaded) { e2eLoaded = true; loadE2e(); }
+  // ── Tabs: Unit & integration | End-to-end | Explorer | Design | Changes | Production ──
+  // Each panel loads its data the first time it is opened. [QA-2: the last four]
+  var TABS = [
+    { tab: 'tabUnit', panel: 'panelUnit' },
+    { tab: 'tabE2e', panel: 'panelE2e', load: function () { loadE2e(); } },
+    { tab: 'tabExplorer', panel: 'panelExplorer', load: function () { loadLatest('e2e', renderExplorer, 'explorerBody'); } },
+    { tab: 'tabDesign', panel: 'panelDesign', load: function () { loadLatest('e2e', renderDesign, 'designBody'); } },
+    { tab: 'tabChanges', panel: 'panelChanges', load: function () { loadChanges(); } },
+    { tab: 'tabProd', panel: 'panelProd', load: function () { loadProd(); } }
+  ];
+  function selectTab(index) {
+    TABS.forEach(function (t, i) {
+      var on = i === index;
+      $(t.tab).setAttribute('aria-selected', String(on));
+      $(t.tab).tabIndex = on ? 0 : -1;
+      $(t.panel).hidden = !on;
+    });
+    var t = TABS[index];
+    if (t.load && !t.loaded) { t.loaded = true; t.load(); }
   }
-  $('tabUnit').addEventListener('click', function () { selectTab('unit'); });
-  $('tabE2e').addEventListener('click', function () { selectTab('e2e'); });
-  [$('tabUnit'), $('tabE2e')].forEach(function (tab) {
-    tab.addEventListener('keydown', function (e) {
+  TABS.forEach(function (t, i) {
+    $(t.tab).addEventListener('click', function () { selectTab(i); });
+    $(t.tab).addEventListener('keydown', function (e) {
       if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
       e.preventDefault();
-      var next = tab.id === 'tabUnit' ? 'e2e' : 'unit';
+      var next = (i + (e.key === 'ArrowRight' ? 1 : TABS.length - 1)) % TABS.length;
       selectTab(next);
-      $(next === 'e2e' ? 'tabE2e' : 'tabUnit').focus();
+      $(TABS[next].tab).focus();
     });
   });
+
+  /** The newest run of a source, with its details, rendered by `render` into `bodyId`. */
+  async function loadLatest(source, render, bodyId) {
+    $(bodyId).innerHTML = '<div class="skeleton skeleton-card"></div>';
+    var list = await App.saFetchJson('/superadmin/qa/runs?source=' + encodeURIComponent(source) + '&limit=1');
+    if (!list) { $(bodyId).innerHTML = '<p class="q-muted">Could not load the runs.</p>'; return; }
+    if (!list.runs.length) { render(null); return; }
+    var run = await App.saFetchJson('/superadmin/qa/runs/' + encodeURIComponent(list.runs[0].id));
+    render(run || list.runs[0]);
+  }
+
+  function runMeta(run) {
+    return '<p class="q-muted">' + esc(fmtWhen(run.createdAt)) + ' · ' + esc(run.ref || '—') + ' · ' + esc((run.commitSha || '').slice(0, 7) || '—') +
+      (run.runUrl ? ' · ' + safeLink(run.runUrl, 'open run') : '') + '</p>';
+  }
+  function countsRow(items) {
+    return '<div class="q-counts">' + items.map(function (c) { return '<div class="q-count"><b>' + esc(c[0]) + '</b><span>' + esc(c[1]) + '</span></div>'; }).join('') + '</div>';
+  }
+  function table(headers, rows) {
+    return '<div class="table-wrap"><table class="q-table"><thead><tr>' + headers.map(function (h) { return '<th>' + esc(h) + '</th>'; }).join('') +
+      '</tr></thead><tbody>' + rows.join('') + '</tbody></table></div>';
+  }
+  var td = function (v, wrap) { return '<td' + (wrap ? ' style="white-space:normal"' : '') + '>' + esc(v == null || v === '' ? '—' : v) + '</td>'; };
+
+  // ── Explorer (details.explorer of the latest e2e run) ──
+  function renderExplorer(run) {
+    var x = run && run.details && run.details.explorer;
+    if (!x) {
+      $('explorerBadge').innerHTML = '';
+      $('explorerBody').innerHTML = '<p class="q-muted">No explorer results yet. They appear with the next end-to-end run.</p>';
+      return;
+    }
+    var rows = [].concat(x.desktop || [], x.mobile || []);
+    var failed = rows.filter(function (r) { return r.status !== 'passed'; });
+    var allowed = rows.filter(function (r) { return r.allowed; });
+    var forb = x.forbidden || [];
+    var shown = forb.filter(function (f) { return f.shown; });
+    $('explorerBadge').innerHTML = statusBadge(failed.length || shown.length ? 'failed' : 'passed');
+    var html = countsRow([
+      [rows.length, 'role × page × viewport'], [failed.length, 'failed'], [allowed.length, 'with allow-listed findings'],
+      [forb.reduce(function (n, f) { return n + (f.checked || 0); }, 0), 'forbidden pages checked']
+    ]) + runMeta(run);
+    var unused = (x.allowlist && x.allowlist.unused) || [];
+    if (unused.length) html += '<div class="q-warn" role="status">Allow-list entries that no longer reproduce (remove them): ' + esc(unused.join('; ')) + '</div>';
+    if (shown.length) html += '<div class="q-warn" role="status">Pages shown to a role that may not open them: ' + esc(shown.map(function (f) { return f.role + ' (' + f.project + '): ' + f.shown; }).join('; ')) + '</div>';
+    ['desktop', 'mobile'].forEach(function (key) {
+      var list = x[key] || [];
+      if (!list.length) return;
+      html += '<h3>' + (key === 'desktop' ? 'Desktop' : 'Phone (Pixel 7)') + '</h3>' + table(['Role', 'Page', 'Status', 'Failed checks', 'Allow-listed', 'Links followed', 'Links failed', 'Tabs'],
+        list.map(function (r) {
+          return '<tr>' + td(r.role) + td(r.page) + '<td>' + e2eStatusBadge(r.status) + '</td>' + td(r.failed, true) + td(r.allowed) + td(r.links) + td(r.linkFailures) + td(r.tabs) + '</tr>';
+        }));
+    });
+    if (forb.length) {
+      html += '<h3>Forbidden pages</h3>' + table(['Viewport', 'Role', 'Pages checked', 'Shown (must be none)', 'Status'],
+        forb.map(function (f) { return '<tr>' + td(f.project) + td(f.role) + td(f.checked) + td(f.shown || 'none') + '<td>' + e2eStatusBadge(f.status) + '</td></tr>'; }));
+    }
+    $('explorerBody').innerHTML = html;
+  }
+
+  // ── Design (visual states of the latest e2e run; the ratchets once recorded) ──
+  function renderDesign(run) {
+    var d = run && run.details;
+    var pages = d && Array.isArray(d.pages) ? d.pages : [];
+    if (!run || !pages.length) {
+      $('designBadge').innerHTML = '';
+      $('designBody').innerHTML = '<p class="q-muted">No design results yet. They appear with the next end-to-end run.</p>';
+      return;
+    }
+    var by = function (v) { return pages.filter(function (p) { return p.visual === v; }); };
+    var diffs = by('diff');
+    var ratchets = (d.design && Array.isArray(d.design.ratchets)) ? d.design.ratchets : [];
+    var worse = ratchets.filter(function (r) { return r.status === 'worse'; });
+    $('designBadge').innerHTML = statusBadge(diffs.length || worse.length ? 'failed' : 'passed');
+    var html = countsRow([[pages.length, 'page views'], [by('compared').length, 'match the baseline'], [diffs.length, 'differ'], [by('no-baseline').length, 'no baseline yet']]) + runMeta(run);
+    if (diffs.length) {
+      html += '<div class="q-warn" role="status">Visual differences: ' + esc(diffs.map(function (p) { return p.page + ' (' + p.project + ')'; }).join(', ')) +
+        (run.runUrl ? ' — expected / actual / diff images: ' + safeLink(run.runUrl + '#artifacts', 'e2e-traces artifact') : '') + '</div>';
+    }
+    if (ratchets.length) {
+      html += '<h3>Design ratchets</h3>' + table(['Ratchet', 'Now', 'Baseline', 'Status'],
+        ratchets.map(function (r) { return '<tr>' + td(r.name) + td(r.count) + td(r.baseline) + '<td>' + e2eStatusBadge(r.status === 'worse' ? 'failed' : 'passed') + '</td></tr>'; }));
+    }
+    html += '<h3>Pages</h3>' + table(['Page', 'Viewport', 'Visual', 'Critical', 'Serious'],
+      pages.map(function (p) { var a = p.axe || {}; return '<tr>' + td(p.page) + td(p.project) + td(p.visual) + td(a.critical) + td(a.serious) + '</tr>'; }));
+    $('designBody').innerHTML = html;
+  }
+
+  // ── Changes (one change impact report per pull-request push) ──
+  async function loadChanges() {
+    $('changesBody').innerHTML = '<div class="skeleton skeleton-card"></div>';
+    var data = await App.saFetchJson('/superadmin/qa/runs?source=impact&limit=20');
+    if (!data) { $('changesBody').innerHTML = '<p class="q-muted">Could not load the reports.</p>'; return; }
+    if (!data.runs.length) { $('changesBody').innerHTML = '<p class="q-muted">No change impact reports yet. The Change impact workflow posts one for every pull-request push.</p>'; return; }
+    $('changesBody').innerHTML = table(['When', 'Branch', 'Commit', 'Affected', 'Covered', 'Not covered'],
+      data.runs.map(function (r) {
+        return '<tr data-impact-id="' + esc(r.id) + '" tabindex="0">' + td(fmtWhen(r.createdAt)) + td(r.ref) + td((r.commitSha || '').slice(0, 7)) + td(r.total) + td(r.passed) +
+          '<td>' + (r.failed ? '<span class="badge badge-warning">' + esc(r.failed) + '</span>' : '0') + '</td></tr>';
+      }));
+    $('changesBody').querySelectorAll('tr[data-impact-id]').forEach(function (tr) {
+      var open = function () { showImpact(tr.getAttribute('data-impact-id')); };
+      tr.addEventListener('click', open);
+      tr.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(); } });
+    });
+    showImpact(data.runs[0].id);
+  }
+  async function showImpact(id) {
+    var run = await App.saFetchJson('/superadmin/qa/runs/' + encodeURIComponent(id));
+    var d = run && run.details;
+    if (!d) { $('changesDetail').innerHTML = ''; return; }
+    var html = '<h3>' + esc(run.ref || '—') + ' · ' + esc((run.commitSha || '').slice(0, 7) || '—') + '</h3>' + runMeta(run);
+    if (Array.isArray(d.uncovered) && d.uncovered.length) html += '<div class="q-warn" role="status">Changed but not covered: ' + esc(d.uncovered.join('; ')) + '</div>';
+    if (Array.isArray(d.items) && d.items.length) {
+      html += table(['Kind', 'Affected', 'Covered by', 'Pages calling it'], d.items.map(function (i) {
+        return '<tr>' + td(i.kind) + td(i.id, true) + (i.covered ? td(i.coveredBy) : '<td><span class="badge badge-warning">not covered</span></td>') + td(i.pages, true) + '</tr>';
+      }));
+    } else {
+      html += '<p class="q-muted">No page, route or data change in this push.</p>';
+    }
+    if (Array.isArray(d.other) && d.other.length) html += '<p class="q-muted">Other files: ' + esc(d.other.join('; ')) + '</p>';
+    $('changesDetail').innerHTML = html;
+  }
+
+  // ── Production (the post-deploy / nightly smoke) ──
+  async function loadProd() {
+    await loadLatest('prod-smoke', renderProd, 'prodBody');
+  }
+  function renderProd(run) {
+    var d = run && run.details;
+    if (!run || !d) {
+      $('prodBadge').innerHTML = '';
+      $('prodBody').innerHTML = '<p class="q-muted">No production smoke runs yet. The Production smoke workflow runs after every deploy and nightly.</p>';
+      return;
+    }
+    $('prodBadge').innerHTML = statusBadge(run.status);
+    var methods = d.methods || {};
+    var sent = Object.keys(methods).map(function (m) { return m + ' ' + methods[m]; }).join(', ') || 'none';
+    var html = countsRow([[run.total, 'checks'], [run.passed, 'passed'], [run.failed, 'failed']]) + runMeta(run) +
+      '<p class="q-muted">Target: ' + esc(d.target || '—') + ' · trigger: ' + esc(run.event || '—') + ' · requests made: ' + esc(sent) + '</p>' +
+      (d.readOnly === false ? '<div class="q-warn" role="status">This run attempted a request other than GET/HEAD (it was blocked, and the run failed).</div>' : '<p class="q-muted">Read-only: only GET and HEAD requests were sent.</p>');
+    if (Array.isArray(d.checks) && d.checks.length) {
+      html += table(['Check', 'Status', 'Detail'], d.checks.map(function (c) { return '<tr>' + td(c.check, true) + '<td>' + e2eStatusBadge(c.status) + '</td>' + td(c.detail, true) + '</tr>'; }));
+    }
+    $('prodBody').innerHTML = html;
+  }
 
   // ── End-to-end: latest run (journeys, accessibility, visual) ──
   function e2eStatusBadge(s) {

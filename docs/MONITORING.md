@@ -182,13 +182,59 @@ quality signals in one place (WP-Q, [ADR 0005](adr/0005-qa-telemetry-in-producti
     `sa_test_suite_dispatched` (statuses only).
   - It only works once `e2e.yml` is on `main`. Before that, GitHub answers 404/422 and the
     page says so.
+- **Explorer, Design, Changes and Production tabs** (QA-2). Each loads its data the first
+  time it is opened.
+  - **Explorer:** `details.explorer` of the latest e2e run. One row per role × page and
+    viewport (failed checks, allow-listed findings, links followed), the forbidden-page
+    matrix, and allow-list entries that no longer reproduce.
+  - **Design:** the visual state of every page in the latest e2e run (matches the baseline,
+    differs, no baseline). On a difference it links to the `e2e-traces` artifact, which
+    holds the expected, actual and diff images. It also shows the design ratchets once the
+    run records them.
+  - **Changes:** the change impact report of each pull-request push (`source: 'impact'`,
+    `.github/workflows/change-impact.yml`), with drill-in to the affected items and
+    anything changed but not covered.
+  - **Production:** the latest production smoke (`source: 'prod-smoke'`, below): checks,
+    target host, and the HTTP methods it requested.
+  - **The Unit & integration tab and the trend** show test-suite runs only (`ci`, `e2e`,
+    `local`) when no source is chosen. The `impact` and `prod-smoke` reports live on their
+    own tabs.
+
+## Production smoke (`.github/workflows/prod-smoke.yml`, [ADR 0009](adr/0009-post-deploy-production-smoke.md))
+
+A read-only, anonymous check of the live site:
+- **When:** after every deploy (`deploy.yml` › **Production smoke**), nightly at 22:00 UTC,
+  and by hand.
+- **What:**
+  - `/health/ready` is ok (polled up to 2 minutes after a deploy);
+  - the public and login pages of the organization in the repository variable
+    `PROD_SMOKE_ORG_SLUG` answer 200 and render in headless Chromium, with no console error
+    and no failed same-origin request;
+  - the linked static assets answer 200;
+  - HSTS, `nosniff`, CSP, framing protection and the referrer policy are set;
+  - http redirects to https.
+- **Read-only, enforced:**
+  - every browser request passes a route guard: anything but GET/HEAD is aborted and fails
+    the run;
+  - the direct checks can only send GET/HEAD, and service workers are blocked;
+  - every request is counted by method and shown on the Production tab.
+- **On failure:** the run is red. When `ALERT_TELEGRAM_BOT_TOKEN`/`ALERT_TELEGRAM_CHAT_ID` or
+  `ALERT_WEBHOOK_URL` are set as repository secrets (the same secrets the deploy passes to
+  the server), it alerts with status only: the trigger and the run link. It never rolls a
+  deploy back.
+- **Results:** posted to the QA ingest as `source: 'prod-smoke'`, best-effort. The report
+  artifact `prod-smoke-report` is kept 7 days.
+- **Not covered:** signed-in pages (the e2e suite and the explorer cover them before
+  deploy), and the in-app **Run production checks**, which needs a super-admin sign-in and
+  stays a manual action on this page.
 
 ## What is *not* monitored (known gaps)
 
-There is **no external APM or uptime monitor** beyond the health endpoints and Docker's
-healthcheck-driven restart policy — reasonable for the current single-VM scale, but a
-conscious gap: nothing pages a human on a sustained outage unless error alerting is
-configured. See the audit snapshot for the full list.
+There is **no external APM or 24/7 uptime monitor** beyond the health endpoints, Docker's
+healthcheck-driven restart policy and the production smoke (after each deploy and nightly)
+— reasonable for the current single-VM scale, but a conscious gap: between smoke runs,
+nothing pages a human on a sustained outage unless error alerting is configured. See the
+audit snapshot for the full list.
 
 ## Related
 

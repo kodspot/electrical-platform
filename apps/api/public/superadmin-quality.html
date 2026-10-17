@@ -48,7 +48,7 @@
   .q-card { padding: .85rem; }
   .q-trend svg { height: 130px; }
 }
-.q-tabs { display: flex; gap: .25rem; border-bottom: 1px solid var(--border); margin-bottom: 1rem; }
+.q-tabs { display: flex; flex-wrap: wrap; gap: .25rem; border-bottom: 1px solid var(--border); margin-bottom: 1rem; }
 .q-tabs button { background: none; border: 0; border-bottom: 2px solid transparent; padding: .55rem .85rem; font: inherit; font-size: .85rem; font-weight: 600; color: var(--text-muted); cursor: pointer; }
 .q-tabs button[aria-selected="true"] { color: var(--text); border-bottom-color: var(--primary); }
 .q-tabs button:focus-visible { outline: 2px solid var(--primary); outline-offset: -2px; }
@@ -76,6 +76,10 @@
   <div class="q-tabs" role="tablist" aria-label="Test suites">
     <button type="button" role="tab" id="tabUnit" aria-controls="panelUnit" aria-selected="true">Unit &amp; integration</button>
     <button type="button" role="tab" id="tabE2e" aria-controls="panelE2e" aria-selected="false" tabindex="-1" data-testid="qa-tab-e2e">End-to-end</button>
+    <button type="button" role="tab" id="tabExplorer" aria-controls="panelExplorer" aria-selected="false" tabindex="-1">Explorer</button>
+    <button type="button" role="tab" id="tabDesign" aria-controls="panelDesign" aria-selected="false" tabindex="-1">Design</button>
+    <button type="button" role="tab" id="tabChanges" aria-controls="panelChanges" aria-selected="false" tabindex="-1">Changes</button>
+    <button type="button" role="tab" id="tabProd" aria-controls="panelProd" aria-selected="false" tabindex="-1">Production</button>
   </div>
 
   <div id="panelUnit" role="tabpanel" aria-labelledby="tabUnit">
@@ -147,9 +151,41 @@
       <div id="e2eBody"><p class="q-muted">Open this tab to load the latest run.</p></div>
     </section>
   </div>
+  <div id="panelExplorer" role="tabpanel" aria-labelledby="tabExplorer" hidden>
+    <section class="q-card" aria-labelledby="explorerTitle">
+      <h2 id="explorerTitle">Explorer: every page as every role <span class="q-spacer"></span><span id="explorerBadge"></span></h2>
+      <p class="q-muted">From the latest end-to-end run: each role opens every page it may open, on desktop and on a phone, and follows every link on it. Allow-listed findings are known defects that are reported but do not fail the run.</p>
+      <div id="explorerBody"><p class="q-muted">Open this tab to load the latest run.</p></div>
+    </section>
+  </div>
+
+  <div id="panelDesign" role="tabpanel" aria-labelledby="tabDesign" hidden>
+    <section class="q-card" aria-labelledby="designTitle">
+      <h2 id="designTitle">Design coverage <span class="q-spacer"></span><span id="designBadge"></span></h2>
+      <p class="q-muted">From the latest end-to-end run: the screenshot comparison of every page against its Linux baseline, and the design ratchets (they fail only when a count gets worse).</p>
+      <div id="designBody"><p class="q-muted">Open this tab to load the latest run.</p></div>
+    </section>
+  </div>
+
+  <div id="panelChanges" role="tabpanel" aria-labelledby="tabChanges" hidden>
+    <section class="q-card" aria-labelledby="changesTitle">
+      <h2 id="changesTitle">Change impact, per commit</h2>
+      <p class="q-muted">For each pull-request push: the pages, API routes and data the change affects, and the tests that cover each. Report-only.</p>
+      <div id="changesBody"><p class="q-muted">Open this tab to load the reports.</p></div>
+      <div class="q-detail" id="changesDetail" aria-live="polite"></div>
+    </section>
+  </div>
+
+  <div id="panelProd" role="tabpanel" aria-labelledby="tabProd" hidden>
+    <section class="q-card" aria-labelledby="prodTitle">
+      <h2 id="prodTitle">Production smoke <span class="q-spacer"></span><span id="prodBadge"></span></h2>
+      <p class="q-muted">After every deploy and nightly: health, every public and login page, static assets, security headers and the https redirect, checked anonymously with GET and HEAD requests only.</p>
+      <div id="prodBody"><p class="q-muted">Open this tab to load the latest run.</p></div>
+    </section>
+  </div>
 </main>
 
 <script src="/js/app.js?v=15"></script>
-<script src="/js/superadmin-quality.js?v=2"></script>
+<script src="/js/superadmin-quality.js?v=3"></script>
 </body>
 </html>
