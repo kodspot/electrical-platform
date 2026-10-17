@@ -22,6 +22,37 @@ has been git-tagged yet, so everything below is grouped under **Unreleased**.
 Complete and merged into the working tree as of this writing, pending its next deploy —
 see `docs/DEPLOYMENT.md` for how a change reaches production.
 
+### 2026-10-18 (CI speed)
+
+- **User-visible (Release Notes):** a deploy now interrupts the site for the restart only, about
+  15 seconds instead of the whole image build.
+- **`[CI]` e2e in 3 parallel shards, one combined report** (`.github/workflows/e2e.yml`,
+  `e2e/merge.config.js`).
+  - **Shards:** each `e2e shard i/3` has its own disposable database and runs
+    `--shard=i/3 --reporter=blob`.
+  - **The required job `e2e`** merges the blob reports with `playwright merge-reports`. The
+    result is the same HTML, JUnit and `results.json`, so `summarize.js`, the contrast ratchet
+    and the QA ingest are unchanged.
+  - **Finer split:** `explorer.spec.js` and `visual-a11y.spec.js` are `mode: 'parallel'`, so
+    the shards can split them; `workers` stays 1.
+  - **Artifacts:** traces and new baselines from all shards are re-uploaded as the usual
+    `e2e-traces` / `e2e-snapshots-linux`. Each shard contributes only the baselines it wrote.
+  - **Browser cache:** the Playwright browser download is cached (`actions/cache@v5.0.5`).
+- **`[CI]` The `e2e` check exists on every PR.**
+  - **Before:** the `paths:` filter meant a docs-only PR never got the required check, so it
+    could not merge.
+  - **Now:** a first job compares the PR's files (`git diff`, no new action). When none is
+    under `apps/api/**`, `e2e/**` or the workflow, `e2e` passes in seconds.
+- **`[CI]` Lint & Test caches Prisma's engine binaries.** Setup was already about 35 s; the
+  211 s is the API test suite itself, which already runs test files in parallel.
+- **`[DEPLOY]` Build before stop.** The deploy script runs `docker compose build` while the old
+  version serves, then `down` and `up -d`. A failed build (`set -e`) now leaves production
+  running, where it used to fail after `down`. Everything else in the script is unchanged:
+  env write, health wait, Caddy check, recorded SHA, smoke job.
+- **Docs:** `e2e/README.md` (CI), `docs/testing/TESTING.md`, `docs/DEPLOYMENT.md`.
+- **Charter §22:** the deployment documentation is triggered, and updated. No ADR is needed:
+  the pipeline's shape (test → deploy → smoke) is unchanged.
+
 ### 2026-10-17 (QA-2 design coverage)
 
 - **User-visible (Release Notes):** none; this is test tooling.

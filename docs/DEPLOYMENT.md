@@ -26,9 +26,11 @@ it grows with nearly every change and a stale number here is worse than none.)
 The **Deploy to Production** job only runs on a direct push to `main`, and only after
 the test job has passed (`needs: test`). It never runs for pull requests. It SSHes into
 the production AWS EC2 host, writes a fresh `.env` from GitHub Actions secrets, and
-runs `docker compose build && docker compose up -d`, then polls `/health/ready` (not
-the always-200 `/health`) until the container reports genuinely healthy before
-declaring the deploy successful.
+runs `docker compose build` **while the old version keeps serving**, then
+`docker compose down` and `up -d`. So the downtime is only the restart, about 15 s, and a
+failed build stops the deploy with the running version untouched (the script runs
+`set -e`). It then polls `/health/ready` (not the always-200 `/health`) until the container
+reports genuinely healthy before declaring the deploy successful.
 
 **After a successful deploy, the Production smoke job runs** (`needs: deploy`, the reusable
 [`.github/workflows/prod-smoke.yml`](../.github/workflows/prod-smoke.yml),
