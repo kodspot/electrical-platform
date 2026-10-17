@@ -1,5 +1,5 @@
 {
   "$comment": "Design ratchets (apps/api/scripts/design-ratchet.js): counts that may only go down. A check fails when a count is HIGHER than this; lower counts are written back with --update. Never raise a number here to make a check pass: use a design token (var(--…)) or fix the contrast.",
   "colourLiterals": 811,
-  "colourContrastNodes": 100000
+  "colourContrastNodes": 110
 }
