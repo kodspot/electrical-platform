@@ -67,6 +67,9 @@ Engineering understanding, not code duplication. Each links to the code it descr
   commands. [`apps/api/test/README.md`](../apps/api/test/README.md) — test-tiering strategy.
 - [`testing/COVERAGE_MATRIX.md`](testing/COVERAGE_MATRIX.md) — what the automated suite
   does and does not cover, per workflow, module, route file and scheduled job (QA-1 snapshot).
+- [`testing/TESTING.md`](testing/TESTING.md) — what runs when: every automated check, its
+  trigger, whether it fails the build, and where its result appears; the PR change impact
+  report.
 
 ### Operations — run, recover, scale
 - [`DEPLOYMENT.md`](DEPLOYMENT.md) — CI/CD, staging, and production deploy flow.
