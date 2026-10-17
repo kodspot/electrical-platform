@@ -277,25 +277,38 @@ node scripts/prod-smoke-summary.js     # reports/prod-smoke-summary.json, incl. 
 ## CI (`.github/workflows/e2e.yml`)
 
 **When it runs**
-- on every pull request that touches `apps/api/**`, `e2e/**` or the workflow, with no
-  branch filter, so stacked PRs run too
+- on every pull request. The required check `e2e` always exists: a first job (`e2e — what
+  changed`) looks at the PR's files, and when none is under `apps/api/**`, `e2e/**` or the
+  workflow, `e2e` passes in seconds without running the suite
 - nightly at 21:30 UTC (03:00 IST)
 - by hand (inputs `update_snapshots`, `requested_by`)
 - from the super-admin Quality page's **Run full test suite now** button, which dispatches
   it on `main`
 
 **What it does**
-1. Starts Postgres 15 as a service (`electrical_e2e` on 127.0.0.1).
-2. Installs Node 22, then runs `npm ci` for the app and for `e2e/`, plus
-   `playwright install --with-deps chromium`.
-3. Runs `npx playwright test`, retrying once in CI.
+1. **Three shards in parallel** (`e2e shard i/3`). Each starts its own Postgres 15 service
+   (`electrical_e2e` on 127.0.0.1), runs `npm ci` for the app and for `e2e/`, installs
+   Chromium (the browser download is cached per Playwright version), and runs
+   `npx playwright test --shard=i/3 --reporter=blob`, retrying once.
+   - `explorer.spec.js` and `visual-a11y.spec.js` are `mode: 'parallel'`, so the shards
+     can split them.
+   - `journeys.spec.js` is one ordered story and stays in one shard.
+   - `workers` stays 1 inside each shard.
+2. **The job named `e2e`** merges the three blob reports with
+   `npx playwright merge-reports --config merge.config.js`. The result is the same HTML,
+   JUnit and `reports/results.json` a single run writes, so the summary, the contrast ratchet
+   and the ingest are unchanged.
+3. **The check is red** when a shard failed or was cancelled.
 
 **What it produces**
 - `scripts/summarize.js` writes `reports/e2e-summary.json` (counts, journeys, per-page axe
   and visual state, first-line failures).
 - The `e2e-report` artifact is always uploaded and kept 7 days.
-- The `e2e-traces` artifact is uploaded on failure only and kept 7 days.
-- With `update_snapshots`, the `e2e-snapshots-linux` artifact holds the new baselines.
+- The `e2e-traces` artifact (all shards' `test-results/`) is uploaded on failure only and
+  kept 7 days.
+- With `update_snapshots`, the `e2e-snapshots-linux` artifact holds the committed baselines
+  with every shard's new or changed ones laid over them. Each shard uploads only what it
+  wrote, so none can overwrite another's with a stale copy.
 - The summary is posted to `POST /api/qa/runs` with `source: 'e2e'`, for the Quality page's
   End-to-end tab. This step is best-effort: it skips when `QA_INGEST_URL`/`QA_INGEST_TOKEN`
   are unset and prints only the HTTP status.
