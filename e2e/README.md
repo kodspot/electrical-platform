@@ -222,6 +222,30 @@ By rule, across both projects:
 These are known, report-only items for a later design pass. A new critical violation fails
 the suite.
 
+## Production smoke (`prod-smoke.config.js`, `tests-prod/`)
+
+A separate, read-only suite that runs against a **deployed** site, not the local app
+([ADR 0009](../docs/adr/0009-post-deploy-production-smoke.md)). It has no web server, no
+database and no seed, and it signs in nowhere. CI runs it after every production deploy,
+nightly and by hand (`.github/workflows/prod-smoke.yml`).
+
+```
+cd e2e
+PROD_SMOKE_URL=https://example.com PROD_SMOKE_ORG_SLUG=<org> npx playwright test -c prod-smoke.config.js
+node scripts/prod-smoke-summary.js     # reports/prod-smoke-summary.json, incl. the methods requested
+```
+
+- **What it checks:** `/health/ready`; every public and login page of the organization (200,
+  no console error, no failed same-origin request); the static assets those pages link;
+  security headers; http → https.
+- **GET and HEAD only, enforced:**
+  - every browser request passes `context.route('**/*')`, and any other method is aborted
+    and fails the test;
+  - direct checks can only call `get`/`head`, and service workers are blocked;
+  - each test records the methods it requested (a `methods` annotation), and the summary adds
+    them up (`methods`, `readOnly`).
+- **Never point it at a site you may not load.** It only reads, but it is real traffic.
+
 ## CI (`.github/workflows/e2e.yml`)
 
 **When it runs**

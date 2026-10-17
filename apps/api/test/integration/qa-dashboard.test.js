@@ -123,11 +123,47 @@ describe('WP-Q — QA run ingest and the super-admin Quality API', () => {
     assert.deepStrictEqual(res.json(), { error: 'Invalid payload' });
   });
 
+  it('ingest: the QA-2 sources (impact, prod-smoke) are accepted and listed by their source filter', async (t) => {
+    if (!dbAvailable) return t.skip('No database available in this environment');
+    process.env.QA_INGEST_TOKEN = INGEST_TOKEN;
+    // Own client address: the ingest allows 10 posts per minute per address.
+    const post = (body) => app.inject({
+      method: 'POST', url: '/api/qa/runs', payload: body,
+      headers: { authorization: `Bearer ${INGEST_TOKEN}`, 'x-forwarded-for': '10.98.0.1' }
+    });
+    const impact = runBody({ source: 'impact', ref: `${MARKER}-impact` });
+    impact.summary = { status: 'not_covered', counts: { tests: 2, pass: 1, fail: 1 }, durationMs: null, items: [{ kind: 'page', id: 'admin-tickets', covered: true }], uncovered: ['route POST /api/x'] };
+    const smoke = runBody({ source: 'prod-smoke', ref: `${MARKER}-smoke` });
+    smoke.summary = { status: 'passed', counts: { tests: 3, pass: 3, fail: 0 }, durationMs: 900, checks: [{ check: 'health', status: 'passed', detail: '' }], methods: { GET: 40, HEAD: 0 }, readOnly: true };
+    for (const body of [impact, smoke]) {
+      const res = await post(body);
+      assert.strictEqual(res.statusCode, 201, `${body.source} accepted`);
+      createdRunIds.push(res.json().id);
+    }
+    assert.strictEqual((await post(runBody({ source: 'prod' }))).statusCode, 400, 'an unknown source is still rejected');
+
+    const listed = (await asSA('/api/superadmin/qa/runs?source=prod-smoke&limit=100')).json().runs;
+    assert.ok(listed.length && listed.every((r) => r.source === 'prod-smoke'));
+    const run = listed.find((r) => r.ref === `${MARKER}-smoke`);
+    const detail = (await asSA(`/api/superadmin/qa/runs/${run.id}`)).json().details;
+    assert.deepStrictEqual(detail.methods, { GET: 40, HEAD: 0 });
+    assert.strictEqual(detail.checks[0].check, 'health');
+    const impacts = (await asSA('/api/superadmin/qa/runs?source=impact&limit=100')).json().runs;
+    assert.ok(impacts.some((r) => r.ref === `${MARKER}-impact`) && impacts.every((r) => r.source === 'impact'));
+
+    // Without ?source= the list and the trend are the test suites only: the existing tabs
+    // are unchanged by the reports.
+    const all = (await asSA('/api/superadmin/qa/runs?limit=100')).json().runs;
+    assert.ok(all.length && all.every((r) => ['ci', 'local', 'e2e'].includes(r.source)), 'the default list holds test-suite runs only');
+    const trend = (await asSA('/api/superadmin/qa/trend?limit=100')).json().runs;
+    assert.ok(trend.every((r) => ['ci', 'local', 'e2e'].includes(r.source)), 'the default trend holds test-suite runs only');
+  });
+
   it('the Quality API rejects ADMIN, SUPERVISOR and worker tokens', async (t) => {
     if (!dbAvailable) return t.skip('No database available in this environment');
     let ip = 0;
     for (const tok of [adminToken, supToken, workerToken]) {
-      for (const url of ['/api/superadmin/qa/runs', '/api/superadmin/qa/trend', '/api/superadmin/qa/ci-status']) {
+      for (const url of ['/api/superadmin/qa/runs', '/api/superadmin/qa/runs?source=impact', '/api/superadmin/qa/runs?source=prod-smoke', '/api/superadmin/qa/trend', '/api/superadmin/qa/ci-status']) {
         const res = await app.inject({ method: 'GET', url, headers: { authorization: `Bearer ${tok}` } });
         assert.ok([401, 403].includes(res.statusCode), `${url} must reject a non-super-admin (got ${res.statusCode})`);
       }

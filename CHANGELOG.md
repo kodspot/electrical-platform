@@ -22,6 +22,47 @@ has been git-tagged yet, so everything below is grouped under **Unreleased**.
 Complete and merged into the working tree as of this writing, pending its next deploy —
 see `docs/DEPLOYMENT.md` for how a change reaches production.
 
+### 2026-10-17 (QA-2 production smoke, Quality tabs)
+
+- **User-visible (Release Notes):** super-admins get four new tabs on the Quality page:
+  Explorer, Design, Changes and Production.
+- **`[QA-2]` Production smoke after every deploy and nightly**
+  ([ADR 0009](docs/adr/0009-post-deploy-production-smoke.md)).
+  - **Workflow:** a reusable `.github/workflows/prod-smoke.yml` (`workflow_call`, nightly
+    22:00 UTC, `workflow_dispatch`). `deploy.yml` gains a job **Production smoke**
+    (`needs: deploy`).
+  - **Suite:** `e2e/prod-smoke.config.js` + `e2e/tests-prod/prod-smoke.spec.js`. It runs
+    against `APP_URL` for the organization in the new repository variable
+    `PROD_SMOKE_ORG_SLUG`.
+  - **Checks:** `/health/ready`; the public and login pages (200, no console error, no
+    failed same-origin request); static assets; security headers; http → https.
+  - **Read-only, enforced:** a route guard aborts anything but GET/HEAD, direct checks can
+    only send GET/HEAD, and service workers are blocked.
+    `e2e/scripts/prod-smoke-summary.js` reports every method requested.
+  - **Not run:** the in-app production checks. They need a super-admin sign-in and a POST,
+    so the smoke does not run them, and no anonymous path was added.
+  - **Results:** QA ingest source `prod-smoke`. On failure, a status-only alert through
+    `ALERT_*` when those secrets are set.
+- **`[QA-2]` Quality page: Explorer, Design, Changes, Production tabs.**
+  - **Ingest:** `POST /api/qa/runs` accepts the sources `impact` (the change impact report)
+    and `prod-smoke`, with array caps for their lists.
+  - **Unchanged tabs:** without `?source=`, `GET /api/superadmin/qa/runs` and `/trend` now
+    return the test suites only (`ci`, `e2e`, `local`), so the existing tabs and the trend
+    are unchanged by the reports.
+  - **Tabs:** they read the latest run of their source. Explorer and Design read the e2e
+    run's `explorer` / `pages` / `design`. The tab list is now table-driven, and the arrow
+    keys cycle through all six.
+  - **Tests:** `qa-dashboard.test.js` (both sources accepted and filtered, an unknown source
+    still 400, non-super-admin tokens still rejected for the new filters, the default list
+    and trend hold test-suite runs only); e2e `quality-qa2-tabs.spec.js` (each tab with
+    seeded runs, keyboard, axe).
+  - **Visual:** the `superadmin-quality` baselines change deliberately (four more tab
+    buttons) and are regenerated on this branch.
+- **Docs:** ADR 0009, `docs/testing/TESTING.md` (the smoke and the tabs), `DEPLOYMENT.md`,
+  `MONITORING.md`, `environment.md` and `.env.example`
+  (`PROD_SMOKE_ORG_SLUG`, a CI-only variable), `e2e/README.md`, and the `QaRun.source`
+  comment in the schema (comment only: no migration).
+
 ### 2026-10-17 (QA-2 change impact)
 
 - **User-visible (Release Notes):** none; this is developer tooling. Every pull request now

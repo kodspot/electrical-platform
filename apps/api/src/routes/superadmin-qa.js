@@ -18,7 +18,12 @@ const { authenticateJWT, requirePolicy } = require('../middleware/auth');
 const { getCiStatus, dispatchE2eWorkflow } = require('../lib/github');
 const { runProductionChecks } = require('../services/production-checks');
 
-const SOURCES = new Set(['ci', 'local', 'e2e']);
+// Test-suite runs (the Unit & integration and End-to-end tabs) and QA-2's reports (the change
+// impact report and the production smoke, each on its own tab). Without ?source= the runs list
+// and the trend show the test suites only, so a report never lands in the test trend.
+const SUITE_SOURCES = ['ci', 'local', 'e2e'];
+const SOURCES = new Set([...SUITE_SOURCES, 'impact', 'prod-smoke']);
+const sourceWhere = (source) => (SOURCES.has(source) ? { source } : { source: { in: SUITE_SOURCES } });
 
 // What the page shows for each dispatch outcome, and the status this API answers with.
 const DISPATCH = {
@@ -46,7 +51,7 @@ async function superadminQaRoutes(fastify) {
   fastify.get('/superadmin/qa/runs', async (request) => {
     const page = intParam(request.query.page, { min: 1, max: 1000, fallback: 1 });
     const limit = intParam(request.query.limit, { min: 1, max: 100, fallback: 20 });
-    const where = SOURCES.has(request.query.source) ? { source: request.query.source } : {};
+    const where = sourceWhere(request.query.source);
     const [runs, total] = await Promise.all([
       prisma.qaRun.findMany({ where, orderBy: [{ createdAt: 'desc' }, { id: 'desc' }], skip: (page - 1) * limit, take: limit, select: LIST_SELECT }),
       prisma.qaRun.count({ where })
@@ -62,7 +67,7 @@ async function superadminQaRoutes(fastify) {
 
   fastify.get('/superadmin/qa/trend', async (request) => {
     const limit = intParam(request.query.limit, { min: 1, max: 100, fallback: 30 });
-    const where = SOURCES.has(request.query.source) ? { source: request.query.source } : {};
+    const where = sourceWhere(request.query.source);
     const runs = await prisma.qaRun.findMany({
       where,
       orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],

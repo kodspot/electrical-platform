@@ -1018,7 +1018,7 @@ model ElectricalImage {
 model QaRun {
   id          String   @id @default(uuid())
   createdAt   DateTime @default(now())
-  source      String // 'ci' | 'local' | 'e2e'
+  source      String // 'ci' | 'local' | 'e2e' | 'impact' | 'prod-smoke'
   commitSha   String?
   ref         String?
   event       String?

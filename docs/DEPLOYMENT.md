@@ -30,6 +30,22 @@ runs `docker compose build && docker compose up -d`, then polls `/health/ready` 
 the always-200 `/health`) until the container reports genuinely healthy before
 declaring the deploy successful.
 
+**After a successful deploy, the Production smoke job runs** (`needs: deploy`, the reusable
+[`.github/workflows/prod-smoke.yml`](../.github/workflows/prod-smoke.yml),
+[ADR 0009](adr/0009-post-deploy-production-smoke.md)). It is a read-only, anonymous check
+of the live site, using GET and HEAD only:
+- `/health/ready`;
+- every public and login page of one organization;
+- static assets, security headers and the https redirect.
+
+A red smoke marks the run red and alerts through `ALERT_*` when configured; it does not roll
+the deploy back. The same workflow runs nightly and by hand.
+- **Required once:** set the repository variable `PROD_SMOKE_ORG_SLUG` (Settings › Secrets
+  and variables › Actions › **Variables**) to the slug of a live organization. It is a
+  variable, not a secret: the slug is already public in that organization's URLs. Until it
+  is set, the smoke fails with a message naming it.
+- It uses the existing `APP_URL` secret for the base URL.
+
 **Net effect: a broken change cannot reach production.** It will fail the test job and
 the deploy job simply won't run. A pull request can never deploy, whatever branch it
 targets: the deploy job is guarded by

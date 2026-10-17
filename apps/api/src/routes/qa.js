@@ -19,14 +19,16 @@ const { scrubJwtShapes } = require('../lib/log-redaction');
 const KEEP_NEWEST = 500;
 const BODY_LIMIT = 256 * 1024;
 const DETAIL_STRING_MAX = 1000;
-const ARRAY_CAPS = { failures: 100, files: 300, tiers: 30, journeys: 100, reasons: 20, pages: 100 };
+// checks: the production smoke; items/uncovered/other: the change impact report. [QA-2]
+const ARRAY_CAPS = { failures: 100, files: 300, tiers: 30, journeys: 100, reasons: 20, pages: 100, checks: 50, items: 50, uncovered: 50, other: 50 };
 
 const str = (max) => z.string().trim().transform((s) => s.slice(0, max));
 const optStr = (max) => str(max).optional().nullable();
 const count = z.number().int().nonnegative().max(10_000_000);
 
 const bodySchema = z.object({
-  source: z.enum(['ci', 'local', 'e2e']),
+  // impact: the PR change impact report; prod-smoke: the post-deploy production smoke. [QA-2]
+  source: z.enum(['ci', 'local', 'e2e', 'impact', 'prod-smoke']),
   commitSha: optStr(64),
   ref: optStr(200),
   event: optStr(64),

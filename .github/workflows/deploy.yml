@@ -383,3 +383,12 @@ jobs:
             docker image prune -f
 
             echo "✅ DEPLOYMENT SUCCESSFUL"
+
+  # Read-only, anonymous check of the live site right after the deploy (ADR 0009): GET/HEAD
+  # only, no sign-in. A failure marks this run red and alerts through ALERT_* when set; it does
+  # not roll the deploy back.
+  smoke:
+    name: Production smoke (read-only)
+    needs: deploy
+    uses: ./.github/workflows/prod-smoke.yml
+    secrets: inherit

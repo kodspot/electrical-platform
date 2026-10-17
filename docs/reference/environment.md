@@ -67,6 +67,12 @@ SSH step's `env`/`envs:` and writes them into the server's `.env`, which
 next deploy rewrites `.env`. `QA_INGEST_URL` is a **CI-only** secret (where the test job posts
 its summary); the app never reads it. Staging uses `STAGING_`-prefixed equivalents.
 
+**`PROD_SMOKE_ORG_SLUG`** is a **CI-only repository variable** (Settings › Secrets and variables ›
+Actions › *Variables*, not a secret: the slug is public in that organization's URLs). It names
+the organization whose public and login pages the production smoke checks
+(`.github/workflows/prod-smoke.yml`, [ADR 0009](../adr/0009-post-deploy-production-smoke.md)).
+The app never reads it. Unset, the smoke fails with a message naming it.
+
 ## Test-only (read by the test runner, never by the app)
 
 Read by `apps/api/scripts/run-tests.js`, `apps/api/test/setup/safety.js` and
