@@ -242,7 +242,7 @@ baseline to make a check pass.
 cd apps/api
 node scripts/design-ratchet.js colours            # lists the files when it fails
 node scripts/design-ratchet.js colours --update   # after removing literals
-node scripts/design-ratchet.js contrast ../e2e/reports/e2e-summary.json [--update]
+node scripts/design-ratchet.js contrast ../../e2e/reports/e2e-summary.json [--update]
 ```
 
 The current numbers are in `design-baseline.json`, and the Quality page's Design tab shows

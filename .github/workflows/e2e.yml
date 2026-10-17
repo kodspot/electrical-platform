@@ -110,7 +110,7 @@ jobs:
       - name: Design ratchet (colour contrast)
         if: always() && hashFiles('e2e/reports/e2e-summary.json') != ''
         working-directory: apps/api
-        run: node scripts/design-ratchet.js contrast ../e2e/reports/e2e-summary.json
+        run: node scripts/design-ratchet.js contrast ../../e2e/reports/e2e-summary.json
 
       - name: Upload the report
         if: always()
