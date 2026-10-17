@@ -1,4 +1,5 @@
 'use strict';
+// QA-2 change-impact demo: comment-only change, never merged
 
 const crypto = require('crypto');
 const { z } = require('zod');
