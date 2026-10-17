@@ -45,6 +45,32 @@ async function apiLogin(request, { email, password }) {
   return body;
 }
 
+/** Worker (electrician) PIN login, cached per run like apiLogin (worker-login has its own 10 per 15 minutes). */
+async function workerLogin(request, { orgSlug, employeeId, pin }) {
+  const key = `${seed().run}:worker:${orgSlug}:${employeeId}`;
+  const cached = readSessions()[key];
+  if (cached) return cached;
+  const res = await request.post('/api/auth/worker-login', { data: { orgSlug, employeeId, pin } });
+  if (!res.ok()) throw new Error(`worker login failed (${res.status()})`);
+  const body = await res.json();
+  const all = readSessions();
+  all[key] = body;
+  fs.writeFileSync(SESSIONS_FILE, JSON.stringify(all));
+  return body;
+}
+
+/** Make the next page loads behave as an already-signed-in electrician of orgSlug. */
+async function signInElectrician(page, account, orgSlug) {
+  const { token, worker } = await workerLogin(page.request, { orgSlug, employeeId: account.employeeId, pin: account.pin });
+  await page.addInitScript(({ token, worker, orgSlug }) => {
+    localStorage.setItem('elec_token', token);
+    localStorage.setItem('elec_user', JSON.stringify(worker || {}));
+    localStorage.setItem('orgSlug', orgSlug);
+    localStorage.setItem('activeModule', 'ele');
+  }, { token, worker, orgSlug });
+  return token;
+}
+
 /** Make the next page loads behave as an already-signed-in admin/supervisor/super-admin. */
 async function signIn(page, kind, account, orgSlug) {
   const { token, user } = await apiLogin(page.request, account);
@@ -123,4 +149,4 @@ async function decodeQrSvg(page, svg) {
   return code ? code.data : null;
 }
 
-module.exports = { seed, db, apiLogin, signIn, orgPage, pickOption, photo, decodeQrSvg };
+module.exports = { seed, db, apiLogin, workerLogin, signIn, signInElectrician, orgPage, pickOption, photo, decodeQrSvg };
