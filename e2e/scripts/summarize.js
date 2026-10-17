@@ -128,6 +128,15 @@ function summarize(report, allowlist = readAllowlist()) {
       const row = { page, project: test.projectName, status, visual, axe };
       if (rulesNote) row.axeRules = JSON.parse(rulesNote.description);
       if (knownNote) row.known = knownNote.description.slice(0, 200);
+      // A screenshot mismatch: where the actual / diff images (and the expected one, when
+      // Playwright copies it) are inside the e2e-traces artifact, whose zip holds
+      // e2e/test-results/ as-is. The expected image is also the committed baseline.
+      if (visual === 'diff') {
+        const images = (last.attachments || []).map((a) => String(a.path || '').replace(/\\/g, '/'))
+          .filter((p) => /-(expected|actual|diff)\.png$/.test(p) && p.includes('test-results/'))
+          .map((p) => p.slice(p.lastIndexOf('test-results/') + 'test-results/'.length));
+        if (images.length) row.diffImages = images.slice(0, 3).join(', ');
+      }
       pages.push(row);
     } else {
       journeys.push({ title: spec.title.slice(0, 160), project: test.projectName, status, durationMs });
