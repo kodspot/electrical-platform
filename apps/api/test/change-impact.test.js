@@ -107,6 +107,12 @@ describe('change-impact: output', () => {
     assert.match(md, /- route `POST \/api\/widgets\/:id\/zap`/);
   });
 
+  it('full commit SHAs are shortened; a change with no affected item says so', () => {
+    const md = toMarkdown(analyze(['docs/a.md'], root), { base: 'a'.repeat(40), head: 'b'.repeat(40) });
+    assert.match(md, /## Change impact — `bbbbbbb` vs `aaaaaaa`/);
+    assert.match(md, /No page, API route or data change\./);
+  });
+
   it('everything covered → no "not covered" section', () => {
     const md = toMarkdown(analyze(['apps/api/public/a-page.html'], root));
     assert.match(md, /Every affected item is covered by a test\./);

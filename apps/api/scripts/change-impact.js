@@ -207,9 +207,11 @@ function toMarkdown(result, { base = '', head = '' } = {}) {
   const pages = by('page');
   const routes = by('route');
   const data = by('data');
-  const lines = [MARKER, `## Change impact${head ? ` — \`${head.slice(0, 7)}\`` : ''}${base ? ` vs \`${base}\`` : ''}`, ''];
+  const short = (ref) => (/^[0-9a-f]{40}$/.test(ref) ? ref.slice(0, 7) : ref);
+  const lines = [MARKER, `## Change impact${head ? ` — \`${short(head)}\`` : ''}${base ? ` vs \`${short(base)}\`` : ''}`, ''];
   lines.push(`${result.files} file(s) changed → **${pages.length} page(s)**, **${routes.length} API route(s)**, **${data.length} data change(s)**. ` +
-    (result.uncovered.length ? `⚠️ **${result.uncovered.length} changed but not covered.**` : 'Every affected item is covered by a test.'));
+    (!result.items.length ? 'No page, API route or data change.'
+      : result.uncovered.length ? `⚠️ **${result.uncovered.length} changed but not covered.**` : 'Every affected item is covered by a test.'));
   lines.push('', '_Deterministic map from the changed files (`apps/api/scripts/change-impact.js`); report-only, never fails the build._');
   if (result.uncovered.length) {
     lines.push('', '### ⚠️ Changed but not covered', '');
