@@ -119,7 +119,7 @@ Playwright against the real app on a disposable `_e2e` database ([ADR 0006](../a
 | J7 | Negative cases | electrician blocked from admin pages/APIs; org B cannot see org A's ticket; wrong PIN; invalid complaint creates nothing |
 | J8 | Worker PIN reset from the email link (Pixel 7) | F12 page; token removed from the address bar; new PIN signs in; link single-use |
 | BUG-0010 (×2) | Electrician and supervisor nav after the module sync | every nav href is `/{org}/ele/{page}` (never the org twice); clicking Tickets / My Work / Scan (supervisor: Electrical / Tickets / Attendance / Scan) answers 200 at that URL and renders the page; a disabled-module link stays hidden |
-| Design/a11y | 10 pages × desktop + mobile | screenshot vs Linux baseline ("no baseline" until generated); axe fails only on critical |
+| Design/a11y (QA-2: every page) | all 42 pages of the explorer list × desktop + mobile, on a fixed-data org with a frozen clock | screenshot vs Linux baseline ("no baseline" until generated); axe fails only on critical (F16 pages: reported as known); design ratchets: colour literals (ci) and axe colour-contrast nodes (e2e) may only go down |
 | Explorer (`explorer.spec.js`, 2026-10-17) | every page × the role that may open it × desktop + mobile; one hop through every link and tab | 200, no login bounce, sync done, nothing stuck loading, no request ≥ 400, no console error, no "not found", no broken image, no slug twice in a link (BUG-0010/BUG-0011), no phone overflow, axe critical 0; forbidden pages redirect. Allow-listed: F16, F17 |
 
 **Explorer coverage (role × page, each on desktop and Pixel 7).** The page list is the route

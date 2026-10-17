@@ -7,9 +7,9 @@ land on the super-admin **Quality** page (`/superadmin-quality`) through the QA 
 
 | When | Workflow / job | What it checks | Fails the build? | On the Quality page |
 |---|---|---|---|---|
-| Every PR, every push to `main` | `deploy.yml` › **Lint & Test** (Node 24) | `npm run ci`: lint, the API suite (unit + integration, on a disposable Postgres), repository checks (`ci-validate`: structure, env, migrations, schema drift, generated docs); dependency audit gate; backup script tests; Docker image smoke test | yes | Unit & integration (source `ci`) |
+| Every PR, every push to `main` | `deploy.yml` › **Lint & Test** (Node 24) | `npm run ci`: lint, the API suite (unit + integration, on a disposable Postgres), repository checks (`ci-validate`: structure, env, migrations, schema drift, generated docs, the **colour-literal design ratchet**); dependency audit gate; backup script tests; Docker image smoke test | yes | Unit & integration (source `ci`) |
 | Every PR, every push to `main` | `deploy.yml` › **Lint & Test (Node 22, report-only)** | the same `npm run ci` on Node 22 | no | — |
-| Every PR touching `apps/api/**` or `e2e/**`; nightly 21:30 UTC; by hand; the Quality page's "Run full test suite now" | `e2e.yml` | the browser suite ([`e2e/README.md`](../../e2e/README.md)): journeys J1–J8, the BUG-0010 nav tests, the **explorer** (every page × every role × desktop + phone, every link), the design/accessibility checks, the Quality page tabs | yes | End-to-end; Explorer and Design (from the same run, source `e2e`) |
+| Every PR touching `apps/api/**` or `e2e/**`; nightly 21:30 UTC; by hand; the Quality page's "Run full test suite now" | `e2e.yml` | the browser suite ([`e2e/README.md`](../../e2e/README.md)): journeys J1–J8, the BUG-0010 nav tests, the **explorer** (every page × every role × desktop + phone, every link), the design/accessibility checks (a screenshot of **every page**, desktop + phone, against its Linux baseline; axe), the Quality page tabs; then the **colour-contrast design ratchet** | yes | End-to-end; Explorer and Design (from the same run, source `e2e`) |
 | Every PR | `change-impact.yml` | the **change impact report** (below) | never | Changes (source `impact`) |
 | Push to `main`, after Lint & Test | `deploy.yml` › **Deploy to Production** | deploys; no test of its own | — | — |
 | After every successful deploy; nightly 22:00 UTC; by hand (Actions › Production smoke) | `deploy.yml` › **Production smoke (read-only)** → `prod-smoke.yml` ([ADR 0009](../adr/0009-post-deploy-production-smoke.md)) | the live site, anonymously, **GET/HEAD only** (enforced): `/health/ready`, the public and login pages of `PROD_SMOKE_ORG_SLUG` (200, no console error, no failed request), static assets, security headers, http → https | the run goes red and alerts through `ALERT_*` when set; it never rolls a deploy back | Production (source `prod-smoke`) |
@@ -17,6 +17,11 @@ land on the super-admin **Quality** page (`/superadmin-quality`) through the QA 
 
 Locally: `npm run ci` (the full gate), `npm run e2e` (the browser suite on a disposable
 database), `npm run bug:test` (the bug registry). See [`apps/api/README.md`](../../apps/api/README.md).
+
+**Design ratchets** (`apps/api/scripts/design-ratchet.js`, `e2e/design-baseline.json`): the
+number of hard-coded colours and of axe colour-contrast violations may only go down. Each
+fails only when its count is higher than the committed baseline; see
+[`e2e/README.md`](../../e2e/README.md#design-ratchets-appsapiscriptsdesign-ratchetjs-design-baselinejson).
 
 ## The change impact report (`apps/api/scripts/change-impact.js`)
 

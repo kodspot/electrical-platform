@@ -113,15 +113,31 @@ function summarize(report, allowlist = readAllowlist()) {
       const visits = (last.annotations || []).filter((a) => a.type === 'explorer').map((a) => JSON.parse(a.description));
       explorerRows.push({ project: test.projectName, status, visits });
     } else if (/visual-a11y\.spec/.test(file)) {
-      const page = spec.title.split(':')[0];
-      const axeNote = annotations.find((a) => a.type === 'axe');
+      // "<page>: screenshot matches …" — a page name may itself contain ':' (scan (/scan/:code)).
+      const page = spec.title.replace(/: screenshot matches[\s\S]*$/, '');
+      const lastNotes = (last.annotations || []).length ? last.annotations : annotations;
+      const axeNote = lastNotes.find((a) => a.type === 'axe');
+      const rulesNote = lastNotes.find((a) => a.type === 'axe-rules');
+      const knownNote = lastNotes.find((a) => a.type === 'axe-known');
       const visualNote = annotations.find((a) => a.type === 'visual');
       const axe = {};
       if (axeNote) for (const m of axeNote.description.matchAll(/(critical|serious|moderate|minor) (\d+)/g)) axe[m[1]] = Number(m[2]);
       let visual = 'not-run';
       if (visualNote) visual = /^no baseline/.test(visualNote.description) ? 'no-baseline' : /^baseline written/.test(visualNote.description) ? 'updated' : 'compared';
       else if (/toHaveScreenshot|screenshot/i.test(error)) visual = 'diff';
-      pages.push({ page, project: test.projectName, status, visual, axe });
+      const row = { page, project: test.projectName, status, visual, axe };
+      if (rulesNote) row.axeRules = JSON.parse(rulesNote.description);
+      if (knownNote) row.known = knownNote.description.slice(0, 200);
+      // A screenshot mismatch: where the actual / diff images (and the expected one, when
+      // Playwright copies it) are inside the e2e-traces artifact, whose zip holds
+      // e2e/test-results/ as-is. The expected image is also the committed baseline.
+      if (visual === 'diff') {
+        const images = (last.attachments || []).map((a) => String(a.path || '').replace(/\\/g, '/'))
+          .filter((p) => /-(expected|actual|diff)\.png$/.test(p) && p.includes('test-results/'))
+          .map((p) => p.slice(p.lastIndexOf('test-results/') + 'test-results/'.length));
+        if (images.length) row.diffImages = images.slice(0, 3).join(', ');
+      }
+      pages.push(row);
     } else {
       journeys.push({ title: spec.title.slice(0, 160), project: test.projectName, status, durationMs });
     }
@@ -134,7 +150,31 @@ function summarize(report, allowlist = readAllowlist()) {
   const durationMs = report.stats && typeof report.stats.duration === 'number' ? Math.round(report.stats.duration) : null;
   const summary = { status, counts, durationMs, journeys, pages, failures };
   if (explorerRows.length) summary.explorer = explorerSection(explorerRows, allowlist);
+  if (pages.length) summary.design = designSection(summary);
   return summary;
+}
+
+/**
+ * The design ratchets (apps/api/scripts/design-ratchet.js) for the Quality page's Design tab:
+ * [{ name, count, baseline, status: ok | better | worse }]. The contrast count is only
+ * meaningful when every page ran, so a partial run (--grep) records it as `partial`.
+ */
+function designSection(summary) {
+  try {
+    const dr = require(path.join(DIR, '..', 'apps', 'api', 'scripts', 'design-ratchet'));
+    const base = dr.readBaseline();
+    const colours = dr.countColourLiterals().count;
+    const contrast = dr.contrastCount(summary);
+    const full = summary.pages.length >= 2 * require(path.join(DIR, 'support', 'explorer')).pages({ slug: 'x', qrCode: 'X', locationId: 'L', reviewToken: 'T' }).length;
+    return {
+      ratchets: [
+        { name: 'colour literals', count: colours, baseline: base.colourLiterals, status: dr.compare(colours, base.colourLiterals) },
+        { name: 'colour contrast (axe nodes)', count: contrast, baseline: base.colourContrastNodes, status: full ? dr.compare(contrast, base.colourContrastNodes) : 'partial' }
+      ]
+    };
+  } catch (err) {
+    return { error: `design ratchets unavailable: ${err.message.split('\n')[0]}`.slice(0, 200) };
+  }
 }
 
 if (require.main === module) {

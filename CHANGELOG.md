@@ -22,6 +22,40 @@ has been git-tagged yet, so everything below is grouped under **Unreleased**.
 Complete and merged into the working tree as of this writing, pending its next deploy —
 see `docs/DEPLOYMENT.md` for how a change reaches production.
 
+### 2026-10-17 (QA-2 design coverage)
+
+- **User-visible (Release Notes):** none; this is test tooling.
+- **`[QA-2]` Visual baselines for every page.** `e2e/tests/visual-a11y.spec.js` takes its
+  page list from the explorer's role map (the route table): 42 pages × desktop + Pixel 7 =
+  84 page views, up from 20.
+  - **The visual org** gets the assets module, a supervisor, a resolved ticket with a fixed
+    review link, an asset with a failure and a default inspection template. Every fixture row
+    is dated, and every page's clock is frozen, at one instant.
+  - **The super-admin pages** use the seed's super-admin (cached login, so the run stays
+    within 9 of the 10 logins per 15 minutes). The dashboard's organization list is
+    answered with two fixed organizations.
+  - **Determinism:** two consecutive local runs on fresh databases match on all 84 views.
+  - **Baselines:** all are regenerated on the PR branch by the E2E workflow's
+    `update_snapshots` and reviewed. `guest-complaint.png` is now `scan.png` (the
+    explorer's name for `/s/:code`).
+  - **Axe:** a critical finding on an F16 page (in the explorer's allow-list) is reported
+    as known (`axe-known`), not failed.
+- **`[QA-2]` Design ratchets** (`apps/api/scripts/design-ratchet.js`,
+  `e2e/design-baseline.json`). Each count may only go down; a check fails only when it is
+  worse, and `--update` lowers the baseline.
+  - **Colour literals:** hex/rgb/hsl outside design-token definitions in `public/**/*.html`
+    and `public/css/**`; 811 today. Checked by `ci-validate` (`npm run ci`).
+  - **Colour contrast:** axe `color-contrast` nodes over every page view. Checked by
+    `e2e.yml` after the suite.
+  - **Summary:** `e2e-summary.json` gains `pages[].axeRules` / `known` / `diffImages` and
+    `design.ratchets`. The Quality page's Design tab shows the ratchets and, for a page whose
+    screenshot differs, where its actual and diff images are inside the `e2e-traces` artifact.
+  - **Tests:** `test/design-ratchet.test.js` (passes at the baseline, fails at +1, lowers
+    with `--update` and never raises; the token/selector exclusions; the contrast sum).
+- **Docs:** `e2e/README.md` (design checks, ratchets), `docs/testing/TESTING.md`,
+  `COVERAGE_MATRIX`. Charter §22: no API, architecture, data-model, deployment, environment or
+  ADR change is triggered.
+
 ### 2026-10-17 (QA-2 production smoke, Quality tabs)
 
 - **User-visible (Release Notes):** super-admins get four new tabs on the Quality page:

@@ -71,23 +71,34 @@ async function checkVisual(page, testInfo, name, maskSelectors = []) {
 }
 
 /**
- * Run axe on the current page. Records counts; fails only on critical violations.
+ * Run axe on the current page. Records counts (per impact, and nodes per rule as an `axe-rules`
+ * annotation — the colour-contrast design ratchet sums them); fails only on critical violations.
+ * @param {{ knownCritical?: string }} [opts] — a tracked finding id (e.g. 'F16') when this page
+ *   is in explorer-allowlist.json for `axe`: its critical violations are then reported as known,
+ *   not failed (the allow-list may only shrink).
  * @returns {Promise<{critical:number, serious:number, moderate:number, minor:number}>}
  */
-async function checkA11y(page, testInfo, name) {
+async function checkA11y(page, testInfo, name, { knownCritical } = {}) {
   await settle(page);
   const results = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa']).analyze();
   const counts = { critical: 0, serious: 0, moderate: 0, minor: 0 };
+  const rules = {};
   const violations = results.violations.map((v) => {
     if (counts[v.impact] !== undefined) counts[v.impact] += v.nodes.length;
+    rules[v.id] = (rules[v.id] || 0) + v.nodes.length;
     return { id: v.id, impact: v.impact, help: v.help, nodes: v.nodes.length, targets: v.nodes.slice(0, 10).map((n) => n.target.join(' ')) };
   });
   testInfo.annotations.push({
     type: 'axe',
     description: `${name}: critical ${counts.critical}, serious ${counts.serious}, moderate ${counts.moderate}, minor ${counts.minor}`
   });
+  testInfo.annotations.push({ type: 'axe-rules', description: JSON.stringify(rules) });
   await testInfo.attach(`axe-${name}.json`, { body: JSON.stringify({ page: name, counts, violations }, null, 2), contentType: 'application/json' });
   const critical = violations.filter((v) => v.impact === 'critical');
+  if (knownCritical && critical.length) {
+    testInfo.annotations.push({ type: 'axe-known', description: `${knownCritical}: ${critical.map((v) => `${v.id} (${v.nodes})`).join(', ')}` });
+    return counts;
+  }
   expect(critical, `critical accessibility violations on ${name}: ${critical.map((v) => `${v.id} (${v.nodes})`).join(', ')}`).toEqual([]);
   return counts;
 }

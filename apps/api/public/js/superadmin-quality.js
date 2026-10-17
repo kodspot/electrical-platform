@@ -359,6 +359,12 @@
     if (diffs.length) {
       html += '<div class="q-warn" role="status">Visual differences: ' + esc(diffs.map(function (p) { return p.page + ' (' + p.project + ')'; }).join(', ')) +
         (run.runUrl ? ' — expected / actual / diff images: ' + safeLink(run.runUrl + '#artifacts', 'e2e-traces artifact') : '') + '</div>';
+      // GitHub serves an artifact as one zip, so each image is named by its path inside it.
+      var withImages = diffs.filter(function (p) { return p.diffImages; });
+      if (withImages.length) {
+        html += '<h3>Diff images (in the e2e-traces artifact)</h3>' + table(['Page', 'Viewport', 'Images'],
+          withImages.map(function (p) { return '<tr>' + td(p.page) + td(p.project) + td(p.diffImages, true) + '</tr>'; }));
+      }
     }
     if (ratchets.length) {
       html += '<h3>Design ratchets</h3>' + table(['Ratchet', 'Now', 'Baseline', 'Status'],

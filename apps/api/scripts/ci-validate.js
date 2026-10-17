@@ -131,6 +131,18 @@ function checkSchemaDrift() {
   else pass('schema drift', r.detail);
 }
 
+// Hard-coded colours in the pages and stylesheets may only go down (QA-2; the contrast
+// ratchet needs a browser and runs in e2e.yml). scripts/design-ratchet.js, e2e/design-baseline.json.
+function checkDesignRatchet() {
+  try {
+    const r = require('./design-ratchet').ratchet('colours');
+    if (r.status === 'worse') fail('design ratchet: colour literals', `${r.count} > baseline ${r.baseline}: use a design token (var(--…)); run node scripts/design-ratchet.js colours for the files`);
+    else pass('design ratchet: colour literals', `${r.count} (baseline ${r.baseline})${r.status === 'better' ? ' — lower: node scripts/design-ratchet.js colours --update' : ''}`);
+  } catch (e) {
+    fail('design ratchet: colour literals', `could not run: ${e.message.split('\n')[0].slice(0, 160)}`);
+  }
+}
+
 const release = process.argv.includes('--release');
 console.log(`\nRepository validation${release ? ' — release readiness' : ''}\n`);
 
@@ -140,6 +152,7 @@ checkEnv();
 checkMigrations();
 checkSchemaDrift();
 checkGenerated();
+checkDesignRatchet();
 
 console.log('');
 if (failures) { console.error(`ci-validate: ${failures} check category(ies) FAILED.`); process.exit(1); }
