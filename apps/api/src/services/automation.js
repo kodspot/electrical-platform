@@ -111,7 +111,11 @@ async function fireAlert(rule, orgId, trigger, data, logger) {
       body,
       entityType: data.entityType || null,
       entityId: data.entityId || null,
-      metadata: data.metadata || null,
+      // The escalation engine re-runs location-scoped actions (assigned supervisors and
+      // electricians, CREATE_TICKET) from the stored alert alone, reading
+      // metadata.locationId / metadata.module. The event payloads carry those at the top
+      // level, so keep them here — without them every such escalation reached no one. [BUG-0019]
+      metadata: data.metadata || (data.locationId ? { locationId: data.locationId, module: data.module || null } : null),
       actionsRun: rule.actions,
       dedupKey
     }

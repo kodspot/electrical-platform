@@ -9,7 +9,7 @@ const { notifyAdmins, notifySupervisors, notifyWorkers, createNotification } = r
 const { notify } = require('../services/notification-service');
 const { escHtml } = require('../lib/email');
 const { getAssignedSupervisorIds, getAssignedWorkerIds, getLocationBreadcrumb } = require('../services/assignment-resolver');
-const { normalizeEnabledModules } = require('../services/module-policy');
+const { normalizeEnabledModules, isModuleEnabled } = require('../services/module-policy');
 const {
   VALID_MODULES,
   DEFAULT_MODULE_ISSUES,
@@ -260,7 +260,7 @@ async function publicRoutes(fastify, opts) {
     // Look up location to get orgId
     const location = await prisma.location.findUnique({
       where: { id: data.locationId },
-      select: { id: true, orgId: true, name: true, isActive: true, org: { select: { status: true } } }
+      select: { id: true, orgId: true, name: true, isActive: true, org: { select: { status: true, enabledModules: true } } }
     });
 
     if (!location || !location.isActive) {
@@ -317,6 +317,12 @@ async function publicRoutes(fastify, opts) {
     const mod = normalizeModuleCode(data.module || 'ele');
     if (!VALID_MODULES.includes(mod)) {
       return reply.code(400).send({ error: 'Invalid module' });
+    }
+    // The same rule POST /tickets enforces for staff: no ticket in a module the
+    // organization has not enabled (the QR page offers only its enabled modules, but a
+    // page left open while a module is switched off, or a crafted request, does not). [BUG-0020]
+    if (!isModuleEnabled(location.org, mod)) {
+      return reply.code(400).send({ error: 'This facility does not take complaints for that service' });
     }
 
     const issueType = String(data.issueType || '').trim().toUpperCase();
@@ -599,7 +605,8 @@ async function publicRoutes(fastify, opts) {
         reviewStatus: true,
         reviewExpiresAt: true,
         assignedToId: true,
-        location: { select: { name: true } }
+        location: { select: { name: true } },
+        resolvedWorkers: { select: { id: true } }
       }
     });
 
@@ -648,7 +655,11 @@ async function publicRoutes(fastify, opts) {
       return { success: true, message: 'Thank you for confirming the resolution!' };
     }
 
-    // REJECT: reopen ticket, clear assignee so it goes back to pool
+    // REJECT: reopen ticket, clear assignee so it goes back to pool. The electricians who
+    // resolved it are disconnected too, as the supervisor's reopen does: still connected, the
+    // ticket stayed out of their pool and their app showed it "Done" with no way to pick it
+    // up again. The resolution itself (photo, note) and the guest's verdict stay. [BUG-0026]
+    const resolverIds = (ticket.resolvedWorkers || []).map((w) => w.id);
     await prisma.ticket.update({
       where: { reviewToken: token },
       data: {
@@ -656,7 +667,8 @@ async function publicRoutes(fastify, opts) {
         reviewNote: data.note?.trim() || null,
         reviewedAt: now,
         status: 'OPEN',
-        assignedToId: null
+        assignedToId: null,
+        resolvedWorkers: { set: [] }
       }
     });
 
@@ -690,6 +702,16 @@ async function publicRoutes(fastify, opts) {
         entityId: ticket.id
       }).catch(() => {});
     }
+
+    // ...and tell them, with the guest's words. [BUG-0026]
+    notify({
+      orgId: ticket.orgId,
+      to: { workerIds: resolverIds },
+      type: 'ticket_review_rejected',
+      title: 'The guest says it is not fixed',
+      body: ticket.title + (data.note?.trim() ? ' — ' + data.note.trim() : ''),
+      entityId: ticket.id
+    }).catch(() => {});
 
     return { success: true, message: 'Your feedback has been recorded. The issue will be re-opened for further attention.' };
   });

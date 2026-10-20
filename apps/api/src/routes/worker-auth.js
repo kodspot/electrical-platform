@@ -518,6 +518,12 @@ async function workerAuthRoutes(fastify) {
     if (ticket.status === TICKET_STATUSES.CLOSED || ticket.status === TICKET_STATUSES.CANCELLED) {
       return reply.code(400).send({ error: 'Ticket is already closed' });
     }
+    // Only work still to be done can be resolved — the same statuses the app offers
+    // "Resolve With Photo" for. A ticket waiting for verification, or already verified,
+    // must not be sent back to RESOLVED_PENDING_VERIFY by an electrician. [BUG-0015]
+    if (!isActiveLikeStatus(ticket.status)) {
+      return reply.code(400).send({ error: 'This ticket is already resolved' });
+    }
 
     const fieldValue = (f) => {
       if (f == null) return undefined;
