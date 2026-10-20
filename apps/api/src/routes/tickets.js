@@ -62,6 +62,8 @@ async function autoCloseExpiredReviews(orgId) {
       where: {
         orgId,
         source: 'PUBLIC',
+        // Only a resolution awaiting the guest's review is auto-accepted. [BUG-0016]
+        status: TICKET_STATUSES.RESOLVED,
         reviewStatus: 'PENDING',
         reviewExpiresAt: { lt: new Date() }
       },
@@ -375,6 +377,14 @@ async function ticketRoutes(fastify, opts) {
       updateData.verifyNote = null;
       updateData.resolvedWorkers = { set: [] };
     }
+    // ...and withdraw a guest review that is still pending: its link would otherwise
+    // still CONFIRM (close) the reopened ticket, and the lazy auto-close would close it
+    // when the review window ran out. [BUG-0016]
+    if (data.status && ACTIVE_TICKET_STATUSES.includes(data.status) && ticket.reviewStatus === 'PENDING') {
+      updateData.reviewToken = null;
+      updateData.reviewExpiresAt = null;
+      updateData.reviewStatus = null;
+    }
 
     const updated = await prisma.ticket.update({
       where: { id },
@@ -632,7 +642,7 @@ async function ticketRoutes(fastify, opts) {
     });
     const data = schema.parse(request.body || {});
 
-    const ticket = await prisma.ticket.findFirst({ where: { id, orgId } });
+    const ticket = await prisma.ticket.findFirst({ where: { id, orgId }, include: { resolvedWorkers: { select: { id: true } } } });
     if (!ticket) return reply.code(404).send({ error: 'Ticket not found' });
     if (ticket.status !== TICKET_STATUSES.RESOLVED_PENDING_VERIFY) {
       return reply.code(400).send({ error: 'Only RESOLVED_PENDING_VERIFY tickets can be verified' });
@@ -649,8 +659,9 @@ async function ticketRoutes(fastify, opts) {
       verifyNote: data.note?.trim() || null
     };
 
-    // Generate review token for PUBLIC tickets
-    if (ticket.source === 'PUBLIC' && !ticket.reviewToken) {
+    // Generate a review token for PUBLIC tickets — a fresh one unless a review is already
+    // pending: after a guest rejected the last fix, the old token is spent. [BUG-0017]
+    if (ticket.source === 'PUBLIC' && ticket.reviewStatus !== 'PENDING') {
       updateData.reviewToken = crypto.randomBytes(32).toString('hex');
       updateData.reviewExpiresAt = new Date(Date.now() + 30 * 60 * 1000);
       updateData.reviewStatus = 'PENDING';
@@ -682,10 +693,15 @@ async function ticketRoutes(fastify, opts) {
       entityId: id
     }).catch(() => {});
 
-    // Notify workers who resolved it
-    if (ticket.resolvedWorkers) {
-      // resolvedWorkers loaded via TICKET_INCLUDE
-    }
+    // Tell the electricians who resolved it that their work was accepted. [BUG-0018]
+    notify({
+      orgId,
+      to: { workerIds: ticket.resolvedWorkers.map((w) => w.id) },
+      type: 'ticket_verified',
+      title: 'Your work was verified',
+      body: updated.title + (updated.location ? ' — ' + updated.location.name : ''),
+      entityId: id
+    }).catch(() => {});
 
     const response = { ...updated };
     if (updated.reviewToken) {
@@ -707,7 +723,7 @@ async function ticketRoutes(fastify, opts) {
     });
     const data = schema.parse(request.body || {});
 
-    const ticket = await prisma.ticket.findFirst({ where: { id, orgId } });
+    const ticket = await prisma.ticket.findFirst({ where: { id, orgId }, include: { resolvedWorkers: { select: { id: true } } } });
     if (!ticket) return reply.code(404).send({ error: 'Ticket not found' });
     if (ticket.status !== TICKET_STATUSES.RESOLVED_PENDING_VERIFY) {
       return reply.code(400).send({ error: 'Only RESOLVED_PENDING_VERIFY tickets can be reopened this way' });
@@ -741,11 +757,20 @@ async function ticketRoutes(fastify, opts) {
       }
     });
 
-    // Notify workers assigned to this location that ticket was rejected
     notifyAdmins(orgId, {
       type: 'ticket_reopened',
       title: 'Ticket resolution rejected',
       body: updated.title + (updated.location ? ' — ' + updated.location.name : ''),
+      entityId: id
+    }).catch(() => {});
+
+    // Tell the electricians whose resolution was rejected, with the reason. [BUG-0018]
+    notify({
+      orgId,
+      to: { workerIds: ticket.resolvedWorkers.map((w) => w.id) },
+      type: 'ticket_reopened',
+      title: 'Your fix was sent back',
+      body: updated.title + (data.note?.trim() ? ' — ' + data.note.trim() : ''),
       entityId: id
     }).catch(() => {});
 

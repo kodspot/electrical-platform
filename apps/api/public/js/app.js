@@ -1273,7 +1273,8 @@ window.App = (function () {
           el.classList.add('read');
         }
         // Navigate to relevant page
-        if (entityId && (type === 'ticket_assigned' || type === 'ticket_resolved' || type === 'public_complaint' || type === 'ticket_pending_verify' || type === 'ticket_picked_up')) {
+        if (entityId && (type === 'ticket_assigned' || type === 'ticket_resolved' || type === 'public_complaint' || type === 'ticket_pending_verify' || type === 'ticket_picked_up' ||
+            type === 'ticket_verified' || type === 'ticket_reopened' || type === 'ticket_review_rejected')) {
           _notifPanelEl.classList.remove('open');
           var base = _notifPage === 'supervisor' ? orgPath('supervisor-tickets')
             : _notifPage === 'electrician' ? orgPath('electrician-tickets')
