@@ -49,6 +49,47 @@ see `docs/DEPLOYMENT.md` for how a change reaches production.
   since F15), ESCALATION_CHECKS, W2 and the complaints module; `module-system.md` (tickets only
   in enabled modules).
 
+### 2026-10-20 (bug hunt: the ticket lifecycle, every role)
+
+- **User-visible (Release Notes):** electricians are told when their fix is verified or sent
+  back (with the reason), and when a guest rejects it — the ticket is back in their pool; a
+  reopened public complaint can no longer be closed by its old guest review link; a guest can
+  review the next fix after rejecting one.
+- **`[BUG-0015]` An electrician could re-resolve a verified ticket.**
+  - **Cause:** `POST /worker/tickets/:id/resolve` refused only CLOSED/CANCELLED, so a
+    RESOLVED (verified) or RESOLVED_PENDING_VERIFY ticket went back to pending verification.
+  - **Fix:** only OPEN, ACKNOWLEDGED, ASSIGNED, IN_PROGRESS and ON_HOLD can be resolved (the
+    statuses the app offers it for); anything else answers 400.
+- **`[BUG-0016]` A reopened public ticket could be closed by its old review.**
+  - **Cause:** `PATCH /tickets/:id` back to an active status cleared the resolution but not the
+    pending guest review; the old link still CONFIRMED (closed) it, and the lazy auto-close
+    closed it once the window passed.
+  - **Fix:** that PATCH withdraws a pending review (token, status, expiry), and
+    `autoCloseExpiredReviews` only closes RESOLVED tickets.
+- **`[BUG-0017]` No second guest review after a rejection.** Verify issued a review link only
+  when the ticket had no token at all; after a rejection the spent token blocked it. It now
+  issues a fresh one unless a review is pending.
+- **`[BUG-0018]` The electrician was never told the outcome.** Verify and reopen notified only
+  the admins. Both now notify the resolving electricians through `notify()` (`to.workerIds`):
+  `ticket_verified`, and `ticket_reopened` with the supervisor's note. Clicking a
+  `ticket_verified`, `ticket_reopened` or `ticket_review_rejected` notification now opens the
+  tickets page (`public/js/app.js`), like the other ticket notifications.
+- **`[BUG-0026]` A guest-rejected ticket was stuck for its electrician.** The guest's REJECT
+  reopened the ticket but left the electrician connected (`resolvedWorkers`), so it was out of
+  their pool and their app showed it "Done" with no Pick Up. It now disconnects them (as the
+  supervisor's reopen does) and notifies them (`ticket_review_rejected`, with the guest's note);
+  the photo, the notes and the guest's verdict stay on the ticket.
+- **Tests:**
+  - `test/integration/ticket-resolve-verify.test.js` (11): staff and electrician resolve with
+    real photo uploads (`STORAGE_DRIVER=local`), verify, reopen and the guest review, for the
+    admin, the assigned supervisor, another supervisor, another org, the electrician and the
+    guest; it closes the COVERAGE_MATRIX gaps on `/resolve` and `/verify`.
+  - `test/integration/public-complaint-chain.test.js` (3): the QR routes, a complaint with a
+    photo, the hierarchy auto-assignment, and exactly who is notified (W1/W3 P1 gaps).
+  - Journey J9 (`e2e/tests/journeys.spec.js`): reject with a reason → the electrician's bell →
+    redo → verify → the bell.
+  - Registry BUG-0015…BUG-0018 and BUG-0026. Each was red on `main` first.
+
 ### 2026-10-18 (UI fixes found by the tester)
 
 - **User-visible (Release Notes):** every admin page has the same working menu. Analytics shows

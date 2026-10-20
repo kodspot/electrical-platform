@@ -65,7 +65,8 @@ Codegen points at your **dev** server and dev data. Use what it records as a sta
   - `journeys.spec.js`: J1–J7, desktop project only. J1–J6 are one ordered story (QR,
     guest complaint, electrician, supervisor, internal ticket), and the steps that happen
     on a phone open their own Pixel 7 context. J7 holds the negative cases (role, tenant,
-    wrong PIN, invalid complaint).
+    wrong PIN, invalid complaint). J9 (BUG-0018): the supervisor sends a fix back with a
+    reason, the electrician sees it in their bell, redoes it, and is told when it is verified.
   - **BUG-0010 (in `journeys.spec.js`):** "electrician nav links work after module sync" and
     "supervisor nav links work after module sync".
     - **They wait** for `/api/auth/worker-me` (`/api/auth/me`) and the module sync, then

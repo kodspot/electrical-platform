@@ -30,10 +30,15 @@ Commands: `npm run bug:list` · `npm run bug:run -- <ID>` · `npm run bug:valida
 | BUG-0012 | MEDIUM | FIXED | ele | Admin analytics showed "undefined" for inspection records, flagged records and the location breakdown | `test/integration/bug-regressions.test.js; e2e/tests/explorer.spec.js › rawValue check (admin › admin-analytics)` |
 | BUG-0013 | MEDIUM | FIXED | ele | Four admin pages had no working admin nav (assets, electrical, failures: run-together links and a too-wide page on phones; predictions: none at all) | `test/integration/bug-regressions.test.js; e2e/tests/explorer.spec.js › nav and overflow checks (admin pages)` |
 | BUG-0014 | LOW | FIXED | ele | The admin Alerts page was always dark, unlike every other admin page | `test/integration/bug-regressions.test.js; e2e visual baseline admin-alerts` |
+| BUG-0015 | HIGH | FIXED | ele | An electrician could "resolve" a ticket that a supervisor had already verified, sending it back to verification | `test/integration/ticket-resolve-verify.test.js` |
+| BUG-0016 | HIGH | FIXED | complaints | A reopened public ticket could still be closed by the guest's old review link, or by the review auto-close | `test/integration/ticket-resolve-verify.test.js` |
+| BUG-0017 | MEDIUM | FIXED | complaints | After a guest rejected a fix, the next verified fix never got a guest review | `test/integration/ticket-resolve-verify.test.js` |
+| BUG-0018 | MEDIUM | FIXED | ele | The electrician was never told that their fix was verified, or that it was sent back and why | `test/integration/ticket-resolve-verify.test.js` |
 | BUG-0019 | HIGH | FIXED | ele | Alert escalations never reached the supervisors or electricians of the location, nor raised their ticket | `test/integration/alert-escalation.test.js` |
 | BUG-0020 | MEDIUM | FIXED | complaints | A guest complaint could be filed under a module the organization had not enabled | `test/integration/authz-sweep.test.js` |
+| BUG-0026 | MEDIUM | FIXED | complaints | After a guest rejected a fix, the electrician who did it saw the ticket as "Done" and could not pick it up again | `test/integration/ticket-resolve-verify.test.js` |
 
-Count: 16 bug scenario(s).
+Count: 21 bug scenario(s).
 
 ## BUG-0001 — Admin could set a ticket to RESOLVED_PENDING_VERIFY directly
 
@@ -285,6 +290,79 @@ Count: 16 bug scenario(s).
 1. Sign in as an admin and open /{org}/ele/admin-alerts.
 2. Broken: a dark page. Fixed: the light admin theme.
 
+## BUG-0015 — An electrician could "resolve" a ticket that a supervisor had already verified, sending it back to verification
+
+- **Severity:** HIGH · **Status:** FIXED · **Module:** ele · **Category:** ticket-workflow
+- **Origin:** Bug hunt 2026-10-20 (ticket lifecycle, every role)
+- **Introduced:** pre-audit · **Fixed:** 2026-10-20
+- **Description:** POST /worker/tickets/:id/resolve refused only CLOSED and CANCELLED tickets. A verified (RESOLVED) ticket, or one already waiting for verification, could be resolved again: a verified ticket dropped back to RESOLVED_PENDING_VERIFY and its proof photo was replaced. The electrician app only offers "Resolve With Photo" on open and in-progress tickets; the server did not enforce it.
+- **Root cause:** worker-auth.js resolve checked status against CLOSED/CANCELLED only, not against the active statuses (OPEN, ACKNOWLEDGED, ASSIGNED, IN_PROGRESS, ON_HOLD) the UI allows.
+- **Expected behavior:** Resolving a RESOLVED or RESOLVED_PENDING_VERIFY ticket answers 400 and leaves the ticket unchanged; resolving straight from OPEN stays allowed.
+- **Broken behavior:** 200: a verified ticket became RESOLVED_PENDING_VERIFY again, with the new photo.
+- **Scenario dependencies:** —
+- **Regression test:** `test/integration/ticket-resolve-verify.test.js`
+
+**Reproduction steps:**
+
+1. Create an org, a location, an electrician covering it, and a RESOLVED (verified) ticket there.
+2. As the electrician, POST /api/worker/tickets/:id/resolve with a proof photo.
+3. Broken: 200 and status RESOLVED_PENDING_VERIFY. Fixed: 400 and status still RESOLVED.
+
+## BUG-0016 — A reopened public ticket could still be closed by the guest's old review link, or by the review auto-close
+
+- **Severity:** HIGH · **Status:** FIXED · **Module:** complaints · **Category:** ticket-workflow
+- **Origin:** Bug hunt 2026-10-20 (ticket lifecycle, every role)
+- **Introduced:** pre-audit · **Fixed:** 2026-10-20
+- **Description:** When an admin moved a resolved public ticket back to an active status (PATCH /tickets/:id), the resolution fields were cleared but the pending guest review was not. The old review link still CONFIRMED the resolution — closing a ticket that was being worked on again — and once the 30-minute review window passed, the lazy auto-close on GET /tickets closed it too.
+- **Root cause:** tickets.js PATCH cleared resolvedAt/verifiedAt and friends but not reviewToken/reviewStatus/reviewExpiresAt; autoCloseExpiredReviews closed any PUBLIC ticket with a PENDING review, whatever its status.
+- **Expected behavior:** Moving a ticket back to an active status withdraws a pending guest review (the link answers 404), and the auto-close only ever closes RESOLVED tickets.
+- **Broken behavior:** The guest's CONFIRM answered 200 and the reopened ticket became CLOSED.
+- **Scenario dependencies:** —
+- **Regression test:** `test/integration/ticket-resolve-verify.test.js`
+
+**Reproduction steps:**
+
+1. Create an org with an admin and a PUBLIC ticket that is RESOLVED with a PENDING guest review.
+2. As the admin, PATCH /api/tickets/:id { status: "IN_PROGRESS" }.
+3. As the guest, POST /api/public/review/:token { action: "CONFIRM" }.
+4. Broken: 200 and the ticket is CLOSED. Fixed: 404 and the ticket stays IN_PROGRESS.
+
+## BUG-0017 — After a guest rejected a fix, the next verified fix never got a guest review
+
+- **Severity:** MEDIUM · **Status:** FIXED · **Module:** complaints · **Category:** ticket-workflow
+- **Origin:** Bug hunt 2026-10-20 (ticket lifecycle, every role)
+- **Introduced:** pre-audit · **Fixed:** 2026-10-20
+- **Description:** POST /tickets/:id/verify issued a guest review link only when the ticket had no review token at all. After a guest rejected the first resolution, the ticket kept its spent (REJECTED) token, so verifying the second fix issued no new link: the supervisor was handed the old one, which says "already reviewed", and the ticket stayed RESOLVED instead of going to the guest.
+- **Root cause:** tickets.js verify tested `!ticket.reviewToken` instead of whether a review is currently pending.
+- **Expected behavior:** Verifying a public ticket issues a fresh review link unless a review is already pending.
+- **Broken behavior:** The response carried the old, already-rejected link; the guest could not review the second fix.
+- **Scenario dependencies:** —
+- **Regression test:** `test/integration/ticket-resolve-verify.test.js`
+
+**Reproduction steps:**
+
+1. Create a PUBLIC ticket in RESOLVED_PENDING_VERIFY whose earlier review the guest REJECTED.
+2. As the admin, POST /api/tickets/:id/verify.
+3. Broken: reviewUrl is the old token ("already reviewed"). Fixed: a new token whose review page is pending.
+
+## BUG-0018 — The electrician was never told that their fix was verified, or that it was sent back and why
+
+- **Severity:** MEDIUM · **Status:** FIXED · **Module:** ele · **Category:** notification
+- **Origin:** Bug hunt 2026-10-20 (ticket lifecycle, every role)
+- **Introduced:** pre-audit · **Fixed:** 2026-10-20
+- **Description:** POST /tickets/:id/verify and POST /tickets/:id/reopen notified only the admins. The code comments said "notify workers", but the electrician who resolved the ticket got nothing: a rejected fix silently reappeared as in-progress, with the supervisor's reason visible nowhere in their app.
+- **Root cause:** tickets.js verify had an empty "Notify workers who resolved it" block; reopen called notifyAdmins under a "notify workers" comment.
+- **Expected behavior:** Verify notifies the ticket's resolving electricians (ticket_verified); reopen does too (ticket_reopened), with the supervisor's note.
+- **Broken behavior:** No Notification row for the electrician on either action.
+- **Scenario dependencies:** —
+- **Regression test:** `test/integration/ticket-resolve-verify.test.js`
+
+**Reproduction steps:**
+
+1. Create two RESOLVED_PENDING_VERIFY tickets resolved by an electrician.
+2. As the admin, verify one and reopen the other with a note.
+3. Broken: the electrician has no notification. Fixed: ticket_verified and ticket_reopened (with the note).
+
 ## BUG-0019 — Alert escalations never reached the supervisors or electricians of the location, nor raised their ticket
 
 - **Severity:** HIGH · **Status:** FIXED · **Module:** ele · **Category:** notification
@@ -320,4 +398,22 @@ Count: 16 bug scenario(s).
 1. Create an org with enabledModules ["ele"] and a location.
 2. As a guest, POST /api/public/complaint { locationId, module: "civil", issueType: "PLUMBING_LEAK" }.
 3. Broken: 200 and a civil ticket. Fixed: 400 and no ticket.
+
+## BUG-0026 — After a guest rejected a fix, the electrician who did it saw the ticket as "Done" and could not pick it up again
+
+- **Severity:** MEDIUM · **Status:** FIXED · **Module:** complaints · **Category:** ticket-workflow
+- **Origin:** Bug hunt 2026-10-20 (ticket lifecycle, every role)
+- **Introduced:** pre-audit · **Fixed:** 2026-10-20
+- **Description:** POST /api/public/review/:token with REJECT reopened the ticket (OPEN, unassigned) but left the resolving electricians connected to it. The worker pool excludes tickets the electrician is connected to, and the app shows a connected OPEN ticket with neither Pick Up nor Resolve, only "✓ Done": the electrician who knew the job could not take it back, and nobody told them the guest said it was not fixed.
+- **Root cause:** public.js REJECT updated status/assignee/review fields only; the supervisor's /reopen already clears resolvedWorkers for this reason.
+- **Expected behavior:** A guest rejection disconnects the resolving electricians (the ticket is back in their pool) and notifies them with the guest's note; the guest's verdict and note stay on the ticket.
+- **Broken behavior:** The ticket was missing from the electrician's pool and showed "Done" in their app; no notification.
+- **Scenario dependencies:** —
+- **Regression test:** `test/integration/ticket-resolve-verify.test.js`
+
+**Reproduction steps:**
+
+1. Create a PUBLIC ticket, RESOLVED by an electrician, with a pending guest review.
+2. As the guest, POST /api/public/review/:token { action: "REJECT", note }.
+3. Broken: the electrician is still in resolvedWorkers and has no notification. Fixed: disconnected, and a ticket_review_rejected notification with the note.
 

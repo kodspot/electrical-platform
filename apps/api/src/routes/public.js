@@ -605,7 +605,8 @@ async function publicRoutes(fastify, opts) {
         reviewStatus: true,
         reviewExpiresAt: true,
         assignedToId: true,
-        location: { select: { name: true } }
+        location: { select: { name: true } },
+        resolvedWorkers: { select: { id: true } }
       }
     });
 
@@ -654,7 +655,11 @@ async function publicRoutes(fastify, opts) {
       return { success: true, message: 'Thank you for confirming the resolution!' };
     }
 
-    // REJECT: reopen ticket, clear assignee so it goes back to pool
+    // REJECT: reopen ticket, clear assignee so it goes back to pool. The electricians who
+    // resolved it are disconnected too, as the supervisor's reopen does: still connected, the
+    // ticket stayed out of their pool and their app showed it "Done" with no way to pick it
+    // up again. The resolution itself (photo, note) and the guest's verdict stay. [BUG-0026]
+    const resolverIds = (ticket.resolvedWorkers || []).map((w) => w.id);
     await prisma.ticket.update({
       where: { reviewToken: token },
       data: {
@@ -662,7 +667,8 @@ async function publicRoutes(fastify, opts) {
         reviewNote: data.note?.trim() || null,
         reviewedAt: now,
         status: 'OPEN',
-        assignedToId: null
+        assignedToId: null,
+        resolvedWorkers: { set: [] }
       }
     });
 
@@ -696,6 +702,16 @@ async function publicRoutes(fastify, opts) {
         entityId: ticket.id
       }).catch(() => {});
     }
+
+    // ...and tell them, with the guest's words. [BUG-0026]
+    notify({
+      orgId: ticket.orgId,
+      to: { workerIds: resolverIds },
+      type: 'ticket_review_rejected',
+      title: 'The guest says it is not fixed',
+      body: ticket.title + (data.note?.trim() ? ' — ' + data.note.trim() : ''),
+      entityId: ticket.id
+    }).catch(() => {});
 
     return { success: true, message: 'Your feedback has been recorded. The issue will be re-opened for further attention.' };
   });
