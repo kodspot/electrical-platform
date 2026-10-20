@@ -366,11 +366,13 @@ async function superadminRoutes(fastify, opts) {
       type: z.string().max(50).optional(),
       address: z.string().max(500).optional(),
       phone: z.string().max(20).optional(),
-      email: z.string().email().max(200).optional(),
+      // The dashboard sends '' for an empty Email field, as it does on edit. [BUG-0023]
+      email: z.string().email().max(200).optional().or(z.literal('')),
       enabledModules: z.array(z.enum(VALID_MODULES)).min(1).optional()
     });
 
     const data = schema.parse(request.body);
+    if (data.email === '') data.email = null;
     if (!data.enabledModules) data.enabledModules = ['ele'];
 
     const activationCheck = await validateActivationPlan({

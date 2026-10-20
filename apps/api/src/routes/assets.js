@@ -44,7 +44,11 @@ const createAssetSchema = z.object({
   metadata: z.record(z.any()).optional()
 });
 
-const updateAssetSchema = createAssetSchema.partial();
+// On edit, null clears the two numeric fields (the form sends null for a cleared one). [BUG-0021]
+const updateAssetSchema = createAssetSchema.partial().extend({
+  maintenanceCycleDays: z.number().int().min(1).max(3650).nullable().optional(),
+  purchaseCost: z.number().min(0).nullable().optional()
+});
 
 async function assetRoutes(fastify, opts) {
   fastify.addHook('preHandler', authenticateJWT);

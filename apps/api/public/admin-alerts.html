@@ -438,7 +438,8 @@ $('ruleForm').addEventListener('submit', async function(e){
 
   var body = {
     name: $('rfName').value.trim(),
-    description: $('rfDesc').value.trim()||undefined,
+    // On edit, a cleared description is sent as null so it is cleared. [BUG-0021]
+    description: $('rfDesc').value.trim()||(editingRuleId?null:undefined),
     trigger: selectedTrigger,
     conditions: conditions,
     actions: actions,

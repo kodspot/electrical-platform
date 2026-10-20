@@ -77,6 +77,17 @@ Codegen points at your **dev** server and dev data. Use what it records as a sta
   - `*.mobile.spec.js`: phone-only journeys, run in `chromium-mobile` only. For example,
     J8 is the worker PIN reset from the emailed link.
   - `explorer.spec.js`: the explorer, an automated manual tester (below), in both projects.
+  - `forms.spec.js`: every button and form the explorer does not press (it only follows links
+    and tabs), desktop project only, in the explorer org. Each form gets an invalid submit (the
+    server's or the page's error is shown, nothing changes), a valid one (the change shows and
+    survives a reload) and its destructive actions (deactivate, delete, the 409 rules):
+    electricians (create, edit, PIN, deactivate, delete), supervisors (duplicate email, password
+    rule, delete with history → 409), assets, locations and alert rules (clearing a field on
+    edit, BUG-0021), alert acknowledge, categories, templates, failures, the supervisor's asset
+    events and failures (BUG-0024), duty roster and attendance (BUG-0025), a hand-typed QR code
+    on both scan pages, a submitted inspection flagged by the admin, the scan page on a browser
+    without BarcodeDetector (BUG-0022), and the super-admin's organization create / edit /
+    module activation / enter / delete (BUG-0023).
   - `visual-a11y.spec.js`: the design and accessibility checks (below), in both projects.
 - **Every journey checks two things:** what the user sees, and the database or API state
   behind it (through the app's own Prisma client). There are no fixed sleeps, only

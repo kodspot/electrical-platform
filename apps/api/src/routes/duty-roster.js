@@ -3,6 +3,7 @@
 const { z } = require('zod');
 const { prisma } = require('../lib/prisma');
 const { authenticateJWT, requirePolicy } = require('../middleware/auth');
+const { getAssignedWorkerIds } = require('../services/assignment-resolver');
 
 const VALID_SHIFTS = ['MORNING', 'AFTERNOON', 'NIGHT', 'GENERAL'];
 
@@ -245,16 +246,18 @@ async function dutyRosterRoutes(fastify) {
       return reply.code(400).send({ error: 'locationId required' });
     }
 
-    // Get workers assigned to this location via WorkerAssignment (admin defaults)
-    const assigned = await prisma.workerAssignment.findMany({
-      where: { locationId, orgId },
-      include: {
-        worker: { select: { id: true, name: true, employeeId: true, isActive: true } }
-      }
-    });
-    const suggested = assigned
-      .filter(a => a.worker.isActive)
-      .map(a => a.worker);
+    // The electricians covering this location: assigned to it, or to an ancestor with
+    // coverChildren — the same coverage the complaint ring and the electrician app use
+    // (assignment-resolver). Only direct assignments counted before, so a floor or room
+    // covered from its building suggested no one. [BUG-0025]
+    const coveringIds = await getAssignedWorkerIds(locationId, orgId);
+    const covering = coveringIds.length
+      ? await prisma.worker.findMany({
+        where: { id: { in: coveringIds }, orgId, isActive: true },
+        select: { id: true, name: true, employeeId: true, isActive: true }
+      })
+      : [];
+    const suggested = coveringIds.map((id) => covering.find((w) => w.id === id)).filter(Boolean);
 
     // Also get ALL active workers for the "add more" list
     const allWorkers = await prisma.worker.findMany({
