@@ -22,7 +22,9 @@ const BUGS_LIST = [
   require('./bug-0011-hidden-nav-link-double-prefix'),
   require('./bug-0012-analytics-undefined-fields'),
   require('./bug-0013-admin-pages-without-admin-shell'),
-  require('./bug-0014-admin-alerts-forced-dark-theme')
+  require('./bug-0014-admin-alerts-forced-dark-theme'),
+  require('./bug-0019-escalation-reaches-no-one-at-location'),
+  require('./bug-0020-complaint-in-disabled-module')
 ];
 
 const BUGS = Object.fromEntries(BUGS_LIST.map((b) => [b.id, b]));

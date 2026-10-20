@@ -9,7 +9,7 @@ const { notifyAdmins, notifySupervisors, notifyWorkers, createNotification } = r
 const { notify } = require('../services/notification-service');
 const { escHtml } = require('../lib/email');
 const { getAssignedSupervisorIds, getAssignedWorkerIds, getLocationBreadcrumb } = require('../services/assignment-resolver');
-const { normalizeEnabledModules } = require('../services/module-policy');
+const { normalizeEnabledModules, isModuleEnabled } = require('../services/module-policy');
 const {
   VALID_MODULES,
   DEFAULT_MODULE_ISSUES,
@@ -260,7 +260,7 @@ async function publicRoutes(fastify, opts) {
     // Look up location to get orgId
     const location = await prisma.location.findUnique({
       where: { id: data.locationId },
-      select: { id: true, orgId: true, name: true, isActive: true, org: { select: { status: true } } }
+      select: { id: true, orgId: true, name: true, isActive: true, org: { select: { status: true, enabledModules: true } } }
     });
 
     if (!location || !location.isActive) {
@@ -317,6 +317,12 @@ async function publicRoutes(fastify, opts) {
     const mod = normalizeModuleCode(data.module || 'ele');
     if (!VALID_MODULES.includes(mod)) {
       return reply.code(400).send({ error: 'Invalid module' });
+    }
+    // The same rule POST /tickets enforces for staff: no ticket in a module the
+    // organization has not enabled (the QR page offers only its enabled modules, but a
+    // page left open while a module is switched off, or a crafted request, does not). [BUG-0020]
+    if (!isModuleEnabled(location.org, mod)) {
+      return reply.code(400).send({ error: 'This facility does not take complaints for that service' });
     }
 
     const issueType = String(data.issueType || '').trim().toUpperCase();

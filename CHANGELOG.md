@@ -22,6 +22,33 @@ has been git-tagged yet, so everything below is grouped under **Unreleased**.
 Complete and merged into the working tree as of this writing, pending its next deploy —
 see `docs/DEPLOYMENT.md` for how a change reaches production.
 
+### 2026-10-20 (bug hunt: authorization sweep and the escalation scheduler)
+
+- **User-visible (Release Notes):** alert escalations now reach the supervisors and
+  electricians responsible for the location, and can raise their ticket.
+- **`[BUG-0019]` Escalations reached no one at the location.**
+  - **Cause:** `runEscalationChecks` reads the location from `alert.metadata.locationId`, but
+    `fireAlert` stored `data.metadata || null` and no event payload has `metadata` (they carry
+    `locationId` at the top level). NOTIFY_ASSIGNED_SUPERVISORS / _WORKERS and CREATE_TICKET
+    returned early on every escalation.
+  - **Fix:** `fireAlert` records `{ locationId, module }` when the payload has a location.
+    Alerts raised before this change still have no location (no data migration).
+- **`[BUG-0020]` A guest complaint could be filed in a disabled module.**
+  `POST /api/public/complaint` checked the module code against the platform's list only; it
+  now also requires the org to have it enabled (400), as `POST /api/tickets` already did.
+- **Tests:**
+  - `test/integration/alert-escalation.test.js` (4): ESCALATION_CHECKS on back-dated alerts
+    raised through `POST /api/tickets` — timing, the second window, `maxEscalations`,
+    acknowledged alerts, inactive rules, recipients, CREATE_TICKET, tenant scoping.
+  - `test/integration/authz-sweep.test.js` (5): all 37 id-taking mutating staff routes called
+    by another org with a valid body (each answers 404 and changes nothing); role boundaries
+    (electrician → staff 401, supervisor → admin 403, admin → super-admin 403); a suspended
+    org; a disabled module; BUG-0020.
+  - Registry BUG-0019, BUG-0020, both red on `main` first.
+- **Docs:** COVERAGE_MATRIX: the `images.js` row (another org's image already answers 404,
+  since F15), ESCALATION_CHECKS, W2 and the complaints module; `module-system.md` (tickets only
+  in enabled modules).
+
 ### 2026-10-18 (UI fixes found by the tester)
 
 - **User-visible (Release Notes):** every admin page has the same working menu. Analytics shows

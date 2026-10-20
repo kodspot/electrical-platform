@@ -30,8 +30,10 @@ Commands: `npm run bug:list` · `npm run bug:run -- <ID>` · `npm run bug:valida
 | BUG-0012 | MEDIUM | FIXED | ele | Admin analytics showed "undefined" for inspection records, flagged records and the location breakdown | `test/integration/bug-regressions.test.js; e2e/tests/explorer.spec.js › rawValue check (admin › admin-analytics)` |
 | BUG-0013 | MEDIUM | FIXED | ele | Four admin pages had no working admin nav (assets, electrical, failures: run-together links and a too-wide page on phones; predictions: none at all) | `test/integration/bug-regressions.test.js; e2e/tests/explorer.spec.js › nav and overflow checks (admin pages)` |
 | BUG-0014 | LOW | FIXED | ele | The admin Alerts page was always dark, unlike every other admin page | `test/integration/bug-regressions.test.js; e2e visual baseline admin-alerts` |
+| BUG-0019 | HIGH | FIXED | ele | Alert escalations never reached the supervisors or electricians of the location, nor raised their ticket | `test/integration/alert-escalation.test.js` |
+| BUG-0020 | MEDIUM | FIXED | complaints | A guest complaint could be filed under a module the organization had not enabled | `test/integration/authz-sweep.test.js` |
 
-Count: 14 bug scenario(s).
+Count: 16 bug scenario(s).
 
 ## BUG-0001 — Admin could set a ticket to RESOLVED_PENDING_VERIFY directly
 
@@ -282,4 +284,40 @@ Count: 14 bug scenario(s).
 
 1. Sign in as an admin and open /{org}/ele/admin-alerts.
 2. Broken: a dark page. Fixed: the light admin theme.
+
+## BUG-0019 — Alert escalations never reached the supervisors or electricians of the location, nor raised their ticket
+
+- **Severity:** HIGH · **Status:** FIXED · **Module:** ele · **Category:** notification
+- **Origin:** Bug hunt 2026-10-20 (scheduler: ESCALATION_CHECKS)
+- **Introduced:** pre-audit · **Fixed:** 2026-10-20
+- **Description:** An alert rule can escalate an unacknowledged alert to the supervisors and electricians assigned to the location, and raise a ticket there. The escalation engine reads the location from the stored alert (metadata.locationId), but no alert ever stored it: the event payloads carry locationId at the top level and fireAlert kept only data.metadata. Every such escalation silently reached no one; only the generic "escalation" notice to the admins went out.
+- **Root cause:** services/automation.js fireAlert stored `metadata: data.metadata || null`; runEscalationChecks passes `alert.metadata?.locationId` to the escalation actions, which return early without a location.
+- **Expected behavior:** An alert raised for a location records it (metadata.locationId/module), so NOTIFY_ASSIGNED_SUPERVISORS, NOTIFY_ASSIGNED_WORKERS and CREATE_TICKET work on escalation.
+- **Broken behavior:** The escalated alert notified no supervisor or electrician of the location and raised no ticket.
+- **Scenario dependencies:** —
+- **Regression test:** `test/integration/alert-escalation.test.js`
+
+**Reproduction steps:**
+
+1. Create an org, a location with an assigned supervisor, and a TICKET_HIGH_PRIORITY rule escalating after 10 minutes to NOTIFY_ASSIGNED_SUPERVISORS.
+2. As the admin, POST /api/tickets with priority HIGH; back-date the alert 11 minutes; run runEscalationChecks().
+3. Broken: the supervisor has no notification for the alert. Fixed: one.
+
+## BUG-0020 — A guest complaint could be filed under a module the organization had not enabled
+
+- **Severity:** MEDIUM · **Status:** FIXED · **Module:** complaints · **Category:** public-complaint
+- **Origin:** Bug hunt 2026-10-20 (authorization: disabled module)
+- **Introduced:** pre-audit · **Fixed:** 2026-10-20
+- **Description:** POST /api/public/complaint checked only that the module code was one of the platform's modules, not that the organization had it enabled. A crafted request, or a QR page left open while an admin switched a module off, created a ticket in a module the organization does not have — rung to its electricians and supervisors, but outside every module-scoped list. POST /api/tickets already refused this for staff (403).
+- **Root cause:** public.js validated `VALID_MODULES.includes(mod)` only; the location lookup did not load the organization's enabledModules.
+- **Expected behavior:** A complaint for a module the organization has not enabled answers 400 and creates nothing; enabled modules work as before.
+- **Broken behavior:** 200 and a ticket in the disabled module.
+- **Scenario dependencies:** —
+- **Regression test:** `test/integration/authz-sweep.test.js`
+
+**Reproduction steps:**
+
+1. Create an org with enabledModules ["ele"] and a location.
+2. As a guest, POST /api/public/complaint { locationId, module: "civil", issueType: "PLUMBING_LEAK" }.
+3. Broken: 200 and a civil ticket. Fixed: 400 and no ticket.
 
