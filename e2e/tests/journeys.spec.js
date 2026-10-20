@@ -7,7 +7,7 @@
 
 const path = require('node:path');
 const { test, expect, devices } = require('@playwright/test');
-const { seed, db, apiLogin, signIn, orgPage, pickOption, photo, decodeQrSvg } = require('../support/app');
+const { seed, db, apiLogin, signIn, signInElectrician, orgPage, pickOption, photo, decodeQrSvg } = require('../support/app');
 
 const APP_URL = 'http://127.0.0.1:3100';
 const factories = () => require(path.join(__dirname, '..', '..', 'apps', 'api', 'scenarios', 'factories'));
@@ -395,5 +395,64 @@ test.describe('BUG-0010 — role nav links after module sync', () => {
     await syncDone(page, assetsSync);
     await expect(page.locator('#sv-nav a[data-mod="asset"]')).toBeHidden();
     await expectNavHrefs(page, slug, NAV_SHORT);
+  });
+});
+
+// J9 / BUG-0018: the supervisor's "Reject & Reopen" and "Verify & Close" used to notify only
+// the admins, so the electrician whose fix it was never learned the outcome, or why it was
+// sent back. Both are now in the electrician's bell, and clicking one opens their tickets.
+test.describe('J9 — a fix sent back, redone and verified: the electrician is told both times', () => {
+  let s;
+  test.beforeAll(() => { s = seed(); });
+
+  test('the supervisor rejects with a reason; the electrician sees it, redoes the fix, and sees it verified (BUG-0018)', async ({ page, browser }) => {
+    const title = `E2E J9 ${s.run}`;
+    const description = `J9 sent back ${s.run}`;
+    const ticket = await factories().createTestTicket(s.orgA.id, s.locations.floor, { title, description, status: 'IN_PROGRESS', assignedToId: s.supNear.id });
+    const status = async () => (await db().ticket.findUnique({ where: { id: ticket.id } })).status;
+
+    const ctx = await browser.newContext(mobile());
+    const m = await ctx.newPage();
+    await signInElectrician(m, s.workers.elecFloor, s.orgA.slug);
+    const resolveInApp = async (file) => {
+      await m.goto(orgPage(s.orgA.slug, 'electrician-tickets'));
+      await m.locator('.filter-tab[data-tab="active"]').click();
+      await m.locator('.el-card', { hasText: description }).getByRole('button', { name: /Resolve With Photo/ }).click();
+      await m.locator('#rNote').fill(`Replaced the starter (${file})`);
+      await m.locator('#rPhoto').setInputFiles(photo(file));
+      await m.locator('#resolveBtn').click();
+      await expect.poll(status).toBe('RESOLVED_PENDING_VERIFY');
+    };
+    const openPendingTicket = async () => {
+      await page.goto(orgPage(s.orgA.slug, 'supervisor-tickets'));
+      await page.locator('.sv-tab[data-status="RESOLVED_PENDING_VERIFY"]').click();
+      await page.locator('.tk-card', { hasText: title }).click();
+    };
+    const bellItem = async (text) => {
+      await m.goto(orgPage(s.orgA.slug, 'electrician-scan'));
+      await m.locator('#notifBell').click();
+      return m.locator('.notif-item', { hasText: text });
+    };
+
+    await resolveInApp('j9-first.png');
+    await signIn(page, 'supervisor', s.supNear, s.orgA.slug);
+    await openPendingTicket();
+    await page.locator('#verifyNote').fill('Still flickering at the far end');
+    page.once('dialog', (d) => d.accept());
+    await page.getByRole('button', { name: /Reject & Reopen/ }).click();
+    await expect.poll(status).toBe('IN_PROGRESS');
+
+    const sentBack = await bellItem('Your fix was sent back');
+    await expect(sentBack).toContainText('Still flickering at the far end');
+    await sentBack.click();
+    await expect(m).toHaveURL(/\/electrician-tickets/);
+
+    await resolveInApp('j9-second.png');
+    await openPendingTicket();
+    await page.getByRole('button', { name: /Verify & Close/ }).click();
+    await expect.poll(status).toBe('RESOLVED');
+
+    await expect(await bellItem('Your work was verified')).toContainText(title);
+    await ctx.close();
   });
 });
