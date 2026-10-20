@@ -26,7 +26,8 @@ const BUGS_LIST = [
   require('./bug-0015-electrician-unverifies-ticket'),
   require('./bug-0016-reopened-ticket-closed-by-old-review'),
   require('./bug-0017-no-second-guest-review'),
-  require('./bug-0018-electrician-not-told-outcome')
+  require('./bug-0018-electrician-not-told-outcome'),
+  require('./bug-0026-rejected-ticket-stuck-for-electrician')
 ];
 
 const BUGS = Object.fromEntries(BUGS_LIST.map((b) => [b.id, b]));

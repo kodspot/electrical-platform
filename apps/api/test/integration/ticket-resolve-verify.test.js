@@ -290,6 +290,28 @@ describe('ticket resolve → verify → reopen, every role', () => {
     assert.strictEqual(page.json().status, 'pending', 'the guest can review the second fix');
   });
 
+  it('BUG-0026: after a guest rejects the fix, the ticket is back in its electrician\'s pool and they are told why', async (t) => {
+    if (!dbAvailable) return t.skip('No database available');
+    const ticket = await createTestTicket(org.id, location.id, { status: 'IN_PROGRESS', source: 'PUBLIC', assignedToId: supA.id });
+    assert.strictEqual((await workerResolve(ticket.id)).statusCode, 200);
+    const verified = await post(supAToken, `/api/tickets/${ticket.id}/verify`);
+    assert.strictEqual(verified.statusCode, 200, verified.body);
+    const reject = await guest('POST', tokenOf(verified.json().reviewUrl), { action: 'REJECT', note: 'Still dark in the corner' });
+    assert.strictEqual(reject.statusCode, 200, reject.body);
+    assert.strictEqual((await ticketNow(ticket.id)).status, 'OPEN');
+
+    const pool = await app.inject({ method: 'GET', url: '/api/worker/tickets/pool', headers: auth(workerToken) });
+    assert.strictEqual(pool.statusCode, 200);
+    assert.ok(pool.json().tickets.some((x) => x.id === ticket.id), 'the rejected ticket is in the electrician\'s pool again');
+    const told = await eventually(() => prisma.notification.findFirst({ where: { workerId: worker.id, entityId: ticket.id, type: 'ticket_review_rejected' } }));
+    assert.ok(told, 'the electrician was told the guest rejected the fix');
+    assert.match(told.body || '', /Still dark in the corner/);
+    // The supervisor still sees the guest's verdict and note on the ticket.
+    const now = await ticketNow(ticket.id);
+    assert.strictEqual(now.reviewStatus, 'REJECTED');
+    assert.strictEqual(now.reviewNote, 'Still dark in the corner');
+  });
+
   it('BUG-0018: the electrician who resolved a ticket is told when it is verified, and when it is sent back', async (t) => {
     if (!dbAvailable) return t.skip('No database available');
     const verified = await createTestTicket(org.id, location.id, { status: 'IN_PROGRESS', assignedToId: supA.id });
