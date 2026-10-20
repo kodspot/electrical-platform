@@ -587,9 +587,13 @@ function openEdit(id, name, type, sort, notes, parentId, isActive) {
 $('locForm').addEventListener('submit', async function(e) {
   e.preventDefault();
   var id = $('locId').value;
-  var body = { name: $('locName').value.trim(), type: $('locType').value, sortOrder: parseInt($('locSort').value) || 0, notes: $('locNotes').value.trim() || undefined };
+  var notes = $('locNotes').value.trim();
+  var body = { name: $('locName').value.trim(), type: $('locType').value, sortOrder: parseInt($('locSort').value) || 0, notes: notes || (id ? '' : undefined) };
   var parentId = $('locParent').value;
+  // On edit, cleared notes and "None (Top Level)" must be sent, or the server keeps the old
+  // values (an omitted key means "unchanged"). [BUG-0021]
   if (parentId) body.parentId = parentId;
+  else if (id) body.parentId = null;
   if (id) body.isActive = $('locActive').value === 'true';
   var res = await App.apiFetch(id ? '/locations/' + id : '/locations', { method: id ? 'PATCH' : 'POST', body: JSON.stringify(body) });
   if (!res) return;

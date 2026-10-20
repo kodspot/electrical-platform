@@ -30,8 +30,13 @@ Commands: `npm run bug:list` · `npm run bug:run -- <ID>` · `npm run bug:valida
 | BUG-0012 | MEDIUM | FIXED | ele | Admin analytics showed "undefined" for inspection records, flagged records and the location breakdown | `test/integration/bug-regressions.test.js; e2e/tests/explorer.spec.js › rawValue check (admin › admin-analytics)` |
 | BUG-0013 | MEDIUM | FIXED | ele | Four admin pages had no working admin nav (assets, electrical, failures: run-together links and a too-wide page on phones; predictions: none at all) | `test/integration/bug-regressions.test.js; e2e/tests/explorer.spec.js › nav and overflow checks (admin pages)` |
 | BUG-0014 | LOW | FIXED | ele | The admin Alerts page was always dark, unlike every other admin page | `test/integration/bug-regressions.test.js; e2e visual baseline admin-alerts` |
+| BUG-0021 | MEDIUM | FIXED | asset | Clearing an optional field in the asset, location or alert-rule edit form was not saved | `e2e/tests/forms.spec.js` |
+| BUG-0022 | LOW | FIXED | ele | On a phone that cannot scan QR codes (iPhone Safari), "Open Camera" switched the camera on with nothing reading it | `e2e/tests/forms.spec.js` |
+| BUG-0023 | HIGH | FIXED | ele | A super-admin could not create an organization without entering an email | `test/integration/superadmin-org-form.test.js` |
+| BUG-0024 | MEDIUM | FIXED | asset | After logging an asset event or reporting a failure, the supervisor saw a blank page | `e2e/tests/forms.spec.js` |
+| BUG-0025 | MEDIUM | FIXED | ele | A new duty roster suggested no electrician when they covered the floor from its building | `test/integration/admin-forms-api.test.js` |
 
-Count: 14 bug scenario(s).
+Count: 19 bug scenario(s).
 
 ## BUG-0001 — Admin could set a ticket to RESOLVED_PENDING_VERIFY directly
 
@@ -282,4 +287,92 @@ Count: 14 bug scenario(s).
 
 1. Sign in as an admin and open /{org}/ele/admin-alerts.
 2. Broken: a dark page. Fixed: the light admin theme.
+
+## BUG-0021 — Clearing an optional field in the asset, location or alert-rule edit form was not saved
+
+- **Severity:** MEDIUM · **Status:** FIXED · **Module:** asset · **Category:** admin-workflow
+- **Origin:** Bug hunt 2026-10-20 (every button and form)
+- **Introduced:** pre-audit · **Fixed:** 2026-10-20
+- **Description:** The edit forms sent `undefined` for a field the admin emptied, so the key was dropped from the request and the server — for which an omitted key means "unchanged" — kept the old value: an asset's make, model, serial, rated capacity, description, install/warranty/maintenance dates, maintenance cycle and purchase cost; a location's notes, and moving it back to "None (Top Level)"; an alert rule's description. The page said "updated" and the old value came back. The asset API also refused null for its two numeric fields, so they could not be cleared at all.
+- **Root cause:** admin-assets.html, admin-locations.html and admin-alerts.html built the PATCH body with `value || undefined` (and `if (parentId)`); assets.js updateAssetSchema was createAssetSchema.partial(), whose numbers are not nullable.
+- **Expected behavior:** On edit, a cleared field is sent empty ("" or null) and stored as empty; an omitted field is still unchanged.
+- **Broken behavior:** The cleared value reappeared after saving; PATCH /assets/:id with purchaseCost: null answered 400.
+- **Scenario dependencies:** —
+- **Regression test:** `e2e/tests/forms.spec.js`
+
+**Reproduction steps:**
+
+1. Create an asset with a make, a warranty date and a purchase cost.
+2. As the admin, PATCH /api/assets/:id { make: "", warrantyExpiry: "", purchaseCost: null } (what the fixed form sends).
+3. Broken: 400 (purchaseCost null). Fixed: 200 and all three are empty. The browser side is e2e/tests/forms.spec.js (BUG-0021 ×3).
+
+## BUG-0022 — On a phone that cannot scan QR codes (iPhone Safari), "Open Camera" switched the camera on with nothing reading it
+
+- **Severity:** LOW · **Status:** FIXED · **Module:** ele · **Category:** ui
+- **Origin:** Bug hunt 2026-10-20 (QR scan without BarcodeDetector)
+- **Introduced:** pre-audit · **Fixed:** 2026-10-20
+- **Description:** The electrician and supervisor scan pages opened the camera first and only then checked for BarcodeDetector. On iPhone Safari (no BarcodeDetector) the live camera stayed on — privacy indicator lit, battery used — under a "not supported, enter the code manually" message, until the user found Stop. Manual code entry itself worked.
+- **Root cause:** startCamera() called getUserMedia before testing `'BarcodeDetector' in window`, and never stopped the stream in the unsupported branch.
+- **Expected behavior:** Without QR support (no BarcodeDetector, or one without qr_code) the camera is never opened; the page says so and focuses the code field.
+- **Broken behavior:** getUserMedia ran and the video stayed live with nothing scanning.
+- **Scenario dependencies:** —
+- **Regression test:** `e2e/tests/forms.spec.js`
+
+**Reproduction steps:**
+
+1. Open the electrician (or supervisor) Scan page in a browser without BarcodeDetector.
+2. Tap "Open Camera".
+3. Broken: the camera turns on. Fixed: it stays off and the manual code field is focused. Browser test: e2e/tests/forms.spec.js (BUG-0022).
+
+## BUG-0023 — A super-admin could not create an organization without entering an email
+
+- **Severity:** HIGH · **Status:** FIXED · **Module:** ele · **Category:** admin-workflow
+- **Origin:** Bug hunt 2026-10-20 (super-admin forms)
+- **Introduced:** pre-audit · **Fixed:** 2026-10-20
+- **Description:** The "New Organization" form sends an empty Email field as "". POST /api/superadmin/organizations validated email as `z.string().email().optional()`, which refuses "", so every organization created without an email failed with 400 "Validation failed" (the edit route already accepted "").
+- **Root cause:** superadmin.js create schema lacked `.or(z.literal(''))` on email, unlike the PATCH schema.
+- **Expected behavior:** An empty email is accepted and stored as no email; an invalid email is still refused.
+- **Broken behavior:** 400 Validation failed (email: Invalid email).
+- **Scenario dependencies:** —
+- **Regression test:** `test/integration/superadmin-org-form.test.js`
+
+**Reproduction steps:**
+
+1. As a super-admin, POST /api/superadmin/organizations with { name, slug, type, enabledModules: ["ele"], phone: "", email: "", address: "" }.
+2. Broken: 400. Fixed: 200 and email is null.
+
+## BUG-0024 — After logging an asset event or reporting a failure, the supervisor saw a blank page
+
+- **Severity:** MEDIUM · **Status:** FIXED · **Module:** asset · **Category:** ui
+- **Origin:** Bug hunt 2026-10-20 (every button and form)
+- **Introduced:** pre-audit · **Fixed:** 2026-10-20
+- **Description:** supervisor-assets.html hid the main view and showed the confirmation with `successView.style.display = ''`. The page's stylesheet has `.success-screen { display: none }`, so clearing the inline style left the confirmation hidden: below the nav bar the page was empty, with no "Back to Asset" button. The event or failure itself was saved.
+- **Root cause:** showSuccess() set display to the empty string on an element whose CSS default is display:none.
+- **Expected behavior:** The confirmation ("Event Logged!" / "Failure Reported!") is shown, with "Back to Asset".
+- **Broken behavior:** A blank page under the nav bar.
+- **Scenario dependencies:** —
+- **Regression test:** `e2e/tests/forms.spec.js`
+
+**Reproduction steps:**
+
+1. As a supervisor, open Assets, pick an asset, Log Inspection with a summary, submit.
+2. Broken: blank page. Fixed: the confirmation. Browser test: e2e/tests/forms.spec.js (BUG-0024).
+
+## BUG-0025 — A new duty roster suggested no electrician when they covered the floor from its building
+
+- **Severity:** MEDIUM · **Status:** FIXED · **Module:** ele · **Category:** supervisor-workflow
+- **Origin:** Bug hunt 2026-10-20 (every button and form)
+- **Introduced:** pre-audit · **Fixed:** 2026-10-20
+- **Description:** GET /api/duty-roster/suggested-workers counted only electricians assigned to that exact location. Electricians are usually assigned to a building with "cover children", and the roster picker lists floors and rooms, so the supervisor got no pre-selected electrician and the roster started empty. Everywhere else (the complaint ring, the electrician app) coverage includes an ancestor with coverChildren.
+- **Root cause:** duty-roster.js queried workerAssignment by locationId only instead of using assignment-resolver getAssignedWorkerIds (direct + ancestors with coverChildren).
+- **Expected behavior:** The suggestion lists the active electricians covering the location, directly or through an ancestor with coverChildren, and no one else.
+- **Broken behavior:** An empty suggestion for a floor covered from its building.
+- **Scenario dependencies:** —
+- **Regression test:** `test/integration/admin-forms-api.test.js`
+
+**Reproduction steps:**
+
+1. Create a building and a floor in it; assign an electrician to the building with coverChildren.
+2. As a supervisor, GET /api/duty-roster/suggested-workers?locationId=<floor>.
+3. Broken: suggested is []. Fixed: it contains the electrician.
 

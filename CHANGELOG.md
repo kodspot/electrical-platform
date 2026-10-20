@@ -22,6 +22,35 @@ has been git-tagged yet, so everything below is grouped under **Unreleased**.
 Complete and merged into the working tree as of this writing, pending its next deploy —
 see `docs/DEPLOYMENT.md` for how a change reaches production.
 
+### 2026-10-20 (bug hunt: every button and form)
+
+- **User-visible (Release Notes):** cleared fields in the asset / location / alert-rule edit
+  forms are saved; supervisors see the confirmation after an asset event or failure; a new
+  roster pre-selects the covering electricians; the Scan page no longer opens the camera on
+  iPhones; super-admins can create an organization without an email.
+- **`[BUG-0021]` Edit forms ignored cleared fields.** `admin-assets.html`,
+  `admin-locations.html` and `admin-alerts.html` sent `undefined` for an emptied field (and
+  dropped "None (Top Level)"), so the server kept the old value. On edit they now send `''` /
+  `null`; `assets.js` accepts `null` for `maintenanceCycleDays` and `purchaseCost`.
+- **`[BUG-0022]` The Scan pages opened the camera with nothing to read it.** Both
+  (`electrician-scan`, `supervisor-scan`) now check BarcodeDetector + `qr_code` support before
+  `getUserMedia`; without it they say so and focus the code field.
+- **`[BUG-0023]` Creating an organization required an email.** The create schema refused the
+  `''` the form sends; it now accepts it (stored as null), as edit already did.
+- **`[BUG-0024]` Blank page after a supervisor's asset event or failure.** `showSuccess()` set
+  `display = ''` on an element that is `display:none` in the stylesheet; it sets `block`.
+- **`[BUG-0025]` A new roster suggested no electrician.** `GET /duty-roster/suggested-workers`
+  counted direct assignments only; it now uses `getAssignedWorkerIds` (direct + ancestors with
+  coverChildren), like the complaint ring.
+- **Tests:**
+  - `e2e/tests/forms.spec.js` (13, desktop only): every button and form the explorer does not
+    press (see `e2e/README.md`). 7 of them were red on `main` — exactly the BUG-0021…0025
+    tests — and all 13 are green.
+  - `test/integration/admin-forms-api.test.js` (3) and `superadmin-org-form.test.js` (2): the
+    API side of BUG-0021, BUG-0023 and BUG-0025, and tenant scoping of the roster suggestion.
+  - Registry BUG-0021…BUG-0025, red on `main` first.
+- **Docs:** COVERAGE_MATRIX (the forms row, duty-roster, the camera QR scan note), `e2e/README.md`.
+
 ### 2026-10-18 (UI fixes found by the tester)
 
 - **User-visible (Release Notes):** every admin page has the same working menu. Analytics shows

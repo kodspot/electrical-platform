@@ -336,7 +336,9 @@ $('failureForm').addEventListener('submit', async function(e){
 // ── Success ──
 function showSuccess(title, sub){
   $('mainView').style.display='none';
-  $('successView').style.display='';
+  // 'block', not '': .success-screen is display:none in the stylesheet, so clearing the
+  // inline style left a blank page after every logged event or failure. [BUG-0024]
+  $('successView').style.display='block';
   $('successTitle').textContent=title;
   $('successSub').textContent=sub;
 }

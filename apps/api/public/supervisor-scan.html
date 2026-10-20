@@ -111,7 +111,21 @@ App.initNotifications(App.supFetch, 'supervisor');
 var esc = App.esc, $ = App.$;
 var videoEl = $('video'), stream = null, scanning = false;
 
+// Can this browser read a QR code from the camera? iPhone Safari (and most desktop browsers)
+// have no BarcodeDetector, or one without qr_code.
+async function qrScanSupported() {
+  if (!('BarcodeDetector' in window)) return false;
+  try { return (await BarcodeDetector.getSupportedFormats()).indexOf('qr_code') !== -1; } catch (e) { return false; }
+}
+
 async function startCamera() {
+  // Don't switch the camera on when nothing can read the code: say so, and hand the user to
+  // the code field. [BUG-0022]
+  if (!(await qrScanSupported())) {
+    App.showError('cameraError', 'QR scanning is not supported on this browser. Please enter the code manually.');
+    $('manualCode').focus();
+    return;
+  }
   $('startBtn').querySelector('.scan-start-text').textContent = 'Starting camera…';
   $('startBtn').style.pointerEvents = 'none';
   $('startBtn').style.opacity = '.6';
@@ -123,12 +137,7 @@ async function startCamera() {
     $('stopBtn').style.display = '';
     videoEl.srcObject = stream;
     scanning = true;
-    if ('BarcodeDetector' in window) {
-      var detector = new BarcodeDetector({ formats: ['qr_code'] });
-      scanLoop(detector);
-    } else {
-      App.showError('cameraError', 'QR scanning not supported on this browser. Please enter code manually.');
-    }
+    scanLoop(new BarcodeDetector({ formats: ['qr_code'] }));
   } catch (e) {
     App.showError('cameraError', 'Camera access denied. Please enter code manually.');
     $('videoWrap').style.display = 'none';

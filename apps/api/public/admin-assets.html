@@ -398,23 +398,27 @@ function openEditModal(a){
 $('assetForm').addEventListener('submit', async function(e){
   e.preventDefault();
   App.hideError('modalError');
+  // On edit, a field the user cleared must be SENT empty ('' / null) so the server clears it:
+  // an omitted key means "unchanged", so the old value used to come back. [BUG-0021]
+  var opt = function(v){ return v || (editingId ? '' : undefined); };
+  var num = function(v, parse){ return v ? parse(v) : (editingId ? null : undefined); };
   var body = {
     assetCode: $('fAssetCode').value.trim(),
     name: $('fName').value.trim(),
     category: $('fCategoryInput').value,
     locationId: $('fLocationInput').value,
-    make: $('fMake').value.trim()||undefined,
-    model: $('fModel').value.trim()||undefined,
-    serialNo: $('fSerialNo').value.trim()||undefined,
-    ratedCapacity: $('fRatedCapacity').value.trim()||undefined,
+    make: opt($('fMake').value.trim()),
+    model: opt($('fModel').value.trim()),
+    serialNo: opt($('fSerialNo').value.trim()),
+    ratedCapacity: opt($('fRatedCapacity').value.trim()),
     status: $('fStatusInput').value,
     condition: $('fConditionInput').value,
-    installDate: $('fInstallDate').value||undefined,
-    warrantyExpiry: $('fWarrantyExpiry').value||undefined,
-    nextMaintenanceDue: $('fNextMaint').value||undefined,
-    maintenanceCycleDays: $('fMaintCycle').value ? parseInt($('fMaintCycle').value) : undefined,
-    description: $('fDescription').value.trim()||undefined,
-    purchaseCost: $('fPurchaseCost').value ? parseFloat($('fPurchaseCost').value) : undefined
+    installDate: opt($('fInstallDate').value),
+    warrantyExpiry: opt($('fWarrantyExpiry').value),
+    nextMaintenanceDue: opt($('fNextMaint').value),
+    maintenanceCycleDays: num($('fMaintCycle').value, function(v){ return parseInt(v, 10); }),
+    description: opt($('fDescription').value.trim()),
+    purchaseCost: num($('fPurchaseCost').value, parseFloat)
   };
 
   var btn = $('saveBtn');

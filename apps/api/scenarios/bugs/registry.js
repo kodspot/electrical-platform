@@ -22,7 +22,12 @@ const BUGS_LIST = [
   require('./bug-0011-hidden-nav-link-double-prefix'),
   require('./bug-0012-analytics-undefined-fields'),
   require('./bug-0013-admin-pages-without-admin-shell'),
-  require('./bug-0014-admin-alerts-forced-dark-theme')
+  require('./bug-0014-admin-alerts-forced-dark-theme'),
+  require('./bug-0021-edit-forms-ignore-cleared-fields'),
+  require('./bug-0022-scan-opens-camera-without-qr-support'),
+  require('./bug-0023-org-create-needs-email'),
+  require('./bug-0024-supervisor-asset-blank-after-save'),
+  require('./bug-0025-roster-suggests-no-covering-electrician')
 ];
 
 const BUGS = Object.fromEntries(BUGS_LIST.map((b) => [b.id, b]));

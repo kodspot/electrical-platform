@@ -61,8 +61,9 @@ module.exports = defineConfig({
       name: 'chromium-mobile',
       use: { ...devices['Pixel 7'] },
       // The journeys are one ordered story; they open their own mobile contexts where a
-      // step happens on a phone, so they run once, in the desktop project.
-      testIgnore: /journeys\.spec\.js/
+      // step happens on a phone, so they run once, in the desktop project. The forms spec
+      // (every button and form) also runs once, in the desktop project.
+      testIgnore: /(journeys|forms)\.spec\.js/
     }
   ],
   webServer: {
