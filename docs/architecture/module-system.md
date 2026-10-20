@@ -57,6 +57,10 @@ definitions and dependencies, so the catalog is always present.
   { moduleCode })` combines role + module in one guard. Both resolve the org's
   `enabledModules` and reject with `403` if the module is off. SUPER_ADMIN bypasses module
   gating. See [auth-and-tenancy.md](auth-and-tenancy.md#authorization-the-policy-matrix).
+- **Tickets carry a module, and only an enabled one:** `POST /api/tickets` answers `403` for a
+  module the org has not enabled, and the unauthenticated `POST /api/public/complaint`
+  answers `400` (BUG-0020) — the QR page offers only enabled modules, but a page left open
+  while a module is switched off, or a crafted request, does not.
 - **Frontend:** pages are served under module-scoped URLs (`/:orgSlug/:mod/...`) and each
   module gets its own PWA manifest and service worker. See
   [frontend.md](frontend.md#module-scoped-routing--pwa).

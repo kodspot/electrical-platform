@@ -34,9 +34,11 @@ Commands: `npm run bug:list` · `npm run bug:run -- <ID>` · `npm run bug:valida
 | BUG-0016 | HIGH | FIXED | complaints | A reopened public ticket could still be closed by the guest's old review link, or by the review auto-close | `test/integration/ticket-resolve-verify.test.js` |
 | BUG-0017 | MEDIUM | FIXED | complaints | After a guest rejected a fix, the next verified fix never got a guest review | `test/integration/ticket-resolve-verify.test.js` |
 | BUG-0018 | MEDIUM | FIXED | ele | The electrician was never told that their fix was verified, or that it was sent back and why | `test/integration/ticket-resolve-verify.test.js` |
+| BUG-0019 | HIGH | FIXED | ele | Alert escalations never reached the supervisors or electricians of the location, nor raised their ticket | `test/integration/alert-escalation.test.js` |
+| BUG-0020 | MEDIUM | FIXED | complaints | A guest complaint could be filed under a module the organization had not enabled | `test/integration/authz-sweep.test.js` |
 | BUG-0026 | MEDIUM | FIXED | complaints | After a guest rejected a fix, the electrician who did it saw the ticket as "Done" and could not pick it up again | `test/integration/ticket-resolve-verify.test.js` |
 
-Count: 19 bug scenario(s).
+Count: 21 bug scenario(s).
 
 ## BUG-0001 — Admin could set a ticket to RESOLVED_PENDING_VERIFY directly
 
@@ -360,6 +362,42 @@ Count: 19 bug scenario(s).
 1. Create two RESOLVED_PENDING_VERIFY tickets resolved by an electrician.
 2. As the admin, verify one and reopen the other with a note.
 3. Broken: the electrician has no notification. Fixed: ticket_verified and ticket_reopened (with the note).
+
+## BUG-0019 — Alert escalations never reached the supervisors or electricians of the location, nor raised their ticket
+
+- **Severity:** HIGH · **Status:** FIXED · **Module:** ele · **Category:** notification
+- **Origin:** Bug hunt 2026-10-20 (scheduler: ESCALATION_CHECKS)
+- **Introduced:** pre-audit · **Fixed:** 2026-10-20
+- **Description:** An alert rule can escalate an unacknowledged alert to the supervisors and electricians assigned to the location, and raise a ticket there. The escalation engine reads the location from the stored alert (metadata.locationId), but no alert ever stored it: the event payloads carry locationId at the top level and fireAlert kept only data.metadata. Every such escalation silently reached no one; only the generic "escalation" notice to the admins went out.
+- **Root cause:** services/automation.js fireAlert stored `metadata: data.metadata || null`; runEscalationChecks passes `alert.metadata?.locationId` to the escalation actions, which return early without a location.
+- **Expected behavior:** An alert raised for a location records it (metadata.locationId/module), so NOTIFY_ASSIGNED_SUPERVISORS, NOTIFY_ASSIGNED_WORKERS and CREATE_TICKET work on escalation.
+- **Broken behavior:** The escalated alert notified no supervisor or electrician of the location and raised no ticket.
+- **Scenario dependencies:** —
+- **Regression test:** `test/integration/alert-escalation.test.js`
+
+**Reproduction steps:**
+
+1. Create an org, a location with an assigned supervisor, and a TICKET_HIGH_PRIORITY rule escalating after 10 minutes to NOTIFY_ASSIGNED_SUPERVISORS.
+2. As the admin, POST /api/tickets with priority HIGH; back-date the alert 11 minutes; run runEscalationChecks().
+3. Broken: the supervisor has no notification for the alert. Fixed: one.
+
+## BUG-0020 — A guest complaint could be filed under a module the organization had not enabled
+
+- **Severity:** MEDIUM · **Status:** FIXED · **Module:** complaints · **Category:** public-complaint
+- **Origin:** Bug hunt 2026-10-20 (authorization: disabled module)
+- **Introduced:** pre-audit · **Fixed:** 2026-10-20
+- **Description:** POST /api/public/complaint checked only that the module code was one of the platform's modules, not that the organization had it enabled. A crafted request, or a QR page left open while an admin switched a module off, created a ticket in a module the organization does not have — rung to its electricians and supervisors, but outside every module-scoped list. POST /api/tickets already refused this for staff (403).
+- **Root cause:** public.js validated `VALID_MODULES.includes(mod)` only; the location lookup did not load the organization's enabledModules.
+- **Expected behavior:** A complaint for a module the organization has not enabled answers 400 and creates nothing; enabled modules work as before.
+- **Broken behavior:** 200 and a ticket in the disabled module.
+- **Scenario dependencies:** —
+- **Regression test:** `test/integration/authz-sweep.test.js`
+
+**Reproduction steps:**
+
+1. Create an org with enabledModules ["ele"] and a location.
+2. As a guest, POST /api/public/complaint { locationId, module: "civil", issueType: "PLUMBING_LEAK" }.
+3. Broken: 200 and a civil ticket. Fixed: 400 and no ticket.
 
 ## BUG-0026 — After a guest rejected a fix, the electrician who did it saw the ticket as "Done" and could not pick it up again
 
