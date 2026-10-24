@@ -87,6 +87,10 @@ Engineering understanding, not code duplication. Each links to the code it descr
   primitives, offsite backup storage.
 - [`history/production-readiness-audit-2026-07.md`](history/production-readiness-audit-2026-07.md)
   — a frozen, dated snapshot of known production risks after WP17.
+- [`history/product-architecture-review-2026-10.md`](history/product-architecture-review-2026-10.md)
+  — a dated product and architecture review (findings `PAR-10/n`): how the product fits real
+  colleges and hostels, a prioritised backlog, and the decisions for the owner. Its proposals
+  are ADRs 0010 and 0011 (Proposed).
 
 ### Chronology
 - [`CHANGELOG.md`](../CHANGELOG.md) — every merged change, dated and Work-Package-tagged.

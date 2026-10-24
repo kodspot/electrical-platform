@@ -22,6 +22,26 @@ has been git-tagged yet, so everything below is grouped under **Unreleased**.
 Complete and merged into the working tree as of this writing, pending its next deploy —
 see `docs/DEPLOYMENT.md` for how a change reaches production.
 
+### 2026-10-24 (product and architecture review — documentation only)
+
+- **Documentation only; no code, schema, dependency, workflow or setting changed.** Not
+  user-visible, so no Release Notes entry.
+- New `docs/history/product-architecture-review-2026-10.md` (findings `PAR-10/1`–`PAR-10/55`).
+  It is a dated review of how the product fits real colleges and hostels and covers:
+  - the inventory and role matrix;
+  - the ticket lifecycle;
+  - post-resolution options;
+  - modules versus feature settings;
+  - risks and scenarios;
+  - QA and release status;
+  - a P0–P3 backlog with an implementation sequence;
+  - external research;
+  - decisions for the owner.
+- New ADR drafts, both `Proposed`:
+  - [`docs/adr/0010-configurable-post-resolution-workflow.md`](docs/adr/0010-configurable-post-resolution-workflow.md);
+  - [`docs/adr/0011-tenant-feature-settings.md`](docs/adr/0011-tenant-feature-settings.md).
+- Indexed in `docs/adr/README.md` and `docs/README.md`.
+
 ### 2026-10-20 (bug hunt: every button and form)
 
 - **User-visible (Release Notes):** cleared fields in the asset / location / alert-rule edit
