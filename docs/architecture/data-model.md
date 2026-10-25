@@ -23,9 +23,9 @@ owned rows.
 - `Organization` — tenant root; `status` (`ACTIVE`/`SUSPENDED`/`DELETED`), `enabledModules`
   (the runtime module gate), AI configuration.
 - `User` — staff (`ADMIN`/`SUPERVISOR`/`SUPER_ADMIN`); `isActive`, `tokenInvalidBefore`,
-  `resetToken`, encrypted PII fields.
-- `Worker` — electricians; PIN-hashed auth, `tokenInvalidBefore`, `resetToken`, encrypted
-  PII.
+  `resetToken` (stored as a SHA-256 digest, never the e-mailed token), encrypted PII fields.
+- `Worker` — electricians; PIN-hashed auth, `tokenInvalidBefore`, `resetToken` (digest, as for
+  `User`), encrypted PII.
 - `AuditLog` — append-only actor/action record (see the SA-audit rule in
   [auth-and-tenancy.md](auth-and-tenancy.md#the-one-cross-tenant-capability-superadmin-x-org-id)).
 

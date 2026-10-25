@@ -97,6 +97,17 @@ see `docs/DEPLOYMENT.md` for how a change reaches production.
     `services/cleanup.js`).
   - The 30-day period itself is unchanged; the privacy page's "7 days" is PAR-10/28.
     Documented in `docs/architecture/resilience.md`.
+- **`[BUG-0034]` Password and PIN reset tokens were stored as issued** (PAR-10/21).
+  - What happened: the database value itself reset the account. Anyone who could read the
+    database or a backup could take over any account with a pending reset.
+  - Now: only the SHA-256 digest is stored and looked up (`hashResetToken` in
+    `lib/security.js`); the e-mailed link is unchanged.
+  - Docs: Charter §6 recovery rule amended (Amendment Log 2026-10-25); `data-model.md`
+    updated.
+  - Tests: `account-recovery.test.js` and the J8 phone journey seed a known token instead of
+    reading it back.
+  - **On deploy:** reset links issued in the hour before the deploy stop working; the person
+    requests a new one. Not otherwise visible to users.
 
 ### 2026-10-24 (product and architecture review — documentation only)
 

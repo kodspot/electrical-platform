@@ -5,7 +5,7 @@ const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const { z } = require('zod');
 const { prisma } = require('../lib/prisma');
-const { BCRYPT_COST } = require('../lib/security');
+const { BCRYPT_COST, hashResetToken } = require('../lib/security');
 const { loginRateLimit, strictRateLimit } = require('../middleware/rateLimits');
 const { uploadToR2 } = require('../lib/r2');
 const { validateImageBuffer } = require('../errors');
@@ -299,9 +299,10 @@ async function workerAuthRoutes(fastify) {
       if (worker && worker.email) {
         const token = crypto.randomBytes(32).toString('hex');
         const resetTokenExpiresAt = new Date(Date.now() + RESET_TOKEN_TTL_MS);
+        // Only the hash is stored; the e-mailed token is the credential. [BUG-0034]
         await prisma.worker.update({
           where: { id: worker.id },
-          data: { resetToken: token, resetTokenExpiresAt }
+          data: { resetToken: hashResetToken(token), resetTokenExpiresAt }
         });
 
         const resetUrl = `${APP_URL}/worker-reset-pin?token=${token}`;
@@ -335,7 +336,7 @@ async function workerAuthRoutes(fastify) {
     }
 
     const worker = await prisma.worker.findUnique({
-      where: { resetToken: data.token },
+      where: { resetToken: hashResetToken(data.token) },
       select: { id: true, orgId: true, name: true, employeeId: true, isActive: true, resetTokenExpiresAt: true }
     });
 

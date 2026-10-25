@@ -2,8 +2,9 @@
 
 // J8 — an electrician resets a forgotten PIN from the emailed link, on a phone (F12).
 // Runs only in the chromium-mobile project (*.mobile.spec.js; see playwright.config.js).
-// Email delivery is off in the e2e app (SES credentials blanked), so the token is read from
-// the database — it is exactly what the emailed link would carry.
+// Email delivery is off in the e2e app (SES credentials blanked), and the database holds only
+// the token's hash (BUG-0034), so the test puts in place a token it knows, stored the way the
+// forgot flow stores one, and opens the link with it.
 
 const path = require('node:path');
 const crypto = require('node:crypto');
@@ -11,6 +12,7 @@ const { test, expect } = require('@playwright/test');
 const { seed, db, apiLogin, orgPage } = require('../support/app');
 
 const factories = () => require(path.join(__dirname, '..', '..', 'apps', 'api', 'scenarios', 'factories'));
+const { hashResetToken } = require(path.join(__dirname, '..', '..', 'apps', 'api', 'src', 'lib', 'security'));
 
 test('J8 — an electrician opens the PIN reset link on a phone, sets a new 6-digit PIN and signs in with it', async ({ page }) => {
   const s = seed();
@@ -31,11 +33,13 @@ test('J8 — an electrician opens the PIN reset link on a phone, sets a new 6-di
   // "Forgot PIN" — the request side always answers the same generic message.
   const forgot = await page.request.post('/api/auth/worker-forgot-pin', { data: { orgSlug: s.orgA.slug, employeeId } });
   expect(forgot.status()).toBe(200);
-  let resetToken = null;
-  await expect.poll(async () => {
-    resetToken = (await db().worker.findUnique({ where: { id: worker.id }, select: { resetToken: true } })).resetToken;
-    return Boolean(resetToken);
-  }).toBe(true);
+  await expect.poll(async () => (await db().worker.findUnique({ where: { id: worker.id }, select: { resetToken: true } })).resetToken)
+    .toMatch(/^[0-9a-f]{64}$/);
+  // Only the token's hash is stored (BUG-0034), so the database cannot give back the link the
+  // email carried: replace the stored hash with one of a token this test holds, as the forgot
+  // flow would have stored it.
+  const resetToken = crypto.randomBytes(32).toString('hex');
+  await db().worker.update({ where: { id: worker.id }, data: { resetToken: hashResetToken(resetToken) } });
 
   // Open the emailed link.
   await page.goto(`/worker-reset-pin?token=${resetToken}`);

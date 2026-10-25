@@ -6,7 +6,7 @@ const jwt = require('jsonwebtoken');
 const QRCode = require('qrcode');
 const { z } = require('zod');
 const { prisma } = require('../lib/prisma');
-const { BCRYPT_COST, passwordSchema } = require('../lib/security');
+const { BCRYPT_COST, passwordSchema, hashResetToken } = require('../lib/security');
 const { strictRateLimit, loginRateLimit } = require('../middleware/rateLimits');
 const { authenticateJWT, requirePolicy } = require('../middleware/auth');
 const { APP_URL } = require('../config/env');
@@ -273,9 +273,10 @@ async function authRoutes(fastify, opts) {
     for (const user of users) {
       const token = crypto.randomBytes(32).toString('hex');
       const resetTokenExpiresAt = new Date(Date.now() + RESET_TOKEN_TTL_MS);
+      // Only the hash is stored; the e-mailed token is the credential. [BUG-0034]
       await prisma.user.update({
         where: { id: user.id },
-        data: { resetToken: token, resetTokenExpiresAt }
+        data: { resetToken: hashResetToken(token), resetTokenExpiresAt }
       });
 
       const resetUrl = `${APP_URL}/reset-password?token=${token}`;
@@ -305,7 +306,7 @@ async function authRoutes(fastify, opts) {
     const { token, newPassword } = schema.parse(request.body);
 
     const user = await prisma.user.findUnique({
-      where: { resetToken: token },
+      where: { resetToken: hashResetToken(token) },
       select: { id: true, orgId: true, role: true, name: true, email: true, isActive: true, resetTokenExpiresAt: true }
     });
 

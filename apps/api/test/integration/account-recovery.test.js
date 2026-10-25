@@ -26,6 +26,16 @@ const {
   cleanupTestOrgs
 } = require('../helpers/db');
 const { prisma } = require('../../src/lib/prisma');
+const crypto = require('node:crypto');
+const { hashResetToken } = require('../../src/lib/security');
+
+// A reset token issued the way the forgot flows issue one: the e-mailed (raw) token is what
+// the user holds; only its hash is stored (BUG-0034). Returns the raw token.
+async function seedResetToken(model, id) {
+  const raw = crypto.randomBytes(32).toString('hex');
+  await prisma[model].update({ where: { id }, data: { resetToken: hashResetToken(raw), resetTokenExpiresAt: new Date(Date.now() + 60 * 60 * 1000) } });
+  return raw;
+}
 
 // The forgot-password/reset-password/worker-forgot-pin/worker-reset-pin
 // endpoints are correctly rate-limited per IP (strictRateLimit — 5 requests
@@ -83,6 +93,16 @@ describe('WP14 — user self-service password reset', () => {
     assert.ok(updated.resetTokenExpiresAt > new Date(), 'resetTokenExpiresAt must be in the future');
   });
 
+  it('BUG-0034: only a hash of the reset token is stored — the database value itself cannot reset the password', async (t) => {
+    if (!dbAvailable) return t.skip('No database available in this environment');
+    const ip = nextTestIp();
+    await app.inject({ method: 'POST', url: '/api/auth/forgot-password', remoteAddress: ip, payload: { email: admin.email } });
+    const { resetToken: stored } = await prisma.user.findUnique({ where: { id: admin.id } });
+    assert.match(stored, /^[0-9a-f]{64}$/, 'a SHA-256 digest is stored');
+    const res = await app.inject({ method: 'POST', url: '/api/auth/reset-password', remoteAddress: ip, payload: { token: stored, newPassword: 'FromTheDb123' } });
+    assert.strictEqual(res.statusCode, 400, 'someone who can read the database must not be able to reset the password');
+  });
+
   it('POST /auth/reset-password with a valid token changes the password, reissues a token, and invalidates old sessions', async (t) => {
     if (!dbAvailable) return t.skip('No database available in this environment');
     const ip = nextTestIp();
@@ -96,9 +116,7 @@ describe('WP14 — user self-service password reset', () => {
     // test below. A short wait avoids racing that edge case.
     await new Promise(r => setTimeout(r, 2100));
 
-    await app.inject({ method: 'POST', url: '/api/auth/forgot-password', remoteAddress: ip, payload: { email: admin.email } });
-    const withToken = await prisma.user.findUnique({ where: { id: admin.id } });
-    const resetToken = withToken.resetToken;
+    const resetToken = await seedResetToken('user', admin.id);
 
     const resetRes = await app.inject({
       method: 'POST',
@@ -128,8 +146,7 @@ describe('WP14 — user self-service password reset', () => {
     if (!dbAvailable) return t.skip('No database available in this environment');
     const ip = nextTestIp();
 
-    await app.inject({ method: 'POST', url: '/api/auth/forgot-password', remoteAddress: ip, payload: { email: admin.email } });
-    const { resetToken } = await prisma.user.findUnique({ where: { id: admin.id } });
+    const resetToken = await seedResetToken('user', admin.id);
 
     const first = await app.inject({ method: 'POST', url: '/api/auth/reset-password', remoteAddress: ip, payload: { token: resetToken, newPassword: 'FirstReset123' } });
     assert.strictEqual(first.statusCode, 200);
@@ -142,8 +159,7 @@ describe('WP14 — user self-service password reset', () => {
     if (!dbAvailable) return t.skip('No database available in this environment');
     const ip = nextTestIp();
 
-    await app.inject({ method: 'POST', url: '/api/auth/forgot-password', remoteAddress: ip, payload: { email: admin.email } });
-    const { resetToken } = await prisma.user.findUnique({ where: { id: admin.id } });
+    const resetToken = await seedResetToken('user', admin.id);
 
     // Simulate the token having expired an hour ago.
     await prisma.user.update({ where: { id: admin.id }, data: { resetTokenExpiresAt: new Date(Date.now() - 60 * 60 * 1000) } });
@@ -193,6 +209,16 @@ describe('WP14 — worker self-service PIN reset', () => {
     assert.deepStrictEqual(resReal.json(), resFake.json());
   });
 
+  it('BUG-0034: only a hash of the PIN-reset token is stored — the database value itself cannot reset the PIN', async (t) => {
+    if (!dbAvailable) return t.skip('No database available in this environment');
+    const ip = nextTestIp();
+    await app.inject({ method: 'POST', url: '/api/auth/worker-forgot-pin', remoteAddress: ip, payload: { orgSlug: org.slug, employeeId: worker.employeeId } });
+    const { resetToken: stored } = await prisma.worker.findUnique({ where: { id: worker.id } });
+    assert.match(stored, /^[0-9a-f]{64}$/, 'a SHA-256 digest is stored');
+    const res = await app.inject({ method: 'POST', url: '/api/auth/worker-reset-pin', remoteAddress: ip, payload: { token: stored, newPin: '864201' } });
+    assert.strictEqual(res.statusCode, 400, 'someone who can read the database must not be able to reset the PIN');
+  });
+
   it('POST /auth/worker-reset-pin with a valid token changes the PIN, reissues a token, and invalidates old sessions', async (t) => {
     if (!dbAvailable) return t.skip('No database available in this environment');
     const ip = nextTestIp();
@@ -204,8 +230,7 @@ describe('WP14 — worker self-service PIN reset', () => {
     // tokenInvalidBefore compares at second-level precision.
     await new Promise(r => setTimeout(r, 2100));
 
-    await app.inject({ method: 'POST', url: '/api/auth/worker-forgot-pin', remoteAddress: ip, payload: { orgSlug: org.slug, employeeId: worker.employeeId } });
-    const { resetToken } = await prisma.worker.findUnique({ where: { id: worker.id } });
+    const resetToken = await seedResetToken('worker', worker.id);
 
     const resetRes = await app.inject({ method: 'POST', url: '/api/auth/worker-reset-pin', remoteAddress: ip, payload: { token: resetToken, newPin: '135790' } });
     assert.strictEqual(resetRes.statusCode, 200);
@@ -225,8 +250,7 @@ describe('WP14 — worker self-service PIN reset', () => {
     if (!dbAvailable) return t.skip('No database available in this environment');
     const ip = nextTestIp();
 
-    await app.inject({ method: 'POST', url: '/api/auth/worker-forgot-pin', remoteAddress: ip, payload: { orgSlug: org.slug, employeeId: worker.employeeId } });
-    const { resetToken } = await prisma.worker.findUnique({ where: { id: worker.id } });
+    const resetToken = await seedResetToken('worker', worker.id);
 
     const first = await app.inject({ method: 'POST', url: '/api/auth/worker-reset-pin', remoteAddress: ip, payload: { token: resetToken, newPin: '111222' } });
     assert.strictEqual(first.statusCode, 200);
@@ -239,8 +263,7 @@ describe('WP14 — worker self-service PIN reset', () => {
     if (!dbAvailable) return t.skip('No database available in this environment');
     const ip = nextTestIp();
 
-    await app.inject({ method: 'POST', url: '/api/auth/worker-forgot-pin', remoteAddress: ip, payload: { orgSlug: org.slug, employeeId: worker.employeeId } });
-    const { resetToken } = await prisma.worker.findUnique({ where: { id: worker.id } });
+    const resetToken = await seedResetToken('worker', worker.id);
 
     await prisma.worker.update({ where: { id: worker.id }, data: { resetTokenExpiresAt: new Date(Date.now() - 60 * 60 * 1000) } });
 

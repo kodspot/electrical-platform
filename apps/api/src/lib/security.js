@@ -30,6 +30,13 @@ function hashAdminKey(key) {
   return crypto.createHmac('sha256', process.env.COOKIE_SECRET).update(key).digest('hex');
 }
 
+// Password/PIN reset tokens are stored as their SHA-256 digest: the e-mailed token is the
+// credential, and a database read (or a backup) must not hand it over. A 256-bit random
+// token needs no slow hash. [BUG-0034]
+function hashResetToken(token) {
+  return crypto.createHash('sha256').update(String(token)).digest('hex');
+}
+
 // The Worker fields an org admin or super-admin may see: the profile, never credential
 // material — the PIN hash, a pending reset token and its expiry, the session cut-off. [BUG-0031]
 const WORKER_PROFILE_SELECT = Object.freeze({
@@ -42,6 +49,7 @@ module.exports = {
   BCRYPT_COST,
   COOKIE_CONFIG,
   hashAdminKey,
+  hashResetToken,
   passwordSchema,
   WORKER_PROFILE_SELECT
 };

@@ -49,8 +49,9 @@ Commands: `npm run bug:list` · `npm run bug:run -- <ID>` · `npm run bug:valida
 | BUG-0031 | HIGH | FIXED | ele | Worker detail, create and update responses carried the PIN hash and a pending PIN-reset token | `test/integration/worker-credentials.test.js` |
 | BUG-0032 | HIGH | FIXED | ele | An org admin's "run escalations" escalated every tenant's alerts, outside the scheduler lock | `test/integration/alert-manual-checks.test.js` |
 | BUG-0033 | HIGH | FIXED | ele | A proof photo uploaded late in an old ticket's life was deleted the next night | `test/integration/image-cleanup.test.js` |
+| BUG-0034 | HIGH | FIXED | ele | Password and PIN reset tokens were stored as issued, so the database value itself reset the account | `test/integration/account-recovery.test.js` |
 
-Count: 33 bug scenario(s).
+Count: 34 bug scenario(s).
 
 ## BUG-0001 — Admin could set a ticket to RESOLVED_PENDING_VERIFY directly
 
@@ -642,4 +643,22 @@ Count: 33 bug scenario(s).
 1. Create a ticket 40 days ago that was resolved 2 days ago with a proof photo.
 2. Run the image cleanup (services/cleanup.js cleanupExpiredImages).
 3. Broken: resolvedImageUrl is null. Fixed: it is kept. Full test with real files and the real query: test/integration/image-cleanup.test.js.
+
+## BUG-0034 — Password and PIN reset tokens were stored as issued, so the database value itself reset the account
+
+- **Severity:** HIGH · **Status:** FIXED · **Module:** ele · **Category:** account-recovery
+- **Origin:** Product and architecture review 2026-10 (PAR-10/21)
+- **Introduced:** 2026-07-21 ([WP14]) · **Fixed:** 2026-10-25
+- **Description:** POST /api/auth/forgot-password and /api/auth/worker-forgot-pin stored the e-mailed reset token unchanged in User.resetToken / Worker.resetToken, and the reset routes looked it up as is. Anyone who could read the database or a backup could reset the password or PIN of any account with a pending request. Found by the 2026-10 product and architecture review (PAR-10/21).
+- **Root cause:** The [WP14] recovery pattern stored the raw token; nothing hashed it before the write or the lookup.
+- **Expected behavior:** Only the token's SHA-256 digest is stored (hashResetToken); the stored value submitted as a token is refused.
+- **Broken behavior:** Submitting User.resetToken from the database to /api/auth/reset-password changed the password (200).
+- **Scenario dependencies:** —
+- **Regression test:** `test/integration/account-recovery.test.js`
+
+**Reproduction steps:**
+
+1. POST /api/auth/forgot-password for an existing staff email.
+2. Read User.resetToken from the database and POST it to /api/auth/reset-password with a new password.
+3. Broken: 200, password changed. Fixed: 400.
 
