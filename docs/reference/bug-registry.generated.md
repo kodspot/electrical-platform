@@ -74,8 +74,9 @@ Commands: `npm run bug:list` · `npm run bug:run -- <ID>` · `npm run bug:valida
 | BUG-0056 | MEDIUM | FIXED | ele | Analytics charts counted inspections between midnight and 05:30 under the day before | `test/integration/analytics-local-days.test.js` |
 | BUG-0057 | MEDIUM | FIXED | ele | Supervisors could mark attendance for any future date, and for two days back just after midnight | `test/integration/attendance-local-day.test.js` |
 | BUG-0058 | MEDIUM | FIXED | ele | Sign-ins, password and PIN changes, templates, rosters, attendance edits, alert actions and ticket creation left no audit row | `test/integration/audit-coverage.test.js` |
+| BUG-0059 | MEDIUM | FIXED | complaints | After 180 days a guest's name was removed from the complaint but kept in its audit row | `test/integration/guest-anonymisation.test.js` |
 
-Count: 58 bug scenario(s).
+Count: 59 bug scenario(s).
 
 ## BUG-0001 — Admin could set a ticket to RESOLVED_PENDING_VERIFY directly
 
@@ -1116,4 +1117,22 @@ Count: 58 bug scenario(s).
 1. As an admin, edit an inspection template; open the audit log.
 2. Broken: nothing. Fixed: "Template Updated" by that admin.
 3. Regression: test/integration/audit-coverage.test.js.
+
+## BUG-0059 — After 180 days a guest's name was removed from the complaint but kept in its audit row
+
+- **Severity:** MEDIUM · **Status:** FIXED · **Module:** complaints · **Category:** data-exposure
+- **Origin:** Product and architecture review 2026-10 (PAR-10/19)
+- **Introduced:** pre-audit · **Fixed:** 2026-10-26
+- **Description:** anonymizeGuestData (services/cleanup.js) nulled guestName and guestPhone on public tickets older than 180 days, but POST /public/complaint also writes the guest's name into the ticket_public_create audit row (actorId and newValue.guestName), and that copy was kept for ever. Found by the 2026-10 product and architecture review (PAR-10/19).
+- **Root cause:** The anonymisation job knew only the ticket's copy of the name.
+- **Expected behavior:** The audit row's copy is cleared too (actorId "anonymous", no guestName), also for complaints anonymised earlier.
+- **Broken behavior:** The audit log kept the guest's name after the complaint itself had been anonymised.
+- **Scenario dependencies:** —
+- **Regression test:** `test/integration/guest-anonymisation.test.js`
+
+**Reproduction steps:**
+
+1. A public complaint with a guest name, older than 180 days.
+2. Run the guest anonymisation job.
+3. Broken: the ticket_public_create audit row still names the guest. Fixed: "anonymous". Test: test/integration/guest-anonymisation.test.js.
 

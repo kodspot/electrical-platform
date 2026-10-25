@@ -82,3 +82,5 @@
 - The electrician app no longer receives residents' contact details.
 - Administrators' pages are protected against harmful text entered as a name.
 - Running alert checks by hand affects only your own organization.
+- A guest's name is removed from the change history after 180 days, as it already was from
+  the complaint itself.

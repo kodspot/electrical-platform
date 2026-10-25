@@ -75,7 +75,7 @@ in `runExclusive` + try/catch so one failure never crashes the scheduler:
 | Job | Scheduler | Cadence | Lock key |
 |---|---|---|---|
 | Image retention cleanup (30 days from when each photo was taken: a ticket's complaint photo from its creation, its proof photo from `resolvedAt`) | `services/cleanup.js` | daily | `IMAGE_CLEANUP` |
-| Guest-PII anonymization (180-day) | `services/cleanup.js` | daily | `GUEST_ANONYMIZATION` |
+| Guest-PII anonymization (180 days: the guest's name and phone on the ticket, and the copy of the name in the complaint's audit row, BUG-0059) | `services/cleanup.js` | daily | `GUEST_ANONYMIZATION` |
 | Default template seeding | `services/cleanup.js` | at startup | `TEMPLATE_SEEDING` |
 | Scheduled alert checks (missed/overdue) | `services/automation.js` | 30 min | `SCHEDULED_CHECKS` |
 | Escalation checks | `services/automation.js` | 5 min | `ESCALATION_CHECKS` |

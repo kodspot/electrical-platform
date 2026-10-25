@@ -91,16 +91,21 @@ async function cleanupExpiredImages(logger) {
 
 /**
  * DPDP Act compliance: Anonymize guest complaint PII after 180 days.
- * Nulls out guestName and guestPhone on public tickets older than cutoff.
+ * Nulls out guestName and guestPhone on public tickets older than cutoff, and the copy of the
+ * name in the complaint's audit row (its actorId and newValue.guestName), which used to stay —
+ * including rows of complaints anonymised before that. [BUG-0059]
+ * `orgId` limits a run to one organization (tests); the scheduled job runs for all.
  */
 const GUEST_RETENTION_DAYS = 180;
 
-async function anonymizeGuestData(logger) {
+async function anonymizeGuestData(logger, { orgId } = {}) {
   const cutoff = new Date();
   cutoff.setDate(cutoff.getDate() - GUEST_RETENTION_DAYS);
+  const scope = orgId ? { orgId } : {};
 
   const result = await prisma.ticket.updateMany({
     where: {
+      ...scope,
       source: 'PUBLIC',
       createdAt: { lt: cutoff },
       OR: [
@@ -114,8 +119,17 @@ async function anonymizeGuestData(logger) {
     }
   });
 
-  if (result.count > 0) {
-    logger.info(`[cleanup] Anonymized PII on ${result.count} guest complaints older than ${GUEST_RETENTION_DAYS} days`);
+  const named = await prisma.auditLog.findMany({
+    where: { ...scope, action: 'ticket_public_create', createdAt: { lt: cutoff }, NOT: { actorId: 'anonymous' } },
+    select: { id: true, newValue: true }
+  });
+  for (const row of named) {
+    const { guestName, ...rest } = row.newValue || {}; // eslint-disable-line no-unused-vars
+    await prisma.auditLog.update({ where: { id: row.id }, data: { actorId: 'anonymous', newValue: rest } });
+  }
+
+  if (result.count > 0 || named.length > 0) {
+    logger.info(`[cleanup] Anonymized PII on ${result.count} guest complaints and ${named.length} audit rows older than ${GUEST_RETENTION_DAYS} days`);
   }
   return result.count;
 }
@@ -201,4 +215,4 @@ function startCleanupScheduler(logger) {
   return { startupTimeout, dailyInterval };
 }
 
-module.exports = { cleanupExpiredImages, expiredTicketPhotos, startCleanupScheduler };
+module.exports = { cleanupExpiredImages, expiredTicketPhotos, anonymizeGuestData, startCleanupScheduler };

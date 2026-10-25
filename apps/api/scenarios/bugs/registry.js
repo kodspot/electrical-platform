@@ -66,7 +66,8 @@ const BUGS_LIST = [
   require('./bug-0055-date-filters-start-at-0530'),
   require('./bug-0056-analytics-group-by-utc-day'),
   require('./bug-0057-attendance-today-is-utc'),
-  require('./bug-0058-actions-without-audit-rows')
+  require('./bug-0058-actions-without-audit-rows'),
+  require('./bug-0059-guest-name-kept-in-audit')
 ];
 
 const BUGS = Object.fromEntries(BUGS_LIST.map((b) => [b.id, b]));

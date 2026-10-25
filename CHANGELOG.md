@@ -367,6 +367,16 @@ see `docs/DEPLOYMENT.md` for how a change reaches production.
     cannot be tested without removing the shared super admin.
   - The existing alert-rule rows keep their `actorType: 'user'`.
   - Documented in `docs/architecture/data-model.md`.
+- **`[BUG-0059]` After 180 days a guest's name was removed from the complaint but kept in its
+  audit row** (PAR-10/19, in part).
+  - A public complaint also writes the guest's name into its `ticket_public_create` audit row,
+    as `actorId` and as `newValue.guestName`. `anonymizeGuestData` cleared only the ticket.
+  - It now clears that copy too: `actorId` becomes `anonymous` and the name is dropped. The
+    first run also clears the rows of complaints anonymised before this change.
+  - `anonymizeGuestData` takes an optional `{ orgId }`, for tests.
+  - Still open, as owner decisions: the copy of the name in the admin notification email,
+    which cannot be recalled once sent, and whether the IP hash, user agent, description and
+    review note should go after 180 days too.
 - **The fixes in `app.js` reach people on their first load after the deploy.**
   - Every page still loaded `app.js?v=14`, or `v=15` on the Quality page. Browsers keep
     `/js` for a day, and both service workers serve it from cache first.
