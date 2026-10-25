@@ -348,6 +348,14 @@ window.App = (function () {
     }, duration);
   }
 
+  // An action the server refused says why — its own error message, else the fallback.
+  // Row actions used to act only on success and say nothing otherwise. [BUG-0048]
+  async function toastFailure(res, fallback) {
+    var d = {};
+    try { d = await res.json(); } catch (e) { /* not JSON */ }
+    toast((d && d.error) || fallback || 'That did not work. Please try again.', 'error');
+  }
+
   // ─── Confirm Dialog ───
   function confirmDialog(msg) {
     return new Promise(function (resolve) {
@@ -1408,7 +1416,7 @@ window.App = (function () {
     supFetch: supFetch, supFetchJson: supFetchJson,
     elecFetch: elecFetch, elecFetchJson: elecFetchJson,
     logout: logout, logoutSA: logoutSA, logoutSup: logoutSup, logoutElec: logoutElec,
-    toast: toast, confirmDialog: confirmDialog,
+    toast: toast, toastFailure: toastFailure, confirmDialog: confirmDialog,
     initAdmin: initAdmin, initSupervisor: initSupervisor, initElectrician: initElectrician,
     initModulePWA: initModulePWA,
     buildUserMenu: _buildUserMenu,

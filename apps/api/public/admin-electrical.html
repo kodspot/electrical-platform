@@ -357,6 +357,8 @@ async function toggleFlag(id, currentStatus) {
     App.toast(currentStatus === 'FLAGGED' ? 'Unflagged' : 'Flagged', 'success');
     App.closeModal('detailModal');
     loadRecords(currentPage);
+  } else if (res) {
+    App.toastFailure(res, 'Could not change the flag');
   }
 }
 

@@ -27,6 +27,11 @@
   inspection now arrives after the night shift, not minutes after it starts, and a round
   done before midnight counts. A room that misses two rounds in a day gets an alert for each.
   Every alert rule you set up now fires; before, only the first rule on the same event did.
+- **Actions that cannot be done say why.** If deleting an alert rule, acknowledging an alert
+  or flagging an inspection is refused (for example because someone just removed it), the
+  page now says so instead of doing nothing.
+- **A purchase cost of 0 is kept.** Assets that cost nothing, such as donations, keep 0 as
+  their cost instead of showing it as unknown.
 - **Photos show in the asset, failure and inspection details.** Photos attached to an asset, a
   failure report or an inspection now appear when you press *View*; they showed as broken
   images before.

@@ -170,7 +170,7 @@ async function assetRoutes(fastify, opts) {
           warrantyExpiry: data.warrantyExpiry ? new Date(data.warrantyExpiry) : null,
           nextMaintenanceDue: data.nextMaintenanceDue ? new Date(data.nextMaintenanceDue) : null,
           maintenanceCycleDays: data.maintenanceCycleDays || null,
-          purchaseCost: data.purchaseCost || null,
+          purchaseCost: data.purchaseCost ?? null, // 0 is a real cost (donated, free) [BUG-0049]
           metadata: data.metadata || null
         },
         include: ASSET_INCLUDE
@@ -269,7 +269,7 @@ async function assetRoutes(fastify, opts) {
     if (data.warrantyExpiry !== undefined) updateData.warrantyExpiry = data.warrantyExpiry ? new Date(data.warrantyExpiry) : null;
     if (data.nextMaintenanceDue !== undefined) updateData.nextMaintenanceDue = data.nextMaintenanceDue ? new Date(data.nextMaintenanceDue) : null;
     if (data.maintenanceCycleDays !== undefined) updateData.maintenanceCycleDays = data.maintenanceCycleDays || null;
-    if (data.purchaseCost !== undefined) updateData.purchaseCost = data.purchaseCost || null;
+    if (data.purchaseCost !== undefined) updateData.purchaseCost = data.purchaseCost ?? null;
     if (data.metadata !== undefined) updateData.metadata = data.metadata || null;
 
     // Track status/condition changes for auto-event

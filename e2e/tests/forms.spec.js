@@ -180,6 +180,41 @@ test.describe('Forms — admin, supervisor, electrician', () => {
     }).toEqual([null, null]);
   });
 
+  // Row actions acted only on success: when the server refused (here: another admin removed
+  // the thing a moment earlier) the page said nothing and the row stayed. [BUG-0048]
+  test('BUG-0048: a row action the server refuses says why — acknowledge an alert, delete a rule, flag an inspection', async ({ page }) => {
+    const name = `Form Rule 48 ${s.run}`;
+    const rule = await db().alertRule.create({ data: { orgId: x.org.id, name, trigger: 'TICKET_HIGH_PRIORITY', conditions: {}, actions: [{ type: 'NOTIFY_ADMINS' }] } });
+    const alert = await db().alert.create({ data: { orgId: x.org.id, ruleId: rule.id, trigger: 'TICKET_HIGH_PRIORITY', severity: 'WARNING', title: `Form alert 48 ${s.run}` } });
+    const room = await db().location.create({ data: { orgId: x.org.id, name: `Form room 48 ${s.run}`, type: 'ROOM', qrCode: `F48${s.run}`.slice(0, 8).toUpperCase() } });
+    const inspection = await db().electricalInspection.create({ data: { orgId: x.org.id, locationId: room.id, supervisorId: x.supervisor.id, shift: 'GENERAL', status: 'SUBMITTED', inspectedAt: new Date() } });
+    page.on('dialog', (d) => d.accept());
+    await signIn(page, 'admin', x.admin, slug);
+
+    await page.goto(orgPage(slug, 'admin-alerts'));
+    await page.locator('.tab', { hasText: 'Alert History' }).click();
+    const alertCard = page.locator('.alert-card', { hasText: `Form alert 48 ${s.run}` });
+    await expect(alertCard).toBeVisible();
+    await db().alert.delete({ where: { id: alert.id } });
+    await alertCard.getByRole('button', { name: 'Acknowledge' }).click();
+    await expect(page.locator('.toast-error', { hasText: 'Alert not found' })).toBeVisible();
+
+    await page.locator('.tab', { hasText: 'Rules' }).first().click();
+    const ruleCard = page.locator('.rule-card', { hasText: name });
+    await expect(ruleCard).toBeVisible();
+    await db().alertRule.delete({ where: { id: rule.id } });
+    await ruleCard.getByRole('button', { name: 'Delete' }).click();
+    await expect(page.locator('.toast-error', { hasText: 'Rule not found' })).toBeVisible();
+
+    await page.goto(orgPage(slug, 'admin-electrical'));
+    await page.locator('tr', { hasText: `Form room 48 ${s.run}` }).getByRole('button', { name: 'View' }).click();
+    await expect(page.locator('#flagBtn')).toBeVisible();
+    await db().electricalInspection.delete({ where: { id: inspection.id } });
+    await page.locator('#flagBtn').click();
+    await expect(page.locator('.toast-error', { hasText: 'Inspection not found' })).toBeVisible();
+    await db().location.delete({ where: { id: room.id } });
+  });
+
   // The form offered only Notify Admins / Notify Supervisors / Create Ticket; the API also takes
   // "notify the location's supervisors / electricians" (what BUG-0019 made escalations reach).
   // Editing a rule that had them rebuilt the actions from the checkboxes and dropped them,

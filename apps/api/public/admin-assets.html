@@ -443,6 +443,7 @@ async function deleteAsset(id, name){
   if(!confirm('Delete/decommission "'+name+'"?')) return;
   var res = await App.apiFetch('/assets/'+id, {method:'DELETE'});
   if(res && res.ok){ var d=await res.json(); App.toast(d.message,'success'); loadAssets(currentPage); }
+  else if(res) App.toastFailure(res, 'Could not delete the asset');
 }
 
 // ── CSV ──

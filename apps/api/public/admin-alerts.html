@@ -408,7 +408,7 @@ async function editRule(id){
 async function deleteRule(id, name){
   if(!confirm('Delete rule "'+name+'"? This cannot be undone.')) return;
   var res = await apiFetch('/alert-rules/'+id,{method:'DELETE'});
-  if(res&&res.ok) loadRules();
+  if(res&&res.ok) loadRules(); else if(res) App.toastFailure(res, 'Could not delete the rule');
 }
 
 function updateTicketPriorityVis(){
@@ -540,13 +540,13 @@ async function loadAlerts(){
 
 async function ackAlert(id){
   var res = await apiFetch('/alerts/'+id+'/acknowledge',{method:'PATCH'});
-  if(res&&res.ok){ loadAlerts(); loadSummary(); }
+  if(res&&res.ok){ loadAlerts(); loadSummary(); } else if(res) App.toastFailure(res, 'Could not acknowledge the alert');
 }
 
 async function acknowledgeAll(){
   if(!confirm('Acknowledge all unacknowledged alerts?')) return;
   var res = await apiFetch('/alerts/acknowledge-all',{method:'PATCH'});
-  if(res&&res.ok){ loadAlerts(); loadSummary(); }
+  if(res&&res.ok){ loadAlerts(); loadSummary(); } else if(res) App.toastFailure(res, 'Could not acknowledge the alerts');
 }
 
 // ─── AI INSIGHTS ───

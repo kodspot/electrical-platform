@@ -239,6 +239,16 @@ see `docs/DEPLOYMENT.md` for how a change reaches production.
     the "Network error" message, and the person can try again knowingly.
   - A 503 (the circuit breaker refused before doing anything) is still retried.
   - Documented in `docs/architecture/frontend.md`.
+- **`[BUG-0048]` Row actions the server refused said nothing** (PAR-10/53).
+  - Deleting an alert rule, acknowledging one or all alerts, and flagging or unflagging an
+    inspection acted only on success. When the server refused, for example because another
+    admin had just removed the item, the page stayed silent.
+  - They now show the server's message through a new `App.toastFailure`.
+  - The asset page's `deleteAsset` got the same treatment, although no button calls it.
+    Admins decommission an asset through the edit form.
+- **`[BUG-0049]` An asset purchase cost of 0 was stored as "unknown"** (PAR-10/52). `|| null`
+  became `?? null` on create and edit.
+- **User-visible (Release Notes):** refused actions say why; a cost of 0 is kept.
 
 ### 2026-10-24 (product and architecture review — documentation only)
 

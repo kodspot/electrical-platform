@@ -63,8 +63,10 @@ Commands: `npm run bug:list` · `npm run bug:run -- <ID>` · `npm run bug:valida
 | BUG-0045 | MEDIUM | FIXED | ele | Missed-inspection alerts: the night shift was checked during the night, and a second shift or a second rule never alerted | `test/integration/missed-inspection.test.js` |
 | BUG-0046 | LOW | FIXED | ele | Token verification accepted any HMAC algorithm, not just the HS256 the app signs | `test/integration/jwt-algorithms.test.js` |
 | BUG-0047 | MEDIUM | FIXED | ele | The pages re-sent a submission after a network error, so one tap could create two complaints or tickets | `test/public-escaping.test.js` |
+| BUG-0048 | LOW | FIXED | ele | Row actions the server refused (delete a rule, acknowledge an alert, flag an inspection) said nothing | `e2e/tests/forms.spec.js` |
+| BUG-0049 | LOW | FIXED | asset | An asset purchase cost of 0 was stored as "unknown" | `test/integration/admin-forms-api.test.js` |
 
-Count: 47 bug scenario(s).
+Count: 49 bug scenario(s).
 
 ## BUG-0001 — Admin could set a ticket to RESOLVED_PENDING_VERIFY directly
 
@@ -908,4 +910,40 @@ Count: 47 bug scenario(s).
 1. Load app.js with a fetch that fails once with a network error, then answers.
 2. App.apiFetch(path, { method: "POST" }).
 3. Broken: two POSTs reach fetch. Fixed: one, and the call rejects.
+
+## BUG-0048 — Row actions the server refused (delete a rule, acknowledge an alert, flag an inspection) said nothing
+
+- **Severity:** LOW · **Status:** FIXED · **Module:** ele · **Category:** ui
+- **Origin:** Product and architecture review 2026-10 (PAR-10/53)
+- **Introduced:** pre-audit · **Fixed:** 2026-10-25
+- **Description:** Several admin row actions only acted when the request succeeded: on a 4xx/5xx — for example a rule or alert another admin had just removed — the page showed no message and the row stayed as if nothing happened. App.apiFetch returns such responses to the caller without a message. Found by the 2026-10 product and architecture review (PAR-10/53).
+- **Root cause:** The handlers had no else branch for a refused request.
+- **Expected behavior:** A refused row action shows the server's error message (App.toastFailure).
+- **Broken behavior:** Nothing visible happened.
+- **Scenario dependencies:** —
+- **Regression test:** `e2e/tests/forms.spec.js`
+
+**Reproduction steps:**
+
+1. Open admin-alerts; in another session delete one of the listed rules.
+2. Press Delete on that rule.
+3. Broken: nothing. Fixed: "Rule not found". Browser test: e2e/tests/forms.spec.js (BUG-0048).
+
+## BUG-0049 — An asset purchase cost of 0 was stored as "unknown"
+
+- **Severity:** LOW · **Status:** FIXED · **Module:** asset · **Category:** admin-workflow
+- **Origin:** Product and architecture review 2026-10 (PAR-10/52)
+- **Introduced:** pre-audit · **Fixed:** 2026-10-25
+- **Description:** routes/assets.js stored `data.purchaseCost || null` on create and edit, so a cost of 0 — a donated or free asset — became null. Found by the 2026-10 product and architecture review (PAR-10/52).
+- **Root cause:** `|| null` treats 0 as missing; `?? null` keeps it.
+- **Expected behavior:** purchaseCost 0 is stored as 0; null still clears it.
+- **Broken behavior:** purchaseCost null after saving 0.
+- **Scenario dependencies:** —
+- **Regression test:** `test/integration/admin-forms-api.test.js`
+
+**Reproduction steps:**
+
+1. POST /api/assets with purchaseCost: 0.
+2. Read the asset.
+3. Broken: purchaseCost null. Fixed: 0.
 
