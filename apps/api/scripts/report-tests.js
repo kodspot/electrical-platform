@@ -260,7 +260,7 @@ function decideExit({ childStatus, reportOk, counts, ci, strict, uncounted = [] 
   const reasons = [];
   if (childStatus !== 0) reasons.push(childStatus === null ? 'test process was killed by a signal' : `test process exited ${childStatus}`);
   if (!reportOk) reasons.push(REPORT_FAILED);
-  if (uncounted.length) reasons.push(`${uncounted.length} failure(s) the runner did not count — a suite threw while collecting its tests, so none of them ran: ${uncounted.join(', ')}`);
+  if (uncounted.length) reasons.push(`${uncounted.length} suite failure(s) the runner did not count — a describe() body or a suite hook threw: ${uncounted.join(', ')}`);
   if ((ci || strict) && counts) {
     for (const key of ['skipped', 'todo', 'cancelled']) {
       if (counts[key] > 0) reasons.push(`${counts[key]} test(s) ${key} under ${ci ? 'CI=true' : 'QA_STRICT=1'}`);
@@ -275,14 +275,18 @@ function notExecuted(counts) {
 }
 
 /**
- * Failures the runner left out of its own counts. When a describe() body throws while its
- * tests are collected, Node (24) reports the suite as failed, exits 0 and counts "fail 0";
- * the JUnit XML still itemises it as a failed testcase and the events stream marks it as a
- * suite with failureType testCodeFailure. Returns their names (scrubbed). [BUG-0029]
+ * Failures the runner left out of its own counts. Node (24) reports these suites as failed
+ * but exits 0 and counts "fail 0":
+ *   - a describe() body that throws while its tests are collected (none of them run) — the
+ *     JUnit XML itemises it as a failed testcase; events: kind suite, testCodeFailure [BUG-0029];
+ *   - a suite hook that throws, e.g. an after() cleanup — only the events stream records it
+ *     (kind suite, hookFailed); the XML shows a passing suite [BUG-0036].
+ * A suite failing because a test inside it failed (subtestsFailed) is already counted.
+ * Returns their names (scrubbed).
  */
 function uncountedFailures(counts, cases, events) {
   const fromEvents = events
-    .filter((e) => e.result === 'fail' && e.kind === 'suite' && e.failureType === 'testCodeFailure')
+    .filter((e) => e.result === 'fail' && e.kind === 'suite' && (e.failureType === 'testCodeFailure' || e.failureType === 'hookFailed'))
     .map((e) => scrub(e.name));
   if (fromEvents.length) return fromEvents;
   const failed = cases.filter((c) => c.status === 'failed');

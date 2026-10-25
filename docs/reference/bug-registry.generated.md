@@ -50,8 +50,10 @@ Commands: `npm run bug:list` · `npm run bug:run -- <ID>` · `npm run bug:valida
 | BUG-0032 | HIGH | FIXED | ele | An org admin's "run escalations" escalated every tenant's alerts, outside the scheduler lock | `test/integration/alert-manual-checks.test.js` |
 | BUG-0033 | HIGH | FIXED | ele | A proof photo uploaded late in an old ticket's life was deleted the next night | `test/integration/image-cleanup.test.js` |
 | BUG-0034 | HIGH | FIXED | ele | Password and PIN reset tokens were stored as issued, so the database value itself reset the account | `test/integration/account-recovery.test.js` |
+| BUG-0035 | MEDIUM | FIXED | ele | Permanently deleting an electrician who was on a duty roster failed with a 500; attendance history was silently erased | `test/integration/permanent-delete-parity.test.js` |
+| BUG-0036 | HIGH | FIXED | ele | `npm test` passed when a suite's after() hook threw — e.g. a cleanup that left test data behind | `test/report-tests.test.js` |
 
-Count: 34 bug scenario(s).
+Count: 36 bug scenario(s).
 
 ## BUG-0001 — Admin could set a ticket to RESOLVED_PENDING_VERIFY directly
 
@@ -661,4 +663,40 @@ Count: 34 bug scenario(s).
 1. POST /api/auth/forgot-password for an existing staff email.
 2. Read User.resetToken from the database and POST it to /api/auth/reset-password with a new password.
 3. Broken: 200, password changed. Fixed: 400.
+
+## BUG-0035 — Permanently deleting an electrician who was on a duty roster failed with a 500; attendance history was silently erased
+
+- **Severity:** MEDIUM · **Status:** FIXED · **Module:** ele · **Category:** admin-workflow
+- **Origin:** Product and architecture review 2026-10 (PAR-10/20)
+- **Introduced:** 2026-03-22 (duty rosters) · **Fixed:** 2026-10-25
+- **Description:** DELETE /api/workers/:id/permanent checked only inspection history. DutyRosterWorker references Worker with ON DELETE RESTRICT, so for anyone ever put on a roster the delete failed with a foreign-key error (500). Attendance records and the worker's link to tickets they resolved cascade, so for those workers the delete went through and silently erased that history — against the rule that history-bearing deletes are refused (409, [WP17]). Found by the 2026-10 product and architecture review (PAR-10/20).
+- **Root cause:** The [WP17] dependency check counted inspections only; rosters, attendance and resolved tickets were added later without extending it.
+- **Expected behavior:** The delete is refused with 409 and counts of every history that names the worker; nothing is deleted.
+- **Broken behavior:** A worker on a roster: 500 "Database error". A worker with attendance records: deleted, attendance gone.
+- **Scenario dependencies:** —
+- **Regression test:** `test/integration/permanent-delete-parity.test.js`
+
+**Reproduction steps:**
+
+1. Deactivate an electrician who is on a duty roster.
+2. DELETE /api/workers/:id/permanent as the org admin.
+3. Broken: 500. Fixed: 409 with dutyRosters: 1.
+
+## BUG-0036 — `npm test` passed when a suite's after() hook threw — e.g. a cleanup that left test data behind
+
+- **Severity:** HIGH · **Status:** FIXED · **Module:** ele · **Category:** qa-tooling
+- **Origin:** PAR-10 fixes 2026-10-25 (found while writing the BUG-0035 test)
+- **Introduced:** pre-audit · **Fixed:** 2026-10-25
+- **Description:** On Node 24 a suite hook that throws after its tests have passed (typically after() calling cleanupTestOrgs) is reported as a failed suite, but node --test exits 0 with "fail 0", and the JUnit XML shows a passing suite. BUG-0029's check covered only a describe() body that throws. Found when a new test's roster made the org cleanup fail (DutyRosterWorker RESTRICT) and the run stayed green.
+- **Root cause:** scripts/report-tests.js counted only suite failures of type testCodeFailure as uncounted; hookFailed was ignored, and only the events stream records it.
+- **Expected behavior:** A suite whose hook throws makes the run exit 1, with the suite named in the reasons.
+- **Broken behavior:** Exit 0, "fail 0"; the cleanup failure and the leftover data went unnoticed.
+- **Scenario dependencies:** —
+- **Regression test:** `test/report-tests.test.js`
+
+**Reproduction steps:**
+
+1. Add a test file whose describe() has an after() that throws, and a passing test.
+2. Run node scripts/run-tests.js on it.
+3. Broken: "[run-tests] exit 0". Fixed: exit 1, "1 suite failure(s) the runner did not count …".
 

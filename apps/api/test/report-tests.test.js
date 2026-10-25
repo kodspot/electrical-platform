@@ -236,6 +236,24 @@ describe('QA-1 report — exit decision', () => {
     });
   }
 
+  // A failing after() hook (a cleanup that throws) is just as invisible: Node exits 0 with
+  // "fail 0", and only the events stream records it — the JUnit XML shows a passing suite.
+  it('BUG-0036: fails a run whose suite after() hook threw (Node 24)', () => {
+    const out = fs.mkdtempSync(path.join(os.tmpdir(), 'qa1-report-'));
+    try {
+      const { counts: c, decision } = generateReport({
+        rawJunitPath: path.join(FIXTURES, 'node24-after-throws.xml'),
+        eventsPath: path.join(FIXTURES, 'node24-after-throws.events.jsonl'),
+        outDir: out, baselinePath: null, childStatus: 0, ci: false, strict: false, nodeVersion: 'v24'
+      });
+      assert.strictEqual(c.fail, 0, 'the runner itself counts no failure');
+      assert.strictEqual(decision.code, 1, `the run must fail: ${decision.reasons.join('; ')}`);
+      assert.ok(decision.reasons.some((r) => r.includes('probe suite whose after() throws')), decision.reasons.join('; '));
+    } finally {
+      fs.rmSync(out, { recursive: true, force: true });
+    }
+  });
+
   it('BUG-0029: a clean run with every failure counted still passes', () => {
     const out = fs.mkdtempSync(path.join(os.tmpdir(), 'qa1-report-'));
     try {

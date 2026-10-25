@@ -108,6 +108,22 @@ see `docs/DEPLOYMENT.md` for how a change reaches production.
     reading it back.
   - **On deploy:** reset links issued in the hour before the deploy stop working; the person
     requests a new one. Not otherwise visible to users.
+- **`[BUG-0035]` Permanently deleting an electrician who was on a duty roster failed with a
+  500; attendance history was silently erased** (PAR-10/20).
+  - The [WP17] guard counted only inspections. Duty rosters reference the worker with
+    `RESTRICT` (hence the 500), and attendance records and resolved-ticket links cascade.
+  - `DELETE /api/workers/:id/permanent` now refuses with `409` and lists every history
+    (inspections, duty rosters, attendance records, resolved tickets).
+  - The admin sees the reason instead of an error. Documented in `data-model.md`, which also
+    notes the roster `RESTRICT` as a hazard for a future org purge.
+- **`[BUG-0036]` `npm test` passed when a suite's `after()` hook threw** — for example a
+  cleanup that left test data behind.
+  - Node 24 exits 0 with `fail 0`, and only the events stream records the failure.
+  - `scripts/report-tests.js` now fails the run for any suite-level `hookFailed`, as BUG-0029
+    did for a throwing `describe()`.
+  - Found when the BUG-0035 test's roster made the org cleanup fail while the run stayed
+    green.
+  - New fixture: `test/fixtures/junit/node24-after-throws.*`.
 
 ### 2026-10-24 (product and architecture review — documentation only)
 

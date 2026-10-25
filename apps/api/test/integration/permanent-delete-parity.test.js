@@ -79,6 +79,44 @@ describe('WP17 — worker/supervisor permanent-delete parity', () => {
     assert.ok(link, "the worker's historical inspection association must be preserved, not silently disconnected");
   });
 
+  // A duty roster references the worker with ON DELETE RESTRICT, so deleting failed with a
+  // foreign-key error (500). Attendance records and resolved tickets cascade, so deleting
+  // silently erased the worker's attendance history and their part in past fixes. All three
+  // now block like inspection history does. [BUG-0035]
+  it('BUG-0035: a worker on a duty roster is refused with 409, not a 500, and stays on the roster', async (t) => {
+    if (!dbAvailable) return t.skip('No database available in this environment');
+    const worker = await createTestWorker(org.id, { isActive: false });
+    const roster = await prisma.dutyRoster.create({ data: { orgId: org.id, date: new Date('2026-10-01'), shift: 'MORNING', locationId: location.id, supervisorId: admin.id, workers: { create: [{ workerId: worker.id }] } } });
+    try {
+      const res = await app.inject({ method: 'DELETE', url: `/api/workers/${worker.id}/permanent`, headers: { authorization: `Bearer ${adminToken}` } });
+      assert.strictEqual(res.statusCode, 409, `expected 409, got ${res.statusCode} ${res.body.slice(0, 120)}`);
+      assert.strictEqual(res.json().dutyRosters, 1);
+      assert.ok(await prisma.worker.findUnique({ where: { id: worker.id } }), 'the worker is kept');
+      assert.strictEqual(await prisma.dutyRosterWorker.count({ where: { rosterId: roster.id, workerId: worker.id } }), 1);
+    } finally {
+      // The org cleanup cannot delete a worker a roster still names (RESTRICT): remove it first.
+      await prisma.dutyRoster.deleteMany({ where: { id: roster.id } });
+    }
+  });
+
+  it('BUG-0035: a worker with attendance records or resolved tickets is refused with 409, keeping that history', async (t) => {
+    if (!dbAvailable) return t.skip('No database available in this environment');
+    const attended = await createTestWorker(org.id, { isActive: false });
+    await prisma.attendance.create({ data: { orgId: org.id, workerId: attended.id, markedById: admin.id, date: new Date('2026-10-02'), shift: 'MORNING', status: 'PRESENT' } });
+    const fixer = await createTestWorker(org.id, { isActive: false });
+    const ticket = await prisma.ticket.create({ data: { orgId: org.id, locationId: location.id, title: '__wp1_test__ fixed by the worker', status: 'RESOLVED', resolvedWorkers: { connect: [{ id: fixer.id }] } } });
+
+    const a = await app.inject({ method: 'DELETE', url: `/api/workers/${attended.id}/permanent`, headers: { authorization: `Bearer ${adminToken}` } });
+    assert.strictEqual(a.statusCode, 409, a.body);
+    assert.strictEqual(a.json().attendanceRecords, 1);
+    assert.strictEqual(await prisma.attendance.count({ where: { workerId: attended.id } }), 1, 'the attendance history is kept');
+
+    const f = await app.inject({ method: 'DELETE', url: `/api/workers/${fixer.id}/permanent`, headers: { authorization: `Bearer ${adminToken}` } });
+    assert.strictEqual(f.statusCode, 409, f.body);
+    assert.strictEqual(f.json().resolvedTickets, 1);
+    assert.ok(await prisma.ticket.findFirst({ where: { id: ticket.id, resolvedWorkers: { some: { id: fixer.id } } } }), 'the ticket still names who fixed it');
+  });
+
   it('still permanently deletes a deactivated worker with no inspection history', async (t) => {
     if (!dbAvailable) return t.skip('No database available in this environment');
 

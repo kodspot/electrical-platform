@@ -102,7 +102,11 @@ everywhere authentication or page-serving happens (see
   changed, never their values. Supervisor values were stored in plain text until BUG-0030;
   `scripts/migrate-user-pii.js` encrypts rows saved before the fix (`docs/DEPLOYMENT.md`).
 - **Permanent deletes are dependency-guarded** — a worker or supervisor with inspection
-  history is blocked (`409`) rather than silently disconnected (`[WP17]`).
+  history is blocked (`409`) rather than silently disconnected (`[WP17]`). For a worker this
+  also covers duty rosters, attendance records and resolved tickets (BUG-0035). Note that
+  `DutyRosterWorker.workerId` is `ON DELETE RESTRICT`, so deleting an organization whose
+  workers are on a roster fails unless the rosters are deleted first. Today org deletion is
+  a soft delete; a future purge job must delete rosters first.
 - **A user who is referenced cannot be hard-deleted.** Six foreign keys to `User` are
   `ON DELETE RESTRICT`: `Ticket.createdById`, `Attendance.markedById`, `DutyRoster.supervisorId`,
   `AssetEvent.loggedById`, `AssetFailure.loggedById` and `ElectricalInspection.supervisorId`.

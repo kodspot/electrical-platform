@@ -42,7 +42,9 @@ const BUGS_LIST = [
   require('./bug-0031-worker-responses-carry-credentials'),
   require('./bug-0032-admin-runs-every-tenants-checks'),
   require('./bug-0033-late-proof-photo-deleted'),
-  require('./bug-0034-reset-tokens-stored-raw')
+  require('./bug-0034-reset-tokens-stored-raw'),
+  require('./bug-0035-worker-delete-history-guard'),
+  require('./bug-0036-test-run-green-when-after-hook-throws')
 ];
 
 const BUGS = Object.fromEntries(BUGS_LIST.map((b) => [b.id, b]));

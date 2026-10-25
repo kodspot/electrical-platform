@@ -334,11 +334,23 @@ async function workerRoutes(fastify, opts) {
     // would stop the old disconnect-then-delete), but disconnecting still
     // lost the historical worker↔inspection association with no warning to
     // the admin performing the delete.
-    const recordCount = await prisma.electricalInspection.count({ where: { workers: { some: { id } } } });
-    if (recordCount > 0) {
+    // The same rule covers every other history that names the worker: duty rosters (a
+    // RESTRICT foreign key — deleting failed with a 500), attendance records and resolved
+    // tickets (both cascaded, silently erasing that history). [BUG-0035]
+    const [electricalInspections, dutyRosters, attendanceRecords, resolvedTickets] = await Promise.all([
+      prisma.electricalInspection.count({ where: { workers: { some: { id } } } }),
+      prisma.dutyRosterWorker.count({ where: { workerId: id } }),
+      prisma.attendance.count({ where: { workerId: id } }),
+      prisma.ticket.count({ where: { resolvedWorkers: { some: { id } } } })
+    ]);
+    const history = [
+      [electricalInspections, 'inspection records'], [dutyRosters, 'duty rosters'],
+      [attendanceRecords, 'attendance records'], [resolvedTickets, 'resolved tickets']
+    ].filter(([n]) => n > 0).map(([n, label]) => `${n} ${label}`);
+    if (history.length > 0) {
       return reply.code(409).send({
-        error: 'Cannot permanently delete worker with ' + recordCount + ' inspection records. They will remain archived.',
-        electricalInspections: recordCount
+        error: 'Cannot permanently delete worker with ' + history.join(', ') + '. They will remain archived.',
+        electricalInspections, dutyRosters, attendanceRecords, resolvedTickets
       });
     }
 
