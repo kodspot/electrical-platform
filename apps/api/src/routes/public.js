@@ -10,6 +10,7 @@ const { notify } = require('../services/notification-service');
 const { escHtml } = require('../lib/email');
 const { getAssignedSupervisorIds, getAssignedWorkerIds, getLocationBreadcrumb } = require('../services/assignment-resolver');
 const { normalizeEnabledModules, isModuleEnabled } = require('../services/module-policy');
+const { STALE_TICKET_ERROR, updateTicketIfUnchanged } = require('../services/ticket-status');
 const {
   VALID_MODULES,
   DEFAULT_MODULE_ISSUES,
@@ -631,8 +632,10 @@ async function publicRoutes(fastify, opts) {
     const now = new Date();
 
     if (data.action === 'CONFIRM') {
-      await prisma.ticket.update({
-        where: { reviewToken: token },
+      // Only if the ticket and its review are still as read: a supervisor reopening it at the
+      // same moment withdraws the review instead of both landing. [BUG-0038]
+      const confirmed = await updateTicketIfUnchanged(prisma, ticket, {
+        where: { reviewToken: token, reviewStatus: 'PENDING' },
         data: {
           reviewStatus: 'CONFIRMED',
           reviewNote: data.note?.trim() || null,
@@ -640,6 +643,7 @@ async function publicRoutes(fastify, opts) {
           status: 'CLOSED'
         }
       });
+      if (!confirmed) return reply.code(409).send({ error: STALE_TICKET_ERROR });
 
       await prisma.auditLog.create({
         data: {
@@ -660,8 +664,8 @@ async function publicRoutes(fastify, opts) {
     // ticket stayed out of their pool and their app showed it "Done" with no way to pick it
     // up again. The resolution itself (photo, note) and the guest's verdict stay. [BUG-0026]
     const resolverIds = (ticket.resolvedWorkers || []).map((w) => w.id);
-    await prisma.ticket.update({
-      where: { reviewToken: token },
+    const rejected = await updateTicketIfUnchanged(prisma, ticket, {
+      where: { reviewToken: token, reviewStatus: 'PENDING' },
       data: {
         reviewStatus: 'REJECTED',
         reviewNote: data.note?.trim() || null,
@@ -671,6 +675,7 @@ async function publicRoutes(fastify, opts) {
         resolvedWorkers: { set: [] }
       }
     });
+    if (!rejected) return reply.code(409).send({ error: STALE_TICKET_ERROR });
 
     await prisma.auditLog.create({
       data: {

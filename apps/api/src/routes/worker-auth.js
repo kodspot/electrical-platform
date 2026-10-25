@@ -7,7 +7,7 @@ const { z } = require('zod');
 const { prisma } = require('../lib/prisma');
 const { BCRYPT_COST, hashResetToken } = require('../lib/security');
 const { loginRateLimit, strictRateLimit } = require('../middleware/rateLimits');
-const { uploadToR2 } = require('../lib/r2');
+const { uploadToR2, deleteFromR2 } = require('../lib/r2');
 const { validateImageBuffer } = require('../errors');
 const { getLocationDescendants } = require('../services/assignment-resolver');
 const { normalizeEnabledModules } = require('../services/module-policy');
@@ -30,7 +30,9 @@ const {
   VERIFY_PENDING_TICKET_STATUSES,
   EDITABLE_TICKET_STATUSES,
   isOpenLikeStatus,
-  isActiveLikeStatus
+  isActiveLikeStatus,
+  STALE_TICKET_ERROR,
+  updateTicketIfUnchanged
 } = require('../services/ticket-status');
 
 const VALID_MODULES = ['ele', 'civil', 'asset', 'complaints'];
@@ -565,8 +567,7 @@ async function workerAuthRoutes(fastify) {
     }
 
     const alreadyConnected = ticket.resolvedWorkers.some(w => w.id === workerId);
-    const updated = await prisma.ticket.update({
-      where: { id: ticket.id },
+    const updated = await updateTicketIfUnchanged(prisma, ticket, {
       data: {
         status: TICKET_STATUSES.RESOLVED_PENDING_VERIFY,
         resolvedAt: new Date(),
@@ -576,6 +577,10 @@ async function workerAuthRoutes(fastify) {
       },
       select: WORKER_TICKET_SELECT
     });
+    if (!updated) {
+      deleteFromR2(resolvedImageUrl).catch(() => {}); // the photo for a write that did not land
+      return reply.code(409).send({ error: STALE_TICKET_ERROR });
+    }
 
     await prisma.auditLog.create({
       data: {
@@ -690,8 +695,10 @@ async function workerAuthRoutes(fastify) {
     }
 
     const alreadyConnected = ticket.resolvedWorkers.some(w => w.id === workerId);
-    const updated = await prisma.ticket.update({
-      where: { id: ticket.id },
+    // Several electricians may join one ticket, so concurrent pickups both land; only a
+    // change to a status that can no longer be picked up (resolved, closed) refuses. [BUG-0038]
+    const updated = await updateTicketIfUnchanged(prisma, ticket, {
+      where: { status: { in: ACTIVE_TICKET_STATUSES } },
       data: {
         status: TICKET_STATUSES.IN_PROGRESS,
         acceptedAt: ticket.acceptedAt || new Date(),
@@ -699,6 +706,7 @@ async function workerAuthRoutes(fastify) {
       },
       select: WORKER_TICKET_SELECT
     });
+    if (!updated) return reply.code(409).send({ error: STALE_TICKET_ERROR });
 
     await prisma.auditLog.create({
       data: {

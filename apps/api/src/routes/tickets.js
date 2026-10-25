@@ -3,7 +3,7 @@
 const crypto = require('crypto');
 const { z } = require('zod');
 const { prisma } = require('../lib/prisma');
-const { uploadToR2 } = require('../lib/r2');
+const { uploadToR2, deleteFromR2 } = require('../lib/r2');
 const { validateImageBuffer } = require('../errors');
 const { authenticateJWT, requirePolicy } = require('../middleware/auth');
 const { createNotification, notifyAdmins } = require('./notifications');
@@ -18,7 +18,9 @@ const {
   ACTIVE_TICKET_STATUSES,
   VERIFY_PENDING_TICKET_STATUSES,
   EDITABLE_TICKET_STATUSES,
-  isOpenLikeStatus
+  isOpenLikeStatus,
+  STALE_TICKET_ERROR,
+  updateTicketIfUnchanged
 } = require('../services/ticket-status');
 
 // SLA deadlines by priority (milliseconds)
@@ -442,11 +444,12 @@ async function ticketRoutes(fastify, opts) {
       return reply.code(400).send({ error: 'Only OPEN/ACKNOWLEDGED/ASSIGNED tickets can be accepted' });
     }
 
-    const updated = await prisma.ticket.update({
-      where: { id },
+    const updated = await updateTicketIfUnchanged(prisma, ticket, {
+      where: { assignedToId: request.user.id },
       data: { status: TICKET_STATUSES.IN_PROGRESS },
       include: TICKET_INCLUDE
     });
+    if (!updated) return reply.code(409).send({ error: STALE_TICKET_ERROR });
 
     await prisma.auditLog.create({
       data: {
@@ -474,11 +477,14 @@ async function ticketRoutes(fastify, opts) {
     });
     if (!ticket) return reply.code(404).send({ error: 'Ticket not found or already assigned' });
 
-    const updated = await prisma.ticket.update({
-      where: { id },
+    // Still unassigned, in the status checked: two supervisors picking it up at once can't
+    // both get it. [BUG-0038]
+    const updated = await updateTicketIfUnchanged(prisma, ticket, {
+      where: { assignedToId: null },
       data: { assignedToId: request.user.id, status: TICKET_STATUSES.IN_PROGRESS },
       include: TICKET_INCLUDE
     });
+    if (!updated) return reply.code(409).send({ error: STALE_TICKET_ERROR });
 
     await prisma.auditLog.create({
       data: {
@@ -581,14 +587,17 @@ async function ticketRoutes(fastify, opts) {
       updateData.reviewStatus = 'PENDING';
     }
 
-    const updated = await prisma.ticket.update({
-      where: { id },
+    const updated = await updateTicketIfUnchanged(prisma, ticket, {
       data: updateData,
       include: {
         ...TICKET_INCLUDE,
         resolvedWorkers: { select: { id: true, name: true } }
       }
     });
+    if (!updated) {
+      deleteFromR2(resolvedImageUrl).catch(() => {}); // the photo for a write that did not land
+      return reply.code(409).send({ error: STALE_TICKET_ERROR });
+    }
 
     await prisma.auditLog.create({
       data: {
@@ -667,11 +676,11 @@ async function ticketRoutes(fastify, opts) {
       updateData.reviewStatus = 'PENDING';
     }
 
-    const updated = await prisma.ticket.update({
-      where: { id },
+    const updated = await updateTicketIfUnchanged(prisma, ticket, {
       data: updateData,
       include: TICKET_INCLUDE
     });
+    if (!updated) return reply.code(409).send({ error: STALE_TICKET_ERROR });
 
     await prisma.auditLog.create({
       data: {
@@ -732,8 +741,7 @@ async function ticketRoutes(fastify, opts) {
       return reply.code(403).send({ error: 'You can only reopen tickets assigned to you' });
     }
 
-    const updated = await prisma.ticket.update({
-      where: { id },
+    const updated = await updateTicketIfUnchanged(prisma, ticket, {
       data: {
         status: TICKET_STATUSES.IN_PROGRESS,
         resolvedAt: null,
@@ -743,6 +751,7 @@ async function ticketRoutes(fastify, opts) {
       },
       include: TICKET_INCLUDE
     });
+    if (!updated) return reply.code(409).send({ error: STALE_TICKET_ERROR });
 
     await prisma.auditLog.create({
       data: {

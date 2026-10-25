@@ -54,6 +54,25 @@ function isActiveLikeStatus(status) {
   return ACTIVE_TICKET_STATUSES.includes(status);
 }
 
+const STALE_TICKET_ERROR = 'This ticket was changed by someone else just now. Reload it and try again.';
+
+/**
+ * Compare-and-set for ticket transitions: the update applies only if the ticket's status is
+ * still the one the route read and checked (plus any extra `where` conditions; a route may
+ * widen `status` to the set it accepts). When two people act on one ticket at once — verify
+ * vs reject, a double verify, two supervisors' pickups — only one write lands; the other gets
+ * null and answers 409 STALE_TICKET_ERROR. Before, every request "succeeded" and the last
+ * write won. [BUG-0038]
+ */
+async function updateTicketIfUnchanged(client, ticket, args) {
+  try {
+    return await client.ticket.update({ ...args, where: { status: ticket.status, ...(args.where || {}), id: ticket.id } });
+  } catch (err) {
+    if (err && err.code === 'P2025') return null; // the status (or a condition) no longer matches
+    throw err;
+  }
+}
+
 module.exports = {
   TICKET_STATUSES,
   OPEN_TICKET_STATUSES,
@@ -62,5 +81,7 @@ module.exports = {
   DONE_TICKET_STATUSES,
   EDITABLE_TICKET_STATUSES,
   isOpenLikeStatus,
-  isActiveLikeStatus
+  isActiveLikeStatus,
+  STALE_TICKET_ERROR,
+  updateTicketIfUnchanged
 };

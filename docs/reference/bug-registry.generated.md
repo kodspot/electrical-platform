@@ -53,8 +53,9 @@ Commands: `npm run bug:list` · `npm run bug:run -- <ID>` · `npm run bug:valida
 | BUG-0035 | MEDIUM | FIXED | ele | Permanently deleting an electrician who was on a duty roster failed with a 500; attendance history was silently erased | `test/integration/permanent-delete-parity.test.js` |
 | BUG-0036 | HIGH | FIXED | ele | `npm test` passed when a suite's after() hook threw — e.g. a cleanup that left test data behind | `test/report-tests.test.js` |
 | BUG-0037 | HIGH | FIXED | ele | A deactivated (or moved) supervisor kept their open tickets, where no one else could see them | `test/integration/supervisor-handover.test.js` |
+| BUG-0038 | HIGH | FIXED | ele | Two people acting on one ticket at once both "succeeded" — the last write won | `test/integration/ticket-concurrency.test.js` |
 
-Count: 37 bug scenario(s).
+Count: 38 bug scenario(s).
 
 ## BUG-0001 — Admin could set a ticket to RESOLVED_PENDING_VERIFY directly
 
@@ -718,4 +719,22 @@ Count: 37 bug scenario(s).
 1. Give a supervisor an OPEN ticket at a location another supervisor also covers.
 2. Deactivate the first supervisor as the org admin.
 3. Broken: the ticket is still theirs. Fixed: it belongs to the other supervisor.
+
+## BUG-0038 — Two people acting on one ticket at once both "succeeded" — the last write won
+
+- **Severity:** HIGH · **Status:** FIXED · **Module:** ele · **Category:** ticket-workflow
+- **Origin:** Product and architecture review 2026-10 (PAR-10/05)
+- **Introduced:** pre-audit · **Fixed:** 2026-10-25
+- **Description:** Every ticket transition read the ticket, checked its status, then updated it by id alone. Two requests at the same moment both passed the check: a fix was verified AND sent back (verify 200, reopen 200), verified twice (two audit rows, two notifications), or picked up by two supervisors. The same held for an electrician's resolve and the guest's review. Found by the 2026-10 product and architecture review (PAR-10/05).
+- **Root cause:** Read-check-write without a condition on the write; nothing stopped the second write after the first changed the status.
+- **Expected behavior:** Each transition writes only if the status is still the one it checked (updateTicketIfUnchanged); the loser answers 409 (or 400 once the change is visible). The admin's generic edit stays an explicit override.
+- **Broken behavior:** Two concurrent verifies of one ticket both answered 200.
+- **Scenario dependencies:** —
+- **Regression test:** `test/integration/ticket-concurrency.test.js`
+
+**Reproduction steps:**
+
+1. Create a ticket waiting for verification, assigned to a supervisor.
+2. Send POST /api/tickets/:id/verify as that supervisor and as an admin at the same moment.
+3. Broken: both 200. Fixed: exactly one 200.
 

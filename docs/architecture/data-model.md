@@ -96,6 +96,12 @@ everywhere authentication or page-serving happens (see
 
 - **Multi-record writes that must agree use `$transaction`** (Charter §8.1) — e.g. an
   asset's status and its `AssetEvent`/`AssetFailure`.
+- **Ticket transitions are compare-and-set on status.** Each lifecycle route (accept, pick up,
+  resolve, verify, reopen, the electrician's pick up and resolve, the guest's review) writes
+  through `updateTicketIfUnchanged` (`services/ticket-status.js`). The update applies only if
+  the status is still the one the route checked, so two people acting at once cannot both
+  win; the loser answers `409`. The admin's generic `PATCH` is an explicit override and stays
+  unconditional (BUG-0038).
 - **PII is encrypted at rest** via `lib/crypto.js` (AES-256-GCM), unconditionally (Charter
   §6). Encrypted fields: the Aadhaar number and blood group of workers and of users
   (supervisors), through `encryptPII` / `decryptPII`. Audit rows record that those two fields

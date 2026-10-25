@@ -11,7 +11,8 @@ const {
   DONE_TICKET_STATUSES,
   EDITABLE_TICKET_STATUSES,
   isOpenLikeStatus,
-  isActiveLikeStatus
+  isActiveLikeStatus,
+  updateTicketIfUnchanged
 } = require('../src/services/ticket-status');
 
 test('every OPEN_TICKET_STATUSES value is also in ACTIVE_TICKET_STATUSES', () => {
@@ -72,4 +73,19 @@ test('isActiveLikeStatus is true for the full open+in-progress+on-hold set', () 
   assert.strictEqual(isActiveLikeStatus(TICKET_STATUSES.ON_HOLD), true);
   assert.strictEqual(isActiveLikeStatus(TICKET_STATUSES.RESOLVED_PENDING_VERIFY), false);
   assert.strictEqual(isActiveLikeStatus(TICKET_STATUSES.CLOSED), false);
+});
+
+// BUG-0038: transitions write only if the status is still the one they checked.
+test('updateTicketIfUnchanged conditions the write on the status it read, lets a route widen it, and turns a miss into null', async () => {
+  const calls = [];
+  const client = { ticket: { update: async (args) => { calls.push(args); return { id: args.where.id }; } } };
+  const ticket = { id: 't1', status: TICKET_STATUSES.RESOLVED_PENDING_VERIFY };
+  assert.deepStrictEqual(await updateTicketIfUnchanged(client, ticket, { data: { status: 'RESOLVED' } }), { id: 't1' });
+  assert.deepStrictEqual(calls[0].where, { status: TICKET_STATUSES.RESOLVED_PENDING_VERIFY, id: 't1' });
+  await updateTicketIfUnchanged(client, ticket, { where: { assignedToId: null, status: { in: ACTIVE_TICKET_STATUSES }, id: 'other' }, data: {} });
+  assert.deepStrictEqual(calls[1].where, { status: { in: ACTIVE_TICKET_STATUSES }, assignedToId: null, id: 't1' }, 'the id is never overridden');
+  const missing = { ticket: { update: async () => { const e = new Error('not found'); e.code = 'P2025'; throw e; } } };
+  assert.strictEqual(await updateTicketIfUnchanged(missing, ticket, { data: {} }), null);
+  const broken = { ticket: { update: async () => { throw new Error('connection lost'); } } };
+  await assert.rejects(updateTicketIfUnchanged(broken, ticket, { data: {} }), /connection lost/, 'other errors still surface');
 });

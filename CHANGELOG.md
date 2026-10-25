@@ -140,6 +140,20 @@ see `docs/DEPLOYMENT.md` for how a change reaches production.
     reaching someone in another tenant.
   - The admin page's message says how many tickets moved. Finished tickets keep their
     assignee.
+- **`[BUG-0038]` Two people acting on one ticket at once both "succeeded" — the last write
+  won** (PAR-10/05).
+  - What happened: every transition read, checked, then updated by id alone. A test showed
+    verify and reopen both answering 200 on one ticket, a double verify both landing (two
+    audit rows), and two supervisors "picking up" the same ticket.
+  - Now: each lifecycle route writes through `updateTicketIfUnchanged`
+    (`services/ticket-status.js`). That covers the staff accept, pick up, resolve, verify and
+    reopen; the electrician's pick up and resolve; and the guest's confirm and reject. The
+    update applies only if the status is still the one checked; the loser answers `409`
+    ("changed by someone else just now — reload").
+  - Electricians may still join one ticket at the same moment.
+  - A proof photo uploaded by a losing resolve is deleted.
+  - The admin's generic PATCH stays an explicit override.
+  - Documented in `data-model.md`.
 
 ### 2026-10-24 (product and architecture review — documentation only)
 
