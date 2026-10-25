@@ -269,8 +269,13 @@ see `docs/DEPLOYMENT.md` for how a change reaches production.
   - The reset pages opened without a token now show a request form: email, or Employee ID
     with the organization code when no organization is passed. The answer is the server's
     generic message, plus who to ask if no email arrives.
-  - The super-admin sign-in page's **Run one-time setup** linked to `/superadmin-setup`, a
-    page that does not exist. It now runs `POST /auth/bootstrap` with the key just entered.
+  - The super-admin sign-in page's **Run one-time setup** linked to `/superadmin-setup`.
+    The owner removed that page on purpose once production was set up (`b9d9d8a`), and the
+    link was left behind. The hint now says the operator creates the first super admin on
+    the server and links nowhere. `docs/DEPLOYMENT.md` gains that step: it runs inside the
+    container, so the key never appears on a command line. (The first version of this fix,
+    `7823390`, ran the bootstrap from the page. That brought back what the owner had
+    removed, so it was reverted.)
   - No server change. The rest of PAR-10/26 is BUG-0052.
 - **User-visible (Release Notes):** "Forgot password?" and "Forgot PIN?" on the sign-in pages.
 - **`[BUG-0052]` Nobody could change their own password or PIN while signed in** (PAR-10/26).

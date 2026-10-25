@@ -561,21 +561,21 @@ test.describe('Forms — admin, supervisor, electrician', () => {
     }
   });
 
-  test('BUG-0051: super admin, none set up yet: "Run one-time setup" runs it with the key just entered', async ({ page }) => {
-    // Stubbed responses — the e2e database already has a super admin, and keeps it.
-    let bootstrapBody = null;
+  // The setup page was removed on purpose once production was set up (b9d9d8a); only the
+  // hint's link to it was left. The hint now says who does the setup, and links nowhere.
+  test('BUG-0051: super admin, none set up yet: the hint says the operator sets it up — no dead link, no setup from the page', async ({ page }) => {
+    // Stubbed: the e2e database already has a super admin, and keeps it.
+    let bootstrapCalled = false;
     await page.route('**/api/auth/login', (r) => r.fulfill({ status: 404, contentType: 'application/json', body: JSON.stringify({ error: 'No SuperAdmin account exists. Use /auth/bootstrap first.' }) }));
-    await page.route('**/api/auth/bootstrap', (r) => {
-      bootstrapBody = r.request().postDataJSON();
-      return r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ token: 'stub', user: { id: 'stub', name: 'Super Admin', role: 'SUPER_ADMIN' } }) });
-    });
-    await page.route('**/superadmin-dashboard', (r) => r.fulfill({ status: 200, contentType: 'text/html', body: '<p>dashboard</p>' }));
+    await page.route('**/api/auth/bootstrap', (r) => { bootstrapCalled = true; return r.abort(); });
     await page.goto('/superadmin-login');
     await page.locator('#adminKey').fill('a-key-typed-by-the-operator');
     await page.getByRole('button', { name: 'Sign In' }).click();
-    await page.getByRole('button', { name: 'Run one-time setup' }).click();
-    await expect(page).toHaveURL(/\/superadmin-dashboard$/);
-    expect(bootstrapBody).toEqual({ adminKey: 'a-key-typed-by-the-operator' });
+    const hint = page.locator('#setupHint');
+    await expect(hint).toContainText('The operator creates it once on the server');
+    await expect(hint.locator('a, button')).toHaveCount(0);
+    await expect(page.locator('a[href="/superadmin-setup"]')).toHaveCount(0);
+    expect(bootstrapCalled).toBe(false);
   });
 
   // PATCH /auth/password and /auth/worker-pin had no screen: nobody could change their own

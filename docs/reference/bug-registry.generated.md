@@ -975,7 +975,7 @@ Count: 52 bug scenario(s).
 - **Introduced:** pre-audit · **Fixed:** 2026-10-25
 - **Description:** POST /auth/forgot-password and /auth/worker-forgot-pin had no caller in the app: no sign-in page had a "Forgot password / PIN" link, and the reset pages, opened without a link, said "request a new reset from the sign-in page", which could not be done. The super-admin sign-in page's "Run one-time setup" linked to /superadmin-setup, which does not exist. Found by the 2026-10 product and architecture review (PAR-10/26).
 - **Root cause:** The request side of the reset flow was built as API only; the setup hint pointed at a page that was never written.
-- **Expected behavior:** Each sign-in page links to a request form (the reset page without a token); the super-admin hint runs POST /auth/bootstrap with the key entered.
+- **Expected behavior:** Each sign-in page links to a request form (the reset page without a token); the super-admin hint says the operator does the one-time setup and links nowhere (the setup page was removed on purpose, b9d9d8a).
 - **Broken behavior:** No way to request a reset from the app; the setup link opened a page that does not exist.
 - **Scenario dependencies:** —
 - **Regression test:** `e2e/tests/forms.spec.js`

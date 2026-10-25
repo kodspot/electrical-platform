@@ -34,7 +34,7 @@ module.exports = {
   dateIntroduced: 'pre-audit',
   dateFixed: '2026-10-25',
   rootCause: 'The request side of the reset flow was built as API only; the setup hint pointed at a page that was never written.',
-  expectedBehavior: 'Each sign-in page links to a request form (the reset page without a token); the super-admin hint runs POST /auth/bootstrap with the key entered.',
+  expectedBehavior: 'Each sign-in page links to a request form (the reset page without a token); the super-admin hint says the operator does the one-time setup and links nowhere (the setup page was removed on purpose, b9d9d8a).',
   brokenBehavior: 'No way to request a reset from the app; the setup link opened a page that does not exist.',
   reproductionSteps: [
     'Open /<org>/ele/admin-login (or the supervisor or electrician sign-in page).',
@@ -60,7 +60,7 @@ module.exports = {
     }
     const sa = read('superadmin-login.html');
     if (sa.includes('href="/superadmin-setup"')) return { ok: false, detail: 'superadmin-login.html still links to /superadmin-setup' };
-    if (!sa.includes("fetch('/api/auth/bootstrap'")) return { ok: false, detail: 'the setup hint does not run the bootstrap' };
+    if (sa.includes("fetch('/api/auth/bootstrap'")) return { ok: false, detail: 'the sign-in page runs the bootstrap: the setup screen was removed on purpose (b9d9d8a)' };
 
     // The endpoints the forms call answer the generic message, for an unknown account too.
     const { org } = ctx['BUG-0051'];
@@ -68,6 +68,6 @@ module.exports = {
     if (staff.statusCode !== 200) return { ok: false, detail: `forgot-password answered ${staff.statusCode}` };
     const worker = await ctx.app.inject({ method: 'POST', url: '/api/auth/worker-forgot-pin', headers: { 'x-forwarded-for': '10.88.51.2' }, payload: { orgSlug: org.slug, employeeId: 'NOBODY-0051' } });
     if (worker.statusCode !== 200) return { ok: false, detail: `worker-forgot-pin answered ${worker.statusCode}` };
-    return { ok: true, detail: 'every sign-in page links to a reset request; the setup hint runs the bootstrap' };
+    return { ok: true, detail: 'every sign-in page links to a reset request; the setup hint links nowhere' };
   }
 };

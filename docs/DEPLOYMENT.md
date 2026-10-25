@@ -118,6 +118,19 @@ cd ~/electrical-platform && docker compose exec -T api npx prisma migrate status
   comes first. Backups taken before step 3 keep the plain-text values until they age out
   (14 days).
 
+**The first super admin on a new database** (a fresh install, or a restore into an empty
+database). There is no setup screen: the one-time page was removed once production was set
+up (`b9d9d8a`). Until a super admin exists, the super-admin sign-in page says so. The owner
+creates it on the host. The command reads `ADMIN_KEY` inside the container, so the key never
+appears on a command line, and it prints only the status: 200 creates it, 409 means one
+already exists.
+
+```bash
+cd ~/electrical-platform && docker compose exec -T api node -e "fetch('http://localhost:' + (process.env.PORT || 3000) + '/api/auth/bootstrap', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ adminKey: process.env.ADMIN_KEY }) }).then((r) => console.log(r.status))"
+```
+
+Then sign in at `/superadmin-login` with the same key.
+
 **Secrets that reach the server only through the deploy job:** besides the long-standing
 ones, the deploy job passes `GIT_SHA` (`github.sha`), `IP_HASH_PEPPER`, `QA_INGEST_TOKEN` and
 `GH_ACTIONS_DISPATCH_TOKEN` through the SSH step's `env`/`envs:` and the `.env` it writes.
