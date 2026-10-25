@@ -3,6 +3,7 @@
 const { z } = require('zod');
 const { prisma } = require('../lib/prisma');
 const { authenticateJWT, requirePolicy, requireModule } = require('../middleware/auth');
+const { auditStaffAction } = require('../services/audit');
 
 // Zod schemas
 const templateItemSchema = z.object({
@@ -136,6 +137,7 @@ async function templateRoutes(fastify, opts) {
       }
     });
 
+    await auditStaffAction(request, { action: 'template_created', entityType: 'InspectionTemplate', entityId: template.id, newValue: { name: template.name, items: template.items.length } });
     return reply.code(201).send(template);
   });
 
@@ -225,6 +227,7 @@ async function templateRoutes(fastify, opts) {
         _count: { select: { inspections: true } }
       }
     });
+    await auditStaffAction(request, { action: 'template_updated', entityType: 'InspectionTemplate', entityId: existing.id, oldValue: { name: existing.name }, newValue: { changed: Object.keys(data) } });
     return updated;
   });
 
@@ -246,11 +249,13 @@ async function templateRoutes(fastify, opts) {
         where: { id: template.id },
         data: { isActive: false, isDefault: false }
       });
+      await auditStaffAction(request, { action: 'template_deactivated', entityType: 'InspectionTemplate', entityId: template.id, oldValue: { name: template.name } });
       return { message: 'Template deactivated (has existing inspections)' };
     }
 
     // No inspections — hard delete (cascade removes items)
     await prisma.inspectionTemplate.delete({ where: { id: template.id } });
+    await auditStaffAction(request, { action: 'template_deleted', entityType: 'InspectionTemplate', entityId: template.id, oldValue: { name: template.name } });
     return { message: 'Template deleted' };
   });
 
@@ -288,6 +293,7 @@ async function templateRoutes(fastify, opts) {
       include: { items: { orderBy: { sortOrder: 'asc' } } }
     });
 
+    await auditStaffAction(request, { action: 'template_duplicated', entityType: 'InspectionTemplate', entityId: copy.id, newValue: { name: copy.name, from: source.id } });
     return reply.code(201).send(copy);
   });
 

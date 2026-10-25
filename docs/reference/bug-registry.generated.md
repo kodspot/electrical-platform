@@ -73,8 +73,9 @@ Commands: `npm run bug:list` · `npm run bug:run -- <ID>` · `npm run bug:valida
 | BUG-0055 | MEDIUM | FIXED | ele | Date filters started each day at 05:30 in India (UTC midnight), and pages took "today" from UTC | `test/integration/date-filters-local-day.test.js` |
 | BUG-0056 | MEDIUM | FIXED | ele | Analytics charts counted inspections between midnight and 05:30 under the day before | `test/integration/analytics-local-days.test.js` |
 | BUG-0057 | MEDIUM | FIXED | ele | Supervisors could mark attendance for any future date, and for two days back just after midnight | `test/integration/attendance-local-day.test.js` |
+| BUG-0058 | MEDIUM | FIXED | ele | Sign-ins, password and PIN changes, templates, rosters, attendance edits, alert actions and ticket creation left no audit row | `test/integration/audit-coverage.test.js` |
 
-Count: 57 bug scenario(s).
+Count: 58 bug scenario(s).
 
 ## BUG-0001 — Admin could set a ticket to RESOLVED_PENDING_VERIFY directly
 
@@ -1097,4 +1098,22 @@ Count: 57 bug scenario(s).
 1. As a supervisor, POST /api/attendance/bulk for tomorrow.
 2. Broken: 200. Fixed: 400 "Supervisors can only mark attendance for today or yesterday".
 3. Regression: test/integration/attendance-local-day.test.js (Asia/Kolkata, clock at 01:00).
+
+## BUG-0058 — Sign-ins, password and PIN changes, templates, rosters, attendance edits, alert actions and ticket creation left no audit row
+
+- **Severity:** MEDIUM · **Status:** FIXED · **Module:** ele · **Category:** admin-workflow
+- **Origin:** Product and architecture review 2026-10 (PAR-10/13)
+- **Introduced:** pre-audit · **Fixed:** 2026-10-26
+- **Description:** The audit log, which admins read to see who changed what, had no row for: signing in; changing or resetting a password or PIN; creating, editing, duplicating or deleting an inspection template; starting, changing or removing a duty roster; editing an attendance record; editing an alert rule; acknowledging one or all alerts; running the alert checks by hand; and raising a ticket as staff. Found by the 2026-10 product and architecture review (PAR-10/13).
+- **Root cause:** Each route wrote its own audit rows, and these never did.
+- **Expected behavior:** Each of these writes one AuditLog row naming the actor (services/audit.js). Failed sign-ins are not audited, by decision.
+- **Broken behavior:** No record of who signed in, changed a template, edited attendance, or acknowledged an alert.
+- **Scenario dependencies:** —
+- **Regression test:** `test/integration/audit-coverage.test.js`
+
+**Reproduction steps:**
+
+1. As an admin, edit an inspection template; open the audit log.
+2. Broken: nothing. Fixed: "Template Updated" by that admin.
+3. Regression: test/integration/audit-coverage.test.js.
 

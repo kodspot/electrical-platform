@@ -7,6 +7,7 @@ const { authenticateJWT, requirePolicy } = require('../middleware/auth');
 const { generateAiInsights, runScheduledChecks, runEscalationChecks } = require('../services/automation');
 const { runExclusive, LOCK_KEYS } = require('../lib/scheduler-lock');
 const { TICKET_PRIORITIES } = require('../services/ticket-status');
+const { auditStaffAction } = require('../services/audit');
 
 const VALID_TRIGGERS = [
   'INSPECTION_FAULT', 'INSPECTION_LATE', 'INSPECTION_MISSED',
@@ -154,6 +155,7 @@ async function alertRoutes(fastify) {
       data: update
     });
 
+    await auditStaffAction(request, { action: 'alert_rule_updated', entityType: 'AlertRule', entityId: rule.id, oldValue: { name: existing.name, isActive: existing.isActive }, newValue: { changed: Object.keys(update) } });
     return rule;
   });
 
@@ -264,6 +266,7 @@ async function alertRoutes(fastify) {
         acknowledgedAt: new Date()
       }
     });
+    await auditStaffAction(request, { action: 'alert_acknowledged', entityType: 'Alert', entityId: alert.id, newValue: { title: alert.title } });
     return updated;
   });
 
@@ -279,6 +282,7 @@ async function alertRoutes(fastify) {
         acknowledgedAt: new Date()
       }
     });
+    await auditStaffAction(request, { action: 'alerts_acknowledged', entityType: 'Alert', newValue: { count: result.count } });
     return { success: true, count: result.count };
   });
 
@@ -400,6 +404,7 @@ async function alertRoutes(fastify) {
     if (!orgId) return reply.code(400).send({ error: 'Select an organization first' });
     const { ran } = await runExclusive(prisma, LOCK_KEYS.SCHEDULED_CHECKS, () => runScheduledChecks(fastify.log, { orgId }), fastify.log);
     if (!ran) return reply.code(409).send({ error: 'The scheduled checks are running right now. Try again in a minute.' });
+    await auditStaffAction(request, { action: 'alert_checks_run' });
     return { success: true, message: 'Scheduled rule checks completed.' };
   });
 
@@ -410,6 +415,7 @@ async function alertRoutes(fastify) {
     if (!orgId) return reply.code(400).send({ error: 'Select an organization first' });
     const { ran } = await runExclusive(prisma, LOCK_KEYS.ESCALATION_CHECKS, () => runEscalationChecks(fastify.log, { orgId }), fastify.log);
     if (!ran) return reply.code(409).send({ error: 'The escalation checks are running right now. Try again in a minute.' });
+    await auditStaffAction(request, { action: 'alert_escalations_run' });
     return { success: true, message: 'Escalation checks completed.' };
   });
 }

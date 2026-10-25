@@ -39,6 +39,9 @@
 - **Attendance is for today or yesterday, and only in the past.** Supervisors can no longer
   mark attendance for a future date. Just after midnight, the dashboard's attendance shows
   the new day.
+- **The audit log shows more.** It now records sign-ins, password and PIN changes, changes
+  to inspection templates and duty rosters, attendance corrections, alert-rule edits,
+  acknowledged alerts, and tickets raised by staff, each with who did it.
 - **A purchase cost of 0 is kept.** Assets that cost nothing, such as donations, keep 0 as
   their cost instead of showing it as unknown.
 - **Photos show in the asset, failure and inspection details.** Photos attached to an asset, a

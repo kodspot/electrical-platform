@@ -4,6 +4,7 @@ const { z } = require('zod');
 const PDFDocument = require('pdfkit');
 const { prisma } = require('../lib/prisma');
 const { localDateKey } = require('../lib/dates');
+const { auditStaffAction } = require('../services/audit');
 const { authenticateJWT, requirePolicy } = require('../middleware/auth');
 
 const VALID_STATUSES = ['PRESENT', 'ABSENT', 'LEAVE', 'HALF_DAY'];
@@ -317,6 +318,7 @@ async function attendanceRoutes(fastify, opts) {
       }
     });
 
+    await auditStaffAction(request, { action: 'attendance_updated', entityType: 'Attendance', entityId: id, oldValue: { status: record.status, note: record.note }, newValue: { status: updated.status, note: updated.note } });
     return updated;
   });
 

@@ -3,6 +3,7 @@
 const { z } = require('zod');
 const { prisma } = require('../lib/prisma');
 const { localDateKey } = require('../lib/dates');
+const { auditStaffAction } = require('../services/audit');
 const { authenticateJWT, requirePolicy } = require('../middleware/auth');
 const { getAssignedWorkerIds } = require('../services/assignment-resolver');
 
@@ -140,6 +141,7 @@ async function dutyRosterRoutes(fastify) {
       }
     });
 
+    await auditStaffAction(request, { action: 'roster_created', entityType: 'DutyRoster', entityId: roster.id, newValue: { date: data.date, shift: data.shift, locationId: data.locationId } });
     return roster;
   });
 
@@ -178,6 +180,7 @@ async function dutyRosterRoutes(fastify) {
       }
     });
 
+    await auditStaffAction(request, { action: 'roster_location_changed', entityType: 'DutyRoster', entityId: id, oldValue: { locationId: roster.locationId }, newValue: { locationId: data.locationId } });
     return updated;
   });
 
@@ -233,6 +236,7 @@ async function dutyRosterRoutes(fastify) {
       }
     });
 
+    await auditStaffAction(request, { action: 'roster_workers_changed', entityType: 'DutyRoster', entityId: id, newValue: { workerIds: data.workerIds } });
     return updated;
   });
 
@@ -318,6 +322,7 @@ async function dutyRosterRoutes(fastify) {
     }
 
     await prisma.dutyRoster.delete({ where: { id } });
+    await auditStaffAction(request, { action: 'roster_deleted', entityType: 'DutyRoster', entityId: id, oldValue: { date: roster.date, shift: roster.shift, locationId: roster.locationId } });
     return { success: true };
   });
 }

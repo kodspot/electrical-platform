@@ -5,6 +5,7 @@ const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const { z } = require('zod');
 const { prisma } = require('../lib/prisma');
+const { auditAccountAction } = require('../services/audit');
 const { BCRYPT_COST, hashResetToken, JWT_VERIFY_OPTIONS } = require('../lib/security');
 const { loginRateLimit, strictRateLimit } = require('../middleware/rateLimits');
 const { uploadToR2, deleteFromR2 } = require('../lib/r2');
@@ -187,6 +188,7 @@ async function workerAuthRoutes(fastify) {
       { expiresIn: '30d' }
     );
 
+    await auditAccountAction({ orgId: worker.orgId, actorType: 'worker', actorId: worker.id, action: 'signed_in', entityType: 'Worker' });
     return {
       token,
       worker: {
@@ -266,6 +268,7 @@ async function workerAuthRoutes(fastify) {
       { expiresIn: '30d' }
     );
 
+    await auditAccountAction({ orgId: request.worker.orgId, actorType: 'worker', actorId: request.worker.id, action: 'pin_changed', entityType: 'Worker' });
     return { success: true, token: newToken };
   });
 
@@ -365,6 +368,7 @@ async function workerAuthRoutes(fastify) {
       { expiresIn: '30d' }
     );
 
+    await auditAccountAction({ orgId: worker.orgId, actorType: 'worker', actorId: worker.id, action: 'pin_reset', entityType: 'Worker' });
     return {
       success: true,
       message: 'PIN reset successfully',

@@ -24,15 +24,9 @@ const {
   updateTicketIfUnchanged
 } = require('../services/ticket-status');
 const { getSlaDeadline } = require('../services/ticket-status');
+// auditActorType tells a SuperAdmin acting via X-Org-Id apart from the org's own staff. [WP8]
+const { auditActorType, auditStaffAction } = require('../services/audit');
 
-// Audit actorType for an org-scoped action — must distinguish a SuperAdmin
-// acting via X-Org-Id org-entry from a genuine org ADMIN/SUPERVISOR, or a
-// SuperAdmin's write gets silently mislabeled as 'supervisor'. [WP8]
-function auditActorType(role) {
-  if (role === 'ADMIN') return 'admin';
-  if (role === 'SUPER_ADMIN') return 'super_admin';
-  return 'supervisor';
-}
 
 const TICKET_INCLUDE = {
   location: { select: { id: true, name: true, type: true } },
@@ -178,6 +172,7 @@ async function ticketRoutes(fastify, opts) {
       include: TICKET_INCLUDE
     });
     if (supervisorLookupError) warnStep(ticket.id, 'resolve_supervisors')(supervisorLookupError);
+    await auditStaffAction(request, { action: 'ticket_created', entityType: 'Ticket', entityId: ticket.id, newValue: { title: ticket.title, priority: ticket.priority, assignedToId: firstSup } });
 
     if (firstSup) {
       createNotification({

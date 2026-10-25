@@ -28,6 +28,16 @@ owned rows.
   `User`), encrypted PII.
 - `AuditLog` — append-only actor/action record (see the SA-audit rule in
   [auth-and-tenancy.md](auth-and-tenancy.md#the-one-cross-tenant-capability-superadmin-x-org-id)).
+  - **What is recorded:** every staff change, and each successful sign-in, password or PIN
+    change and reset (`signed_in`, `password_changed`, `password_reset`, `pin_changed`,
+    `pin_reset`).
+  - **What is not:** a failed sign-in. Anyone can cause one, and the rows would let them fill
+    the table.
+  - **No IP address or device** is stored.
+  - **How rows are written:** through `services/audit.js`. `auditStaffAction(request, …)` is
+    for a change by signed-in staff, with `actorType` from `auditActorType`, which tells a
+    super admin acting in an org apart from the org's own staff. `auditAccountAction` is for
+    an account acting on itself (BUG-0058).
 
 **Module registry** (global, not tenant-scoped) — `ModuleDefinition`, `ModuleDependency`,
 `OrgModuleActivation`. See [module-system.md](module-system.md).

@@ -352,6 +352,21 @@ see `docs/DEPLOYMENT.md` for how a change reaches production.
     refuses a future date. Admins keep their override.
   - Rosters for future dates are still accepted, as before. Planning ahead may be wanted, so
     that is left to the owner.
+- **`[BUG-0058]` Many actions left no audit row** (PAR-10/13).
+  - **Now audited — accounts:** a successful sign-in (staff, super admin and electrician),
+    and changing or resetting a password or PIN.
+  - **Now audited — admin changes:** inspection templates (create, edit, duplicate,
+    deactivate, delete), duty rosters (start, change location, change electricians, remove),
+    attendance edits, alert-rule edits, acknowledging one or all alerts, running the alert
+    checks or escalations by hand, and raising a ticket as staff.
+  - New rows go through `services/audit.js`. `auditActorType` moved there from `tickets.js`
+    unchanged; it tells a super admin acting in an org apart from the org's own staff.
+  - No IP address or device is stored.
+  - **Not audited, on purpose:** failed sign-ins, since anyone can cause them (an owner
+    decision); requests for a reset link; and the super admin's one-time bootstrap, which
+    cannot be tested without removing the shared super admin.
+  - The existing alert-rule rows keep their `actorType: 'user'`.
+  - Documented in `docs/architecture/data-model.md`.
 - **The fixes in `app.js` reach people on their first load after the deploy.**
   - Every page still loaded `app.js?v=14`, or `v=15` on the Quality page. Browsers keep
     `/js` for a day, and both service workers serve it from cache first.

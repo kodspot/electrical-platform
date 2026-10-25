@@ -6,6 +6,7 @@ const jwt = require('jsonwebtoken');
 const QRCode = require('qrcode');
 const { z } = require('zod');
 const { prisma } = require('../lib/prisma');
+const { auditActorType, auditAccountAction } = require('../services/audit');
 const { BCRYPT_COST, passwordSchema, hashResetToken } = require('../lib/security');
 const { strictRateLimit, loginRateLimit } = require('../middleware/rateLimits');
 const { authenticateJWT, requirePolicy } = require('../middleware/auth');
@@ -106,6 +107,7 @@ async function authRoutes(fastify, opts) {
         process.env.JWT_SECRET,
         { expiresIn: '24h' }
       );
+      await auditAccountAction({ orgId: null, actorType: 'super_admin', actorId: superAdmin.id, action: 'signed_in', entityType: 'User' });
       return { token, user: { id: superAdmin.id, name: superAdmin.name, email: superAdmin.email, role: superAdmin.role, orgId: null } };
     }
 
@@ -176,6 +178,7 @@ async function authRoutes(fastify, opts) {
       { expiresIn: '24h' }
     );
 
+    await auditAccountAction({ orgId: user.orgId, actorType: auditActorType(user.role), actorId: user.id, action: 'signed_in', entityType: 'User' });
     return {
       token,
       user: { id: user.id, name: user.name, email: user.email, role: user.role, orgId: user.orgId, orgSlug: orgSlugValue, orgName: orgNameValue, enabledModules }
@@ -232,6 +235,7 @@ async function authRoutes(fastify, opts) {
       { expiresIn: '24h' }
     );
 
+    await auditAccountAction({ orgId: request.user.orgId, actorType: auditActorType(request.user.role), actorId: request.user.id, action: 'password_changed', entityType: 'User' });
     return { success: true, message: 'Password updated', token: newToken };
   });
 
@@ -351,6 +355,7 @@ async function authRoutes(fastify, opts) {
       { expiresIn: '24h' }
     );
 
+    await auditAccountAction({ orgId: user.orgId, actorType: auditActorType(user.role), actorId: user.id, action: 'password_reset', entityType: 'User' });
     return {
       success: true,
       message: 'Password reset successfully',
