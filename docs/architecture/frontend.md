@@ -35,6 +35,20 @@ owns: attaching the auth header for the active role, injecting `X-Org-Id` when a
 has an org selected, and handling `401` centrally. New page code calls `apiFetch` rather
 than using `fetch` directly, so auth and tenant-context handling stay in a single place.
 
+## Escaping text into markup
+
+Pages build HTML strings from data that org admins and guests type (names, notes, titles),
+and super-admins open those pages for every org. Two helpers in `public/js/app.js` cover the
+two contexts:
+- **`App.esc(text)`** for element content and for quoted attribute values
+  (`title="…"`, `data-name="…"`, `value="…"`). It escapes `& < > " '`.
+- **`App.escJs(text)`** for a JS string argument inside an inline handler, as in
+  `onclick="fn('" + App.escJs(name) + "')"`. The browser HTML-decodes the attribute before
+  running it, so this escapes for JS first and then for HTML.
+
+Never pass `esc()` output to an inline handler. Text set through `textContent` or `.value`
+needs no escaping. `test/public-escaping.test.js` enforces this (BUG-0028).
+
 ## Module-scoped routing & PWA {#module-scoped-routing--pwa}
 
 Pages are served under **org-and-module-scoped URLs**: `/:orgSlug/:mod/<page>` (e.g.

@@ -35,7 +35,8 @@ const BUGS_LIST = [
   require('./bug-0024-supervisor-asset-blank-after-save'),
   require('./bug-0025-roster-suggests-no-covering-electrician'),
   require('./bug-0026-rejected-ticket-stuck-for-electrician'),
-  require('./bug-0027-electrician-sees-guest-review-token')
+  require('./bug-0027-electrician-sees-guest-review-token'),
+  require('./bug-0028-attribute-xss-via-names')
 ];
 
 const BUGS = Object.fromEntries(BUGS_LIST.map((b) => [b.id, b]));

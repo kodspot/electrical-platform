@@ -43,8 +43,9 @@ Commands: `npm run bug:list` · `npm run bug:run -- <ID>` · `npm run bug:valida
 | BUG-0025 | MEDIUM | FIXED | ele | A new duty roster suggested no electrician when they covered the floor from its building | `test/integration/admin-forms-api.test.js` |
 | BUG-0026 | MEDIUM | FIXED | complaints | After a guest rejected a fix, the electrician who did it saw the ticket as "Done" and could not pick it up again | `test/integration/ticket-resolve-verify.test.js` |
 | BUG-0027 | CRITICAL | FIXED | ele | The electrician API returned the guest's review token, name, phone, IP hash and user agent | `test/integration/ticket-resolve-verify.test.js` |
+| BUG-0028 | CRITICAL | FIXED | ele | Stored XSS: an org admin could plant script in names that ran for anyone opening the page, including a super-admin | `test/public-escaping.test.js` |
 
-Count: 27 bug scenario(s).
+Count: 28 bug scenario(s).
 
 ## BUG-0001 — Admin could set a ticket to RESOLVED_PENDING_VERIFY directly
 
@@ -528,4 +529,22 @@ Count: 27 bug scenario(s).
 1. Create an org, a location, an electrician covering it, and a PUBLIC ticket awaiting guest review there, with guest name and phone.
 2. As the electrician, GET /api/worker/tickets/:id.
 3. Broken: the JSON contains reviewToken and guestPhone. Fixed: neither key is present.
+
+## BUG-0028 — Stored XSS: an org admin could plant script in names that ran for anyone opening the page, including a super-admin
+
+- **Severity:** CRITICAL · **Status:** FIXED · **Module:** ele · **Category:** data-exposure
+- **Origin:** Product and architecture review 2026-10 (PAR-10/29)
+- **Introduced:** pre-audit · **Fixed:** 2026-10-25
+- **Description:** App.esc built its output with textContent → innerHTML, which escapes & < > but not quotes, and 42 places put its output inside double-quoted attributes (title, data-name, value) with names an org admin types — a location named `x" onmouseover="…` gained a live handler. Fifteen inline onclick handlers passed names as esc(name).replace(/'/g, "\\'"), which a backslash or a double quote defeats. The CSP allows inline handlers, and a super-admin who enters the org opens these pages with a token for every tenant. Found by the 2026-10 product and architecture review (PAR-10/29).
+- **Root cause:** App.esc did not escape " and '; inline handlers HTML-escaped (not JS-escaped) their string arguments.
+- **Expected behavior:** App.esc escapes & < > " '; inline handlers take App.escJs(text), which escapes for JS and then for HTML, so the exact text arrives as one argument.
+- **Broken behavior:** A location named `x" data-x="1` rendered an extra attribute on admin-locations; an electrician named `x\');alert(1);//` ran code when Locations was clicked.
+- **Scenario dependencies:** —
+- **Regression test:** `test/public-escaping.test.js`
+
+**Reproduction steps:**
+
+1. As an org admin, create a location named `Q" data-bug0028="1` and an electrician named `E\');window.__bug0028=1;//`.
+2. Open admin-locations, then admin-workers and click the electrician's Locations button.
+3. Broken: an element carries data-bug0028 and window.__bug0028 is 1. Fixed: neither. Browser test: e2e/tests/forms.spec.js (BUG-0028).
 

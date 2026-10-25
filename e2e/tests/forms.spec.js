@@ -7,7 +7,7 @@
 // only; every name is unique to the run. Asserts what the user sees AND the database behind it.
 
 const { test, expect } = require('@playwright/test');
-const { seed, db, signIn, signInElectrician, orgPage, pickOption } = require('../support/app');
+const { seed, db, apiLogin, signIn, signInElectrician, orgPage, pickOption } = require('../support/app');
 
 const confirmYes = (page) => page.locator('#_cfmYes').click();
 
@@ -433,5 +433,29 @@ test.describe('Forms — admin, supervisor, electrician', () => {
     await page.locator('#orgBody tr', { hasText: `${name} (renamed)` }).getByRole('button', { name: 'Delete' }).click();
     await confirmYes(page);
     await expect.poll(async () => (await db().organization.findUnique({ where: { id: org.id } }))?.status ?? 'GONE').not.toBe('ACTIVE');
+  });
+
+  test('BUG-0028: names with quotes, backslashes or markup render as text — no injected attribute or handler code runs', async ({ page, request }) => {
+    const { token } = await apiLogin(request, x.admin);
+    const headers = { authorization: `Bearer ${token}` };
+    const locName = `Loc28 ${s.run}" data-bug0028="1`;
+    const empId = `XSS-${s.run}`;
+    const elecName = `Elec28 ${s.run}\\');window.__bug0028=1;//`;
+    expect((await request.post('/api/locations', { headers, data: { name: locName, type: 'ROOM' } })).ok()).toBeTruthy();
+    expect((await request.post('/api/workers', { headers, data: { name: elecName, employeeId: empId } })).ok()).toBeTruthy();
+    try {
+      await signIn(page, 'admin', x.admin, slug);
+      await page.goto(orgPage(slug, 'admin-locations'));
+      await expect(page.getByText(locName).first()).toBeVisible();
+      await expect(page.locator('[data-bug0028]')).toHaveCount(0);
+
+      await page.goto(orgPage(slug, 'admin-workers'));
+      await page.locator('#workerBody tr', { hasText: empId }).getByRole('button', { name: 'Locations' }).click();
+      await expect(page.locator('#floorTitle')).toHaveText(`Assign Floors — ${elecName}`);
+      expect(await page.evaluate(() => window.__bug0028)).toBeUndefined();
+    } finally {
+      await db().worker.deleteMany({ where: { employeeId: empId } });
+      await db().location.deleteMany({ where: { orgId: x.org.id, name: locName } });
+    }
   });
 });

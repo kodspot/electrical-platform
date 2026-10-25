@@ -32,6 +32,22 @@ see `docs/DEPLOYMENT.md` for how a change reaches production.
   explicit field allow-list (`WORKER_TICKET_SELECT`) holding exactly what the electrician app
   reads. Not visible to users. No data migration: a pending review link expires 30 minutes
   after it is issued, so any token already exposed is short-lived.
+- **`[BUG-0028]` Stored XSS through names in attributes and inline handlers** (PAR-10/29).
+  `App.esc` (`textContent` → `innerHTML`) escaped `& < >` but not quotes. 42 places put its
+  output inside quoted attributes with names an org admin types, so a location named
+  `x" onmouseover="…` gained a live handler. 15 inline `onclick` handlers passed names as
+  `esc(name).replace(/'/g, "\\'")`, which a backslash or a double quote defeats. The CSP
+  allows inline handlers, and a super-admin who enters the org opens these pages.
+  - `App.esc` now escapes `& < > " '`.
+  - A new `App.escJs` escapes for JS first and HTML second, and every handler argument uses
+    it.
+  - One `textContent` assignment no longer double-escapes.
+  - The rule is in `docs/architecture/frontend.md`.
+  - Tests: `test/public-escaping.test.js` (the helpers, run in a sandbox, plus a static check
+    that the old idiom is gone) and a browser test in `e2e/tests/forms.spec.js`, red on the
+    old pages.
+  - Names that contain quotes now show in full in tooltips; nothing else is visible to users.
+  - CSP `'unsafe-inline'` (PRA-07 M1) is unchanged.
 
 ### 2026-10-24 (product and architecture review — documentation only)
 

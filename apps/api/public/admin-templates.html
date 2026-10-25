@@ -217,7 +217,7 @@ function renderGrid() {
       '<div class="tpl-card-actions">' +
         '<button class="btn btn-sm btn-outline" onclick="openEditModal(\'' + t.id + '\')">Edit</button>' +
         '<button class="btn btn-sm btn-outline" onclick="duplicateTemplate(\'' + t.id + '\')">Duplicate</button>' +
-        (t.isActive ? '<button class="btn btn-sm btn-ghost" style="color:var(--danger)" onclick="deleteTemplate(\'' + t.id + '\',\'' + esc(t.name).replace(/'/g, "\\'") + '\')">Delete</button>' : '<button class="btn btn-sm btn-outline" onclick="reactivateTemplate(\'' + t.id + '\')">Reactivate</button>') +
+        (t.isActive ? '<button class="btn btn-sm btn-ghost" style="color:var(--danger)" onclick="deleteTemplate(\'' + t.id + '\',\'' + App.escJs(t.name) + '\')">Delete</button>' : '<button class="btn btn-sm btn-outline" onclick="reactivateTemplate(\'' + t.id + '\')">Reactivate</button>') +
       '</div></div>';
   }
   $('templateGrid').innerHTML = html;

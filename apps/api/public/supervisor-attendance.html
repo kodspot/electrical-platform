@@ -347,13 +347,13 @@ function renderLocationTree(tree) {
     if (bldg.children && bldg.children.length) {
       for (var j = 0; j < bldg.children.length; j++) {
         var floor = bldg.children[j];
-        html += '<div class="setup-loc-item" onclick="selectLocation(this,\'' + esc(floor.id) + '\')">'
+        html += '<div class="setup-loc-item" onclick="selectLocation(this,\'' + App.escJs(floor.id) + '\')">'
           + '<span>' + esc(floor.name) + '</span>'
           + (floor.children && floor.children.length ? '<span style="font-size:.7rem;color:var(--text-muted)">' + floor.children.length + ' rooms</span>' : '')
           + '</div>';
       }
     } else {
-      html += '<div class="setup-loc-item" onclick="selectLocation(this,\'' + esc(bldg.id) + '\')">'
+      html += '<div class="setup-loc-item" onclick="selectLocation(this,\'' + App.escJs(bldg.id) + '\')">'
         + '<span>' + esc(bldg.name) + '</span></div>';
     }
     html += '</div>';

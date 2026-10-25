@@ -80,11 +80,21 @@ window.App = (function () {
   // ─── DOM Helpers ───
   function $(id) { return document.getElementById(id); }
 
+  // HTML-escapes text for element content and for quoted attribute values: quotes too, since
+  // pages put org-entered names in title="…", data-name="…" and value="…". [BUG-0028]
   function esc(s) {
     if (!s) return '';
-    const d = document.createElement('div');
-    d.textContent = s;
-    return d.innerHTML;
+    return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  }
+
+  // A JS string argument inside an inline handler: onclick="fn('" + escJs(name) + "')". The
+  // browser HTML-decodes the attribute before running it, so escape for JS first (backslash,
+  // quotes, line breaks), then for HTML. [BUG-0028]
+  function escJs(s) {
+    if (s == null) return '';
+    return esc(String(s).replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/"/g, '\\"')
+      .replace(/\r/g, '\\r').replace(/\n/g, '\\n').replace(/\u2028/g, '\\u2028').replace(/\u2029/g, '\\u2029'));
   }
 
   function fmtDate(s) {
@@ -1379,7 +1389,7 @@ window.App = (function () {
 
   // ─── Public API ───
   return {
-    $: $, esc: esc, fmtDate: fmtDate, fmtDateShort: fmtDateShort,
+    $: $, esc: esc, escJs: escJs, fmtDate: fmtDate, fmtDateShort: fmtDateShort,
     getOrgSlug: getOrgSlug, orgPath: orgPath,
     getModule: getModule, modulePath: modulePath,
     getEnabledModules: getEnabledModules, isModuleEnabled: isModuleEnabled,

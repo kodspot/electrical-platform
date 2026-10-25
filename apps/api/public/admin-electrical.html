@@ -325,7 +325,7 @@ async function viewDetail(id) {
     html += '<div style="margin-top:.75rem;font-weight:600;font-size:.82rem">Photos (' + r.images.length + ')</div>';
     html += '<div style="display:flex;gap:.4rem;flex-wrap:wrap;margin-top:.35rem">';
     r.images.forEach(function(img) {
-      html += '<img src="' + esc(img.imageUrl) + '" style="width:64px;height:64px;object-fit:cover;border-radius:var(--radius-sm);cursor:pointer;border:1px solid var(--border)" onclick="openLightbox(\'' + esc(img.imageUrl) + '\')">';
+      html += '<img src="' + esc(img.imageUrl) + '" style="width:64px;height:64px;object-fit:cover;border-radius:var(--radius-sm);cursor:pointer;border:1px solid var(--border)" onclick="openLightbox(\'' + App.escJs(img.imageUrl) + '\')">';
     });
     html += '</div>';
   }

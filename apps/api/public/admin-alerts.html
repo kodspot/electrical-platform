@@ -294,7 +294,7 @@ async function loadRules(){
       '</div></div>'+
       '<div style="display:flex;gap:.35rem">'+
       '<button class="btn btn-sm btn-ghost" onclick="editRule(\''+r.id+'\')">Edit</button>'+
-      '<button class="btn btn-sm btn-ghost" style="color:var(--danger)" onclick="deleteRule(\''+r.id+'\',\''+esc(r.name).replace(/'/g,"\\'")+'\')">Delete</button>'+
+      '<button class="btn btn-sm btn-ghost" style="color:var(--danger)" onclick="deleteRule(\''+r.id+'\',\''+App.escJs(r.name)+'\')">Delete</button>'+
       '</div></div>';
   }).join('');
 }
