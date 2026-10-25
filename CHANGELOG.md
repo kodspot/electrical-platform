@@ -162,6 +162,16 @@ see `docs/DEPLOYMENT.md` for how a change reaches production.
   - Browser test: `e2e/tests/ui-fixes.spec.js`.
 - **User-visible (Release Notes):** the analytics performance bars show counts, and the
   dashboard lists today's inspections.
+- **`[BUG-0040]` Asset, failure and inspection photos were broken images in the admin detail
+  views** (PAR-10/24).
+  - `admin-assets`, `admin-failures` and `admin-electrical` used raw `/images/...` paths;
+    photos are served only through `/api/images/...` with the viewer's token. All three now
+    go through `App.imgUrl`, including the inspection lightbox.
+  - Browser test in `e2e/tests/ui-fixes.spec.js` with a real stored photo.
+  - The BUG-0039 browser test now uses the explorer org's cached sign-in. It had used fresh
+    admins, which hit the per-IP login limit (429) in a full run.
+- **User-visible (Release Notes):** photos attached to assets, failures and inspections show
+  in the admin pages.
 
 ### 2026-10-24 (product and architecture review — documentation only)
 

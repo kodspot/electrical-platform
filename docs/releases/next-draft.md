@@ -19,6 +19,9 @@
   bars in *Analytics* show how many inspections each person did; they read "undefined"
   before. The dashboard's *Today's Inspection Log* now lists today's inspections instead of
   always saying none were logged.
+- **Photos show in the asset, failure and inspection details.** Photos attached to an asset, a
+  failure report or an inspection now appear when you press *View*; they showed as broken
+  images before.
 - **Proof photos stay for 30 days from when they were taken.** A proof photo for work finished
   on an older ticket is no longer removed the next night.
 - **Supervisors' ID details are better protected.** Aadhaar numbers and blood groups of

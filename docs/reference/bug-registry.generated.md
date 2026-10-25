@@ -55,8 +55,9 @@ Commands: `npm run bug:list` · `npm run bug:run -- <ID>` · `npm run bug:valida
 | BUG-0037 | HIGH | FIXED | ele | A deactivated (or moved) supervisor kept their open tickets, where no one else could see them | `test/integration/supervisor-handover.test.js` |
 | BUG-0038 | HIGH | FIXED | ele | Two people acting on one ticket at once both "succeeded" — the last write won | `test/integration/ticket-concurrency.test.js` |
 | BUG-0039 | MEDIUM | FIXED | ele | Analytics labelled every electrician and supervisor bar "undefined"; the dashboard's inspection log was always empty | `e2e/tests/ui-fixes.spec.js` |
+| BUG-0040 | MEDIUM | FIXED | asset | Asset, failure and inspection photos were broken images in the admin detail views | `e2e/tests/ui-fixes.spec.js` |
 
-Count: 39 bug scenario(s).
+Count: 40 bug scenario(s).
 
 ## BUG-0001 — Admin could set a ticket to RESOLVED_PENDING_VERIFY directly
 
@@ -756,4 +757,22 @@ Count: 39 bug scenario(s).
 1. Sign in as an admin of an org with an inspection today that names an electrician.
 2. Open admin-analytics, then admin-dashboard.
 3. Broken: the bars read "undefined"; the log says "No inspections logged today". Browser test: e2e/tests/ui-fixes.spec.js (BUG-0039).
+
+## BUG-0040 — Asset, failure and inspection photos were broken images in the admin detail views
+
+- **Severity:** MEDIUM · **Status:** FIXED · **Module:** asset · **Category:** ui
+- **Origin:** Product and architecture review 2026-10 (PAR-10/24)
+- **Introduced:** pre-audit · **Fixed:** 2026-10-25
+- **Description:** admin-assets, admin-failures and admin-electrical rendered stored photos by their raw /images/... path. Images are served only through /api/images/... with the viewer's token (App.imgUrl, F15), so every such photo failed to load — the admin could not see the evidence attached to an asset, a failure report or an inspection. The visual and explorer fixtures carried no photos, so nothing noticed. Found by the 2026-10 product and architecture review (PAR-10/24).
+- **Root cause:** Those three detail views built <img src> from img.imageUrl directly instead of App.imgUrl(img.imageUrl).
+- **Expected behavior:** Every stored photo in the three detail views is requested through App.imgUrl, and loads.
+- **Broken behavior:** The images loaded /images/uploads/... and got 404.
+- **Scenario dependencies:** —
+- **Regression test:** `e2e/tests/ui-fixes.spec.js`
+
+**Reproduction steps:**
+
+1. Attach a stored photo to an asset (or a failure, or an inspection).
+2. Open admin-assets (admin-failures, admin-electrical) and press View on that row.
+3. Broken: a broken image. Fixed: the photo shows. Browser test: e2e/tests/ui-fixes.spec.js (BUG-0040).
 

@@ -320,7 +320,7 @@ async function viewDetail(id){
   if(a.images && a.images.length){
     h += '<div style="font-weight:600;font-size:.82rem;margin-bottom:.3rem">Photos ('+a.images.length+')</div>';
     h += '<div class="img-grid">';
-    a.images.forEach(function(img){ h+='<img src="'+esc(img.imageUrl)+'" title="'+(img.caption?esc(img.caption):'')+'">'; });
+    a.images.forEach(function(img){ h+='<img src="'+esc(App.imgUrl(img.imageUrl))+'" title="'+(img.caption?esc(img.caption):'')+'">'; });
     h += '</div>';
   }
 
