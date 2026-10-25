@@ -97,7 +97,10 @@ everywhere authentication or page-serving happens (see
 - **Multi-record writes that must agree use `$transaction`** (Charter §8.1) — e.g. an
   asset's status and its `AssetEvent`/`AssetFailure`.
 - **PII is encrypted at rest** via `lib/crypto.js` (AES-256-GCM), unconditionally (Charter
-  §6). Encrypted fields include worker/user Aadhaar and blood group.
+  §6). Encrypted fields: the Aadhaar number and blood group of workers and of users
+  (supervisors), through `encryptPII` / `decryptPII`. Audit rows record that those two fields
+  changed, never their values. Supervisor values were stored in plain text until BUG-0030;
+  `scripts/migrate-user-pii.js` encrypts rows saved before the fix (`docs/DEPLOYMENT.md`).
 - **Permanent deletes are dependency-guarded** — a worker or supervisor with inspection
   history is blocked (`409`) rather than silently disconnected (`[WP17]`).
 - **A user who is referenced cannot be hard-deleted.** Six foreign keys to `User` are

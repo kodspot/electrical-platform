@@ -103,6 +103,21 @@ cd ~/electrical-platform && docker compose exec -T api npx prisma migrate status
 - **"failed migrations" or "migrations not found locally"** — the history diverged. Do not
   merge; restore a backup into a scratch database first (`docs/DISASTER_RECOVERY.md`).
 
+**One-off data steps after a deploy.** These are run by the owner, never by the deploy job.
+- **BUG-0030: encrypt supervisors' Aadhaar and blood group saved before the fix.** Once the
+  release with the fix is deployed, new and edited values are encrypted, and older
+  plain-text values still read correctly. To encrypt those older rows and strip the values
+  from old supervisor audit rows:
+  1. Take a fresh backup (`docs/DISASTER_RECOVERY.md`).
+  2. Dry run, which only counts rows and prints no values:
+     `cd ~/electrical-platform && docker compose exec -T api node scripts/migrate-user-pii.js`
+  3. Apply, then check that a second dry run counts 0:
+     `docker compose exec -T api node scripts/migrate-user-pii.js --apply`
+
+  Encrypting can be undone with the key. The audit redaction cannot, which is why the backup
+  comes first. Backups taken before step 3 keep the plain-text values until they age out
+  (14 days).
+
 **Secrets that reach the server only through the deploy job:** besides the long-standing
 ones, the deploy job passes `GIT_SHA` (`github.sha`), `IP_HASH_PEPPER`, `QA_INGEST_TOKEN` and
 `GH_ACTIONS_DISPATCH_TOKEN` through the SSH step's `env`/`envs:` and the `.env` it writes.

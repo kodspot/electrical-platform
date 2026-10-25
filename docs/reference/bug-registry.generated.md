@@ -45,8 +45,9 @@ Commands: `npm run bug:list` · `npm run bug:run -- <ID>` · `npm run bug:valida
 | BUG-0027 | CRITICAL | FIXED | ele | The electrician API returned the guest's review token, name, phone, IP hash and user agent | `test/integration/ticket-resolve-verify.test.js` |
 | BUG-0028 | CRITICAL | FIXED | ele | Stored XSS: an org admin could plant script in names that ran for anyone opening the page, including a super-admin | `test/public-escaping.test.js` |
 | BUG-0029 | HIGH | FIXED | ele | `npm test` passed when a test file's describe() threw while collecting its tests | `test/report-tests.test.js` |
+| BUG-0030 | CRITICAL | FIXED | ele | Supervisors' Aadhaar numbers and blood groups were stored in plain text and copied into audit logs | `test/integration/supervisor-pii.test.js` |
 
-Count: 29 bug scenario(s).
+Count: 30 bug scenario(s).
 
 ## BUG-0001 — Admin could set a ticket to RESOLVED_PENDING_VERIFY directly
 
@@ -566,4 +567,22 @@ Count: 29 bug scenario(s).
 1. Add a test file whose describe() callback throws before registering any test.
 2. Run node scripts/run-tests.js on it.
 3. Broken: "[run-tests] exit 0". Fixed: exit 1, "1 failure(s) the runner did not count …".
+
+## BUG-0030 — Supervisors' Aadhaar numbers and blood groups were stored in plain text and copied into audit logs
+
+- **Severity:** CRITICAL · **Status:** FIXED · **Module:** ele · **Category:** data-exposure
+- **Origin:** Product and architecture review 2026-10 (PAR-10/15)
+- **Introduced:** pre-audit · **Fixed:** 2026-10-25
+- **Description:** POST /api/supervisors and PATCH /api/supervisors/:id wrote User.aadharNo and User.bloodGroup as typed. Only electricians' (Worker) values went through lib/crypto.js. Every supervisor edit also copied the old and new values into AuditLog.newValue as { from, to }, and from there into every backup. The Engineering Charter (§6) requires these fields encrypted at rest, and docs/architecture/data-model.md said they were. Found by the 2026-10 product and architecture review (PAR-10/15).
+- **Root cause:** supervisors.js never called the PII encryption helpers (they were named and used for workers only), and its audit diff recorded every changed field's raw values.
+- **Expected behavior:** Both fields are stored encrypted ("v1:…") and read back decrypted by the admin; audit rows record { changed: true } for them. scripts/migrate-user-pii.js encrypts rows saved before the fix.
+- **Broken behavior:** The database row and the audit row held the Aadhaar number as typed.
+- **Scenario dependencies:** —
+- **Regression test:** `test/integration/supervisor-pii.test.js`
+
+**Reproduction steps:**
+
+1. As an org admin, POST /api/supervisors with an aadharNo, then PATCH it to another number.
+2. Read User.aadharNo and the supervisor_updated AuditLog row directly from the database.
+3. Broken: both hold the numbers in plain text. Fixed: the row holds "v1:…" and the audit row { changed: true }.
 

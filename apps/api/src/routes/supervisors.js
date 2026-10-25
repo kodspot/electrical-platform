@@ -4,6 +4,7 @@ const bcrypt = require('bcrypt');
 const { z } = require('zod');
 const { prisma } = require('../lib/prisma');
 const { BCRYPT_COST, passwordSchema } = require('../lib/security');
+const { PII_FIELDS, encryptPII, decryptPII } = require('../lib/crypto');
 const { authenticateJWT, requirePolicy } = require('../middleware/auth');
 const { ACTIVE_TICKET_STATUSES } = require('../services/ticket-status');
 
@@ -53,7 +54,7 @@ async function supervisorRoutes(fastify, opts) {
     ]);
 
     return {
-      supervisors,
+      supervisors: supervisors.map(decryptPII),
       page: pageNum,
       limit: take,
       total,
@@ -75,7 +76,7 @@ async function supervisorRoutes(fastify, opts) {
       }
     });
     if (!user) return reply.code(404).send({ error: 'Supervisor not found' });
-    return user;
+    return decryptPII(user);
   });
 
   // Create supervisor
@@ -108,25 +109,27 @@ async function supervisorRoutes(fastify, opts) {
 
     const passwordHash = await bcrypt.hash(data.password, BCRYPT_COST);
 
+    // Aadhaar number and blood group are encrypted at rest, as for workers (Charter §6). [BUG-0030]
+    const supervisorData = encryptPII({
+      orgId,
+      name: data.name,
+      email: normalizedEmail,
+      phone: data.phone || null,
+      designation: data.designation || null,
+      employeeId: data.employeeId || null,
+      department: data.department || null,
+      gender: data.gender || null,
+      bloodGroup: data.bloodGroup || null,
+      dateOfBirth: data.dateOfBirth ? new Date(data.dateOfBirth) : null,
+      dateOfJoin: data.dateOfJoin ? new Date(data.dateOfJoin) : null,
+      address: data.address || null,
+      aadharNo: data.aadharNo || null,
+      notes: data.notes || null,
+      passwordHash,
+      role: 'SUPERVISOR'
+    });
     const supervisor = await prisma.user.create({
-      data: {
-        orgId,
-        name: data.name,
-        email: normalizedEmail,
-        phone: data.phone || null,
-        designation: data.designation || null,
-        employeeId: data.employeeId || null,
-        department: data.department || null,
-        gender: data.gender || null,
-        bloodGroup: data.bloodGroup || null,
-        dateOfBirth: data.dateOfBirth ? new Date(data.dateOfBirth) : null,
-        dateOfJoin: data.dateOfJoin ? new Date(data.dateOfJoin) : null,
-        address: data.address || null,
-        aadharNo: data.aadharNo || null,
-        notes: data.notes || null,
-        passwordHash,
-        role: 'SUPERVISOR'
-      },
+      data: supervisorData,
       select: { id: true, name: true, email: true, phone: true, designation: true, role: true, createdAt: true }
     });
 
@@ -188,17 +191,21 @@ async function supervisorRoutes(fastify, opts) {
     });
     if (!user) return reply.code(404).send({ error: 'Supervisor not found' });
 
+    // Audit log — track changes, compared on decrypted values. The Aadhaar number and blood
+    // group are recorded as changed, never as values. [BUG-0030]
+    const before = decryptPII({ ...user });
+    const changes = {};
+    for (const key of Object.keys(data)) {
+      if (data[key] === before[key]) continue;
+      changes[key] = PII_FIELDS.includes(key) ? { changed: true } : { from: before[key], to: data[key] };
+    }
+
     const updated = await prisma.user.update({
       where: { id },
-      data,
+      data: encryptPII(data),
       select: { id: true, name: true, email: true, phone: true, designation: true, isActive: true }
     });
 
-    // Audit log — track changes
-    const changes = {};
-    for (const key of Object.keys(data)) {
-      if (data[key] !== user[key]) changes[key] = { from: user[key], to: data[key] };
-    }
     if (Object.keys(changes).length > 0) {
       await prisma.auditLog.create({
         data: {

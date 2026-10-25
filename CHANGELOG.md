@@ -56,6 +56,19 @@ see `docs/DEPLOYMENT.md` for how a change reaches production.
   - New real Node 24 fixture: `test/fixtures/junit/node24-suite-throws.*`.
   - `apps/api/test/README.md` documents the rule.
   - No test in the current suite was affected.
+- **`[BUG-0030]` Supervisors' Aadhaar numbers and blood groups were stored in plain text and
+  copied into audit logs** (PAR-10/15). Only electricians' values were encrypted; the
+  supervisor routes wrote them as typed, and each edit recorded the old and new values in
+  AuditLog as `{ from, to }`. That broke Charter §6, and `data-model.md` claimed otherwise.
+  - `lib/crypto.js` now has generic `encryptPII` / `decryptPII` (the worker helpers are
+    aliases) and `isEncrypted`.
+  - `supervisors.js` encrypts on create and update and decrypts for the admin.
+  - The audit diff runs on decrypted values and records `{ changed: true }` for these two
+    fields.
+  - A row saved before the fix still reads correctly and is encrypted when next saved.
+- **Deployment step (owner):** `scripts/migrate-user-pii.js` encrypts the older rows and strips
+  the values from old supervisor audit rows. It runs as a dry run by default; `--apply` writes.
+  Run it after a backup (`docs/DEPLOYMENT.md`). Not visible to users.
 
 ### 2026-10-24 (product and architecture review — documentation only)
 
