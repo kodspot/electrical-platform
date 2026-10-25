@@ -288,6 +288,9 @@ see `docs/DEPLOYMENT.md` for how a change reaches production.
   - The form sends with `fetch`, not the role's fetch helper. `/auth/worker-pin` answers a
     wrong current PIN with 401, and the helper treats any 401 as a lost session and signs out.
 - **User-visible (Release Notes):** change your password or PIN from your profile.
+- **`[BUG-0053]` The profile of an electrician said "Admin"** (found while fixing BUG-0052).
+  `_renderProfileModal` labelled every role except super admin and supervisor as "Admin". It
+  now maps `ELECTRICIAN` too.
 
 ### 2026-10-24 (product and architecture review — documentation only)
 

@@ -45,6 +45,7 @@
 - **Tickets under a deactivated floor open.** If an administrator deactivates a floor or a
   block but keeps the rooms in it, you can now open the complaints from those rooms that you
   are notified about. Before, the app said the ticket was not found.
+- **Your profile says Electrician.** It said Admin before.
 
 ## For residents and guests
 - **You can see the photo of the fix.** The review page that asks whether the problem is

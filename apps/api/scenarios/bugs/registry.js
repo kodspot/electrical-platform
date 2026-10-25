@@ -60,7 +60,8 @@ const BUGS_LIST = [
   require('./bug-0049-zero-purchase-cost-lost'),
   require('./bug-0050-rung-for-ticket-under-inactive-location'),
   require('./bug-0051-no-way-to-request-a-reset'),
-  require('./bug-0052-no-signed-in-password-change')
+  require('./bug-0052-no-signed-in-password-change'),
+  require('./bug-0053-electrician-profile-says-admin')
 ];
 
 const BUGS = Object.fromEntries(BUGS_LIST.map((b) => [b.id, b]));

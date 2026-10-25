@@ -749,7 +749,8 @@ window.App = (function () {
     var name = data.name || 'User';
     var parts = name.trim().split(/\s+/);
     var initials = parts.length > 1 ? (parts[0][0] + parts[parts.length - 1][0]).toUpperCase() : parts[0].substring(0, 2).toUpperCase();
-    var roleLabel = data.role === 'SUPER_ADMIN' ? 'Super Admin' : data.role === 'SUPERVISOR' ? 'Supervisor' : 'Admin';
+    // Electricians were labelled "Admin": only these two were mapped. [BUG-0053]
+    var roleLabel = { SUPER_ADMIN: 'Super Admin', SUPERVISOR: 'Supervisor', ELECTRICIAN: 'Electrician' }[data.role] || 'Admin';
     var since = data.createdAt ? new Date(data.createdAt).toLocaleDateString('en-IN', { year: 'numeric', month: 'long', day: 'numeric' }) : '—';
     // A super admin signs in with the admin key, so has nothing to change here. [BUG-0052]
     var canChange = data.role !== 'SUPER_ADMIN';

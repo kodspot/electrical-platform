@@ -68,8 +68,9 @@ Commands: `npm run bug:list` · `npm run bug:run -- <ID>` · `npm run bug:valida
 | BUG-0050 | MEDIUM | FIXED | ele | An electrician was rung for a ticket under a deactivated location that their app would not open | `test/integration/worker-coverage-inactive.test.js` |
 | BUG-0051 | MEDIUM | FIXED | ele | No sign-in page let anyone ask for a password or PIN reset; the super-admin "Run one-time setup" link was dead | `e2e/tests/forms.spec.js` |
 | BUG-0052 | MEDIUM | FIXED | ele | Nobody could change their own password or PIN while signed in | `e2e/tests/forms.spec.js` |
+| BUG-0053 | LOW | FIXED | ele | The profile of an electrician said "Admin" | `e2e/tests/forms.spec.js` |
 
-Count: 52 bug scenario(s).
+Count: 53 bug scenario(s).
 
 ## BUG-0001 — Admin could set a ticket to RESOLVED_PENDING_VERIFY directly
 
@@ -1003,4 +1004,21 @@ Count: 52 bug scenario(s).
 1. Sign in; open the user menu → Profile.
 2. Broken: only Close. Fixed: Change password / Change PIN → current, new, confirm → "changed".
 3. Browser test: e2e/tests/forms.spec.js (BUG-0052).
+
+## BUG-0053 — The profile of an electrician said "Admin"
+
+- **Severity:** LOW · **Status:** FIXED · **Module:** ele · **Category:** ui
+- **Origin:** Found while fixing BUG-0052 (2026-10-25)
+- **Introduced:** pre-audit · **Fixed:** 2026-10-25
+- **Description:** public/js/app.js _renderProfileModal mapped SUPER_ADMIN and SUPERVISOR to their labels and everything else to "Admin", so an electrician's profile (role ELECTRICIAN) showed an Admin badge. Found while fixing BUG-0052.
+- **Root cause:** A two-way ternary with "Admin" as the default.
+- **Expected behavior:** The badge reads Electrician for an electrician.
+- **Broken behavior:** The badge read Admin.
+- **Scenario dependencies:** —
+- **Regression test:** `e2e/tests/forms.spec.js`
+
+**Reproduction steps:**
+
+1. Sign in as an electrician; user menu → Profile.
+2. Broken: "Admin". Fixed: "Electrician". Browser test: e2e/tests/forms.spec.js (BUG-0053).
 

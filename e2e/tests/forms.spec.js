@@ -578,6 +578,16 @@ test.describe('Forms — admin, supervisor, electrician', () => {
     expect(bootstrapCalled).toBe(false);
   });
 
+  // The profile modal's badge mapped SUPER_ADMIN and SUPERVISOR and called everyone else
+  // "Admin" — electricians included. [BUG-0053]
+  test('BUG-0053: the profile of an electrician says Electrician, not Admin', async ({ page }) => {
+    await signInElectrician(page, x.worker, slug);
+    await page.goto(orgPage(slug, 'electrician-tickets'));
+    await page.locator('#userMenuTrigger').click();
+    await page.locator('#userMenuProfile').click();
+    await expect(page.locator('.profile-role-badge')).toHaveText('Electrician');
+  });
+
   // PATCH /auth/password and /auth/worker-pin had no screen: nobody could change their own
   // password or PIN while signed in. The profile modal now can; the session goes on with the
   // token the server returns, and a wrong current PIN (401) says so instead of signing the
