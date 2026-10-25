@@ -36,7 +36,7 @@ module.exports = {
     const { prisma } = require('../../src/lib/prisma');
     const resetToken = crypto.randomBytes(32).toString('hex');
     await prisma.worker.update({ where: { id: worker.id }, data: { resetToken, resetTokenExpiresAt: new Date(Date.now() + 3600000) } });
-    return { admin, worker, resetToken };
+    return { org, admin, worker, resetToken };
   },
 
   async validate(ctx) {
