@@ -67,8 +67,9 @@ Commands: `npm run bug:list` · `npm run bug:run -- <ID>` · `npm run bug:valida
 | BUG-0049 | LOW | FIXED | asset | An asset purchase cost of 0 was stored as "unknown" | `test/integration/admin-forms-api.test.js` |
 | BUG-0050 | MEDIUM | FIXED | ele | An electrician was rung for a ticket under a deactivated location that their app would not open | `test/integration/worker-coverage-inactive.test.js` |
 | BUG-0051 | MEDIUM | FIXED | ele | No sign-in page let anyone ask for a password or PIN reset; the super-admin "Run one-time setup" link was dead | `e2e/tests/forms.spec.js` |
+| BUG-0052 | MEDIUM | FIXED | ele | Nobody could change their own password or PIN while signed in | `e2e/tests/forms.spec.js` |
 
-Count: 51 bug scenario(s).
+Count: 52 bug scenario(s).
 
 ## BUG-0001 — Admin could set a ticket to RESOLVED_PENDING_VERIFY directly
 
@@ -984,4 +985,22 @@ Count: 51 bug scenario(s).
 1. Open /<org>/ele/admin-login (or the supervisor or electrician sign-in page).
 2. Broken: no "Forgot password?" link; /reset-password without a token is a dead end. Fixed: link → email → "If an account exists…".
 3. Browser test: e2e/tests/forms.spec.js (BUG-0051).
+
+## BUG-0052 — Nobody could change their own password or PIN while signed in
+
+- **Severity:** MEDIUM · **Status:** FIXED · **Module:** ele · **Category:** account-recovery
+- **Origin:** Product and architecture review 2026-10 (PAR-10/26)
+- **Introduced:** pre-audit · **Fixed:** 2026-10-25
+- **Description:** PATCH /auth/password (admin, supervisor) and PATCH /auth/worker-pin (electrician) had no screen in the app; the only way to a new password or PIN was an administrator, or a reset email. Found by the 2026-10 product and architecture review (PAR-10/26).
+- **Root cause:** The endpoints were built without a screen.
+- **Expected behavior:** The profile modal has "Change password" (staff) or "Change PIN" (electrician); the session goes on with the token the server returns; a wrong current PIN does not sign the electrician out.
+- **Broken behavior:** No way to change a password or PIN from the app.
+- **Scenario dependencies:** —
+- **Regression test:** `e2e/tests/forms.spec.js`
+
+**Reproduction steps:**
+
+1. Sign in; open the user menu → Profile.
+2. Broken: only Close. Fixed: Change password / Change PIN → current, new, confirm → "changed".
+3. Browser test: e2e/tests/forms.spec.js (BUG-0052).
 

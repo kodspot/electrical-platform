@@ -6,8 +6,12 @@
 // 409 rules) behave as the API says. Runs in the explorer org (asset module on), desktop project
 // only; every name is unique to the run. Asserts what the user sees AND the database behind it.
 
+const path = require('node:path');
 const { test, expect } = require('@playwright/test');
 const { seed, db, apiLogin, signIn, signInElectrician, orgPage, pickOption } = require('../support/app');
+
+// The app's own modules, for the tests that make an account or check a stored hash.
+const apiRequire = (rel) => require(path.join(__dirname, '..', '..', 'apps', 'api', rel));
 
 const confirmYes = (page) => page.locator('#_cfmYes').click();
 
@@ -573,4 +577,75 @@ test.describe('Forms — admin, supervisor, electrician', () => {
     await expect(page).toHaveURL(/\/superadmin-dashboard$/);
     expect(bootstrapBody).toEqual({ adminKey: 'a-key-typed-by-the-operator' });
   });
+
+  // PATCH /auth/password and /auth/worker-pin had no screen: nobody could change their own
+  // password or PIN while signed in. The profile modal now can; the session goes on with the
+  // token the server returns, and a wrong current PIN (401) says so instead of signing the
+  // electrician out. [BUG-0052]
+  for (const role of ['admin', 'supervisor', 'electrician']) {
+    test(`BUG-0052: ${role} › change my ${role === 'electrician' ? 'PIN' : 'password'} from the profile; a wrong current one is refused; the session goes on`, async ({ page }) => {
+      // A dedicated account, so no seeded password changes. Its session is signed here with the
+      // run's secret instead of a login: the suite stays inside the 10-logins-per-15-minutes limit.
+      const f = apiRequire('scenarios/factories');
+      const jwt = apiRequire('node_modules/jsonwebtoken');
+      const bcrypt = apiRequire('node_modules/bcrypt');
+      const isElec = role === 'electrician';
+      const [oldSecret, newSecret] = isElec ? ['246802', '135791'] : ['OldPass123', 'NewPass456'];
+      const account = isElec
+        ? await f.createTestWorker(x.org.id, { pin: oldSecret, name: `PIN Elec ${s.run}`, employeeId: `PIN-${s.run}` })
+        : await f.createTestUser(x.org.id, { role: role.toUpperCase(), password: oldSecret, name: `Pw ${role} ${s.run}`, email: `pw-${role}-${s.run}@example.test` });
+      const token = isElec
+        ? jwt.sign({ workerId: account.id, orgId: x.org.id }, process.env.JWT_SECRET, { expiresIn: '1h' })
+        : jwt.sign({ userId: account.id, orgId: x.org.id, role: account.role }, process.env.JWT_SECRET, { expiresIn: '1h' });
+      const key = { admin: 'token', supervisor: 'sup_token', electrician: 'elec_token' }[role];
+      const userKey = { admin: 'user', supervisor: 'sup_user', electrician: 'elec_user' }[role];
+      // Set once: a reload must keep the token the page stored after the change.
+      await page.addInitScript(({ key, userKey, token, user, slug }) => {
+        if (localStorage.getItem(key)) return;
+        localStorage.setItem(key, token);
+        localStorage.setItem(userKey, JSON.stringify(user));
+        localStorage.setItem('orgSlug', slug);
+        localStorage.setItem('activeModule', 'ele');
+      }, { key, userKey, token, slug, user: { id: account.id, name: account.name, role: account.role, orgId: x.org.id, orgSlug: slug } });
+      const home = { admin: 'admin-dashboard', supervisor: 'supervisor-tickets', electrician: 'electrician-tickets' }[role];
+      const label = isElec ? 'PIN' : 'password';
+      try {
+        await page.goto(orgPage(slug, home));
+        await page.locator('#userMenuTrigger').click();
+        await page.locator('#userMenuProfile').click();
+        await page.getByRole('button', { name: `Change ${label}` }).click();
+
+        await page.locator('#secretCurrent').fill(isElec ? '000000' : 'WrongPass1');
+        await page.locator('#secretNew').fill(newSecret);
+        await page.locator('#secretConfirm').fill(newSecret);
+        await page.getByRole('button', { name: 'Save' }).click();
+        await expect(page.locator('#secretError')).toContainText(`Current ${label} is incorrect`);
+        await expect(page).toHaveURL(new RegExp(`/${home}$`));
+
+        await page.locator('#secretCurrent').fill(oldSecret);
+        await page.getByRole('button', { name: 'Save' }).click();
+        await expect(page.locator('.toast-success', { hasText: `${isElec ? 'PIN' : 'Password'} changed` })).toBeVisible();
+        const row = isElec
+          ? await db().worker.findUnique({ where: { id: account.id }, select: { pinHash: true } })
+          : await db().user.findUnique({ where: { id: account.id }, select: { passwordHash: true } });
+        expect(await bcrypt.compare(newSecret, isElec ? row.pinHash : row.passwordHash)).toBe(true);
+        expect(await page.evaluate((k) => localStorage.getItem(k), key)).not.toBe(token);
+
+        // The old session ended with the change; the page goes on with the new token.
+        await page.reload();
+        await expect(page.locator('#userMenuTrigger')).toBeVisible();
+        const status = (t) => page.evaluate(async ({ url, t }) => (await fetch(url, { headers: { Authorization: `Bearer ${t}` } })).status,
+          { url: isElec ? '/api/auth/worker-me' : '/api/auth/me', t });
+        expect(await status(await page.evaluate((k) => localStorage.getItem(k), key))).toBe(200);
+        expect(await status(token)).toBe(401);
+        await expect(page).toHaveURL(new RegExp(`/${home}$`));
+      } finally {
+        if (isElec) await db().worker.deleteMany({ where: { id: account.id } });
+        else {
+          await db().auditLog.deleteMany({ where: { actorId: account.id } });
+          await db().user.deleteMany({ where: { id: account.id } });
+        }
+      }
+    });
+  }
 });

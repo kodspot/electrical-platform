@@ -271,10 +271,18 @@ see `docs/DEPLOYMENT.md` for how a change reaches production.
     generic message, plus who to ask if no email arrives.
   - The super-admin sign-in page's **Run one-time setup** linked to `/superadmin-setup`, a
     page that does not exist. It now runs `POST /auth/bootstrap` with the key just entered.
-  - No server change. The rest of PAR-10/26, a password or PIN change while signed in, is not
-    done yet: `PATCH /auth/password` still has no screen, and electricians have no PIN-change
-    endpoint.
+  - No server change. The rest of PAR-10/26 is BUG-0052.
 - **User-visible (Release Notes):** "Forgot password?" and "Forgot PIN?" on the sign-in pages.
+- **`[BUG-0052]` Nobody could change their own password or PIN while signed in** (PAR-10/26).
+  - `PATCH /auth/password` and `PATCH /auth/worker-pin` had no screen.
+  - The profile modal (user menu → Profile) now has **Change password** for admins and
+    supervisors and **Change PIN** for electricians. A super admin, who signs in with the
+    admin key, gets neither.
+  - The server ends every session of the account and returns a fresh token, which replaces
+    the stored one, so the session on this device goes on.
+  - The form sends with `fetch`, not the role's fetch helper. `/auth/worker-pin` answers a
+    wrong current PIN with 401, and the helper treats any 401 as a lost session and signs out.
+- **User-visible (Release Notes):** change your password or PIN from your profile.
 
 ### 2026-10-24 (product and architecture review — documentation only)
 

@@ -54,6 +54,9 @@
 - **"Forgot password?" and "Forgot PIN?"** The sign-in pages now let you ask for a reset link
   by email. Electricians receive it at the email address their administrator has on file. If
   no email arrives, your administrator can still set a new password or PIN for you.
+- **Change your password or PIN yourself.** Open your name at the top right, then *Profile*,
+  then *Change password* (or *Change PIN*). You stay signed in on this device, and any other
+  device that is signed in to your account is signed out.
 - **Password and PIN reset links are better protected.** If you requested a reset link shortly
   before this update and it no longer works, request a new one.
 - **Names show in full.** Names containing quotation marks or apostrophes, such as

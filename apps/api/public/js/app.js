@@ -751,6 +751,8 @@ window.App = (function () {
     var initials = parts.length > 1 ? (parts[0][0] + parts[parts.length - 1][0]).toUpperCase() : parts[0].substring(0, 2).toUpperCase();
     var roleLabel = data.role === 'SUPER_ADMIN' ? 'Super Admin' : data.role === 'SUPERVISOR' ? 'Supervisor' : 'Admin';
     var since = data.createdAt ? new Date(data.createdAt).toLocaleDateString('en-IN', { year: 'numeric', month: 'long', day: 'numeric' }) : '—';
+    // A super admin signs in with the admin key, so has nothing to change here. [BUG-0052]
+    var canChange = data.role !== 'SUPER_ADMIN';
 
     var html =
       '<div class="profile-card">' +
@@ -766,11 +768,98 @@ window.App = (function () {
           _profileRow('Member Since', since, 'M8 2v4|M16 2v4|M3 10h18|M21 8v13a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h14a2 2 0 012 2z') +
         '</div>' +
         '<div class="profile-footer">' +
+          (canChange ? '<button class="btn btn-outline btn-sm" id="profileChangeSecret" style="width:100%;margin-bottom:.5rem">Change ' + (role === 'electrician' ? 'PIN' : 'password') + '</button>' : '') +
           '<button class="btn btn-outline btn-sm" onclick="App.closeModal(\'profileModal\')" style="width:100%">Close</button>' +
         '</div>' +
       '</div>';
 
     $('profileContent').innerHTML = html;
+    if (canChange) $('profileChangeSecret').addEventListener('click', function() { _renderSecretForm(role); });
+  }
+
+  // ─── Change Password / PIN (signed in) ───
+  // PATCH /auth/password (admin, supervisor) or /auth/worker-pin (electrician). The server ends
+  // every session of the account and returns a fresh token, which replaces the stored one so
+  // this session goes on. Sent with fetch, not the role's fetch helper: /auth/worker-pin answers
+  // a wrong current PIN with 401, which the helper takes for a lost session and signs out on.
+  // Neither endpoint had a screen. [BUG-0052]
+  var SECRET_CHANGE = {
+    admin: { path: '/auth/password', key: 'token', headers: function() { return adminHeaders(); } },
+    supervisor: { path: '/auth/password', key: 'sup_token', headers: function() { return { ...supHeaders(), 'Content-Type': 'application/json' }; } },
+    electrician: { path: '/auth/worker-pin', key: 'elec_token', headers: function() { return elecHeaders(); } }
+  };
+
+  // Mirrors the server's passwordSchema (src/lib/security.js), as reset-password.js does.
+  function _passwordProblem(p) {
+    if (p.length < 8) return 'Password must be at least 8 characters.';
+    if (p.length > 100) return 'Password must be at most 100 characters.';
+    if (!/[A-Z]/.test(p)) return 'Password must contain at least one uppercase letter.';
+    if (!/[a-z]/.test(p)) return 'Password must contain at least one lowercase letter.';
+    if (!/\d/.test(p)) return 'Password must contain at least one number.';
+    return null;
+  }
+
+  function _renderSecretForm(role) {
+    var isPin = role === 'electrician';
+    var label = isPin ? 'PIN' : 'password';
+    var field = function(id, text, autocomplete, hint) {
+      return '<div class="form-group"><label class="form-label" for="' + id + '">' + text + '</label>' +
+        '<input class="form-input" type="password" id="' + id + '" autocomplete="' + autocomplete + '"' +
+        (isPin ? ' inputmode="numeric" maxlength="6"' : ' maxlength="100"') + '>' +
+        (hint ? '<div class="form-hint">' + hint + '</div>' : '') + '</div>';
+    };
+    $('profileContent').innerHTML =
+      '<form id="secretForm" novalidate>' +
+        '<h3 class="modal-title">Change ' + label + '</h3>' +
+        '<div class="error-msg" id="secretError" role="alert"></div>' +
+        field('secretCurrent', 'Current ' + label, 'current-password') +
+        field('secretNew', 'New ' + label, 'new-password', isPin ? 'Exactly 6 digits.' : 'At least 8 characters, with an uppercase letter, a lowercase letter and a number.') +
+        field('secretConfirm', 'Confirm new ' + label, 'new-password') +
+        '<div class="profile-footer" style="display:flex;gap:.5rem">' +
+          '<button type="button" class="btn btn-outline btn-sm" style="flex:1" onclick="App.closeModal(\'profileModal\')">Cancel</button>' +
+          '<button type="submit" class="btn btn-primary btn-sm" style="flex:1" id="secretSave">Save</button>' +
+        '</div>' +
+      '</form>';
+    $('secretForm').addEventListener('submit', function(e) { e.preventDefault(); _saveSecret(role); });
+  }
+
+  async function _saveSecret(role) {
+    var isPin = role === 'electrician';
+    var label = isPin ? 'PIN' : 'password';
+    var target = SECRET_CHANGE[role];
+    var current = $('secretCurrent').value;
+    var next = $('secretNew').value;
+    var errEl = $('secretError');
+    var fail = function(msg) { errEl.textContent = msg; errEl.classList.add('show'); };
+    errEl.classList.remove('show');
+    if (isPin ? !/^\d{6}$/.test(current) : !current) return fail('Enter your current ' + label + (isPin ? ' (6 digits).' : '.'));
+    var problem = isPin ? (/^\d{6}$/.test(next) ? null : 'The new PIN must be exactly 6 digits.') : _passwordProblem(next);
+    if (problem) return fail(problem);
+    if (next !== $('secretConfirm').value) return fail('The two new ' + label + 's do not match.');
+
+    var btn = $('secretSave');
+    btn.disabled = true; btn.textContent = 'Saving…';
+    try {
+      var res = await fetch(API + target.path, {
+        method: 'PATCH',
+        headers: target.headers(),
+        body: JSON.stringify(isPin ? { currentPin: current, newPin: next } : { currentPassword: current, newPassword: next })
+      });
+      var data = {};
+      try { data = await res.json(); } catch (_) { /* non-JSON */ }
+      if (res.ok && data.token) {
+        localStorage.setItem(target.key, data.token);
+        closeModal('profileModal');
+        toast((isPin ? 'PIN' : 'Password') + ' changed. Your other devices are signed out.', 'success');
+        return;
+      }
+      if (res.status === 429) return fail('Too many attempts. Please wait a few minutes and try again.');
+      fail((data.error === 'Validation failed' && data.details && data.details.join(' ')) || data.error || 'Could not change the ' + label + '. Please try again.');
+    } catch (_) {
+      fail('Network error. Please check your connection and try again.');
+    } finally {
+      btn.disabled = false; btn.textContent = 'Save';
+    }
   }
 
   function _profileRow(label, value, iconPaths) {
