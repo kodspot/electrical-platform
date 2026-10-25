@@ -124,6 +124,22 @@ see `docs/DEPLOYMENT.md` for how a change reaches production.
   - Found when the BUG-0035 test's roster made the org cleanup fail while the run stayed
     green.
   - New fixture: `test/fixtures/junit/node24-after-throws.*`.
+- **User-visible (Release Notes, new [`docs/releases/next-draft.md`](docs/releases/next-draft.md)
+  for changes since v1.0.0):** a deactivated supervisor's open tickets are handed over.
+- **`[BUG-0037]` A deactivated or moved supervisor kept their open tickets, where no one else
+  could see them** (PAR-10/09).
+  - Applies to all three paths: `PATCH /api/supervisors/:id` with `isActive: false`,
+    `DELETE /api/supervisors/:id`, and the super-admin user edit (deactivate, or move to
+    another org).
+  - Each open ticket (active or pending verification) goes to the nearest active supervisor
+    covering its location — the rule a new complaint uses — or back to the pool. It happens
+    in the same transaction, with one `ticket_reassigned` audit row per ticket, and the new
+    assignee is notified (`planTicketHandover` / `applyTicketHandover` /
+    `notifyTicketHandover` in `services/assignment-resolver.js`).
+  - A move also deletes the user's coverage in the old org, so new complaints there stop
+    reaching someone in another tenant.
+  - The admin page's message says how many tickets moved. Finished tickets keep their
+    assignee.
 
 ### 2026-10-24 (product and architecture review — documentation only)
 

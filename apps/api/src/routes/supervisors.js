@@ -7,6 +7,7 @@ const { BCRYPT_COST, passwordSchema } = require('../lib/security');
 const { PII_FIELDS, encryptPII, decryptPII } = require('../lib/crypto');
 const { authenticateJWT, requirePolicy } = require('../middleware/auth');
 const { ACTIVE_TICKET_STATUSES } = require('../services/ticket-status');
+const { planTicketHandover, applyTicketHandover, notifyTicketHandover } = require('../services/assignment-resolver');
 
 async function supervisorRoutes(fastify, opts) {
   fastify.addHook('preHandler', authenticateJWT);
@@ -200,11 +201,19 @@ async function supervisorRoutes(fastify, opts) {
       changes[key] = PII_FIELDS.includes(key) ? { changed: true } : { from: before[key], to: data[key] };
     }
 
-    const updated = await prisma.user.update({
-      where: { id },
-      data: encryptPII(data),
-      select: { id: true, name: true, email: true, phone: true, designation: true, isActive: true }
+    // Deactivating hands their open tickets to whoever else covers each location, or back to
+    // the pool, in the same transaction. [BUG-0037]
+    const plan = data.isActive === false && user.isActive ? await planTicketHandover(id, orgId) : [];
+    const updated = await prisma.$transaction(async (tx) => {
+      const u = await tx.user.update({
+        where: { id },
+        data: encryptPII(data),
+        select: { id: true, name: true, email: true, phone: true, designation: true, isActive: true }
+      });
+      await applyTicketHandover(tx, plan, { orgId, fromId: id, actorType: 'admin', actorId: request.user.id, reason: 'supervisor_deactivated' });
+      return u;
     });
+    notifyTicketHandover(orgId, plan);
 
     if (Object.keys(changes).length > 0) {
       await prisma.auditLog.create({
@@ -221,7 +230,7 @@ async function supervisorRoutes(fastify, opts) {
       });
     }
 
-    return updated;
+    return plan.length > 0 ? { ...updated, reassignedTickets: plan.length } : updated;
   });
 
   // Reset supervisor password
@@ -264,11 +273,17 @@ async function supervisorRoutes(fastify, opts) {
     });
     if (!user) return reply.code(404).send({ error: 'Supervisor not found' });
 
-    await prisma.user.update({ where: { id }, data: { isActive: false } });
+    const orgId = request.user.orgId;
+    const plan = user.isActive ? await planTicketHandover(id, orgId) : [];
+    await prisma.$transaction(async (tx) => {
+      await tx.user.update({ where: { id }, data: { isActive: false } });
+      await applyTicketHandover(tx, plan, { orgId, fromId: id, actorType: 'admin', actorId: request.user.id, reason: 'supervisor_deactivated' });
+    });
+    notifyTicketHandover(orgId, plan);
 
     await prisma.auditLog.create({
       data: {
-        orgId: request.user.orgId,
+        orgId,
         actorType: 'admin',
         actorId: request.user.id,
         action: 'supervisor_deactivated',
@@ -278,7 +293,7 @@ async function supervisorRoutes(fastify, opts) {
       }
     });
 
-    return { success: true, message: 'Supervisor deactivated' };
+    return { success: true, message: 'Supervisor deactivated', reassignedTickets: plan.length };
   });
 
   // Supervisor stats — enriched with flagged, tickets, shifts, top locations, late submissions

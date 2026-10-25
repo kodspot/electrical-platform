@@ -52,8 +52,9 @@ Commands: `npm run bug:list` · `npm run bug:run -- <ID>` · `npm run bug:valida
 | BUG-0034 | HIGH | FIXED | ele | Password and PIN reset tokens were stored as issued, so the database value itself reset the account | `test/integration/account-recovery.test.js` |
 | BUG-0035 | MEDIUM | FIXED | ele | Permanently deleting an electrician who was on a duty roster failed with a 500; attendance history was silently erased | `test/integration/permanent-delete-parity.test.js` |
 | BUG-0036 | HIGH | FIXED | ele | `npm test` passed when a suite's after() hook threw — e.g. a cleanup that left test data behind | `test/report-tests.test.js` |
+| BUG-0037 | HIGH | FIXED | ele | A deactivated (or moved) supervisor kept their open tickets, where no one else could see them | `test/integration/supervisor-handover.test.js` |
 
-Count: 36 bug scenario(s).
+Count: 37 bug scenario(s).
 
 ## BUG-0001 — Admin could set a ticket to RESOLVED_PENDING_VERIFY directly
 
@@ -699,4 +700,22 @@ Count: 36 bug scenario(s).
 1. Add a test file whose describe() has an after() that throws, and a passing test.
 2. Run node scripts/run-tests.js on it.
 3. Broken: "[run-tests] exit 0". Fixed: exit 1, "1 suite failure(s) the runner did not count …".
+
+## BUG-0037 — A deactivated (or moved) supervisor kept their open tickets, where no one else could see them
+
+- **Severity:** HIGH · **Status:** FIXED · **Module:** ele · **Category:** supervisor-workflow
+- **Origin:** Product and architecture review 2026-10 (PAR-10/09)
+- **Introduced:** pre-audit · **Fixed:** 2026-10-25
+- **Description:** Deactivating a supervisor (PATCH /api/supervisors/:id, DELETE /api/supervisors/:id, or the super-admin user edit) left their open tickets assigned to them. Other supervisors only see tickets assigned to themselves or unassigned, and only the assigned supervisor or an admin may verify, so the work stranded. A super-admin moving the user to another org also left the tickets — and the user's coverage, so new complaints kept going to someone in another org. Found by the 2026-10 product and architecture review (PAR-10/09).
+- **Root cause:** The deactivation paths only flipped isActive; nothing re-ran the assignment rule for the tickets they held.
+- **Expected behavior:** Each open ticket goes to the nearest active supervisor covering its location, else back to the pool; audited, and the new assignee is notified. A move also drops the old org's coverage.
+- **Broken behavior:** The open ticket stayed assigned to the deactivated supervisor.
+- **Scenario dependencies:** —
+- **Regression test:** `test/integration/supervisor-handover.test.js`
+
+**Reproduction steps:**
+
+1. Give a supervisor an OPEN ticket at a location another supervisor also covers.
+2. Deactivate the first supervisor as the org admin.
+3. Broken: the ticket is still theirs. Fixed: it belongs to the other supervisor.
 

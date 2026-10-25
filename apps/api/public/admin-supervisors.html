@@ -586,7 +586,9 @@ async function deactivateSup(id, name) {
   var res = await App.apiFetch('/supervisors/' + id, { method: 'PATCH', body: JSON.stringify({ isActive: false }) });
   if (!res) return;
   if (!res.ok) { App.toast('Failed to deactivate', 'error'); return; }
-  App.toast('Supervisor deactivated', 'success'); loadSupervisors(currentPage);
+  var moved = ((await res.json().catch(function(){ return {}; })) || {}).reassignedTickets || 0;
+  App.toast(moved ? 'Supervisor deactivated — ' + moved + ' open ticket' + (moved === 1 ? '' : 's') + ' handed over' : 'Supervisor deactivated', 'success');
+  loadSupervisors(currentPage);
 }
 
 async function reactivateSup(id) {

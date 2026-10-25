@@ -1,0 +1,33 @@
+# Release notes — next release (DRAFT, not tagged)
+
+> **Draft.** These notes cover the customer-visible changes since v1.0.0. They come from the
+> fixes that followed the 2026-10 product and architecture review (BUG-0027 onwards). Per
+> Charter §18 they use the words each audience would recognise, and security fixes describe
+> the improvement, not the mechanics. Publish them with the next tagged release.
+
+## For administrators
+- **Deactivating a supervisor hands over their open tickets.** Each open ticket goes to the
+  other supervisor covering its location. If no one else covers it, the ticket goes back to
+  the shared list. The new assignee is notified, and the message after deactivating says how
+  many tickets moved. Before, the tickets stayed with the deactivated supervisor, where other
+  supervisors could not see them.
+- **Deleting an electrician explains why it can't.** An electrician who appears on a duty
+  roster, in attendance records or on tickets they fixed is kept, with that reason shown. This
+  is the same rule as for inspection history. Before, the delete failed with an error, or
+  removed their attendance history.
+- **Proof photos stay for 30 days from when they were taken.** A proof photo for work finished
+  on an older ticket is no longer removed the next night.
+- **Supervisors' ID details are better protected.** Aadhaar numbers and blood groups of
+  supervisors are now protected the same way as electricians'. Change history records that
+  they changed, not the numbers themselves.
+
+## For everyone who signs in
+- **Password and PIN reset links are better protected.** If you requested a reset link shortly
+  before this update and it no longer works, request a new one.
+- **Names show in full.** Names containing quotation marks or apostrophes, such as
+  *O'Brien Hostel*, now show correctly in tooltips and buttons.
+
+## Security and privacy improvements (no action needed)
+- The electrician app no longer receives residents' contact details.
+- Administrators' pages are protected against harmful text entered as a name.
+- Running alert checks by hand affects only your own organization.

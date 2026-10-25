@@ -11,6 +11,7 @@ const { APP_URL } = require('../config/env');
 const { isModuleEnabled } = require('../services/module-policy');
 const { validateActivationPlan, syncOrgModuleActivations } = require('../services/module-registry');
 const { ACTIVE_TICKET_STATUSES } = require('../services/ticket-status');
+const { planTicketHandover, applyTicketHandover, notifyTicketHandover } = require('../services/assignment-resolver');
 
 const VALID_MODULES = ['ele', 'civil', 'asset', 'complaints'];
 
@@ -665,11 +666,22 @@ async function superadminRoutes(fastify, opts) {
       if (dup && dup.id !== id) return reply.code(409).send({ error: 'Email already in use in the target organization' });
     }
 
-    const updated = await prisma.user.update({
-      where: { id },
-      data,
-      select: { id: true, name: true, email: true, phone: true, role: true, isActive: true, orgId: true }
+    // Deactivating or moving a user hands their open tickets in their (old) org to whoever
+    // else covers each location, or back to the pool; a move also drops their coverage there,
+    // so new complaints in that org stop reaching someone in another org. [BUG-0037]
+    const handoverOrgId = user.orgId && ((data.isActive === false && user.isActive) || orgChanged) ? user.orgId : null;
+    const plan = handoverOrgId ? await planTicketHandover(id, handoverOrgId) : [];
+    const updated = await prisma.$transaction(async (tx) => {
+      const u = await tx.user.update({
+        where: { id },
+        data,
+        select: { id: true, name: true, email: true, phone: true, role: true, isActive: true, orgId: true }
+      });
+      if (orgChanged && user.orgId) await tx.supervisorAssignment.deleteMany({ where: { supervisorId: id, orgId: user.orgId } });
+      await applyTicketHandover(tx, plan, { orgId: handoverOrgId, fromId: id, actorType: 'super_admin', actorId: request.user.id, reason: orgChanged ? 'user_transferred' : 'user_deactivated' });
+      return u;
     });
+    if (handoverOrgId) notifyTicketHandover(handoverOrgId, plan);
 
     const oldValue = { name: user.name, email: user.email };
     if (orgChanged) oldValue.orgId = user.orgId;
