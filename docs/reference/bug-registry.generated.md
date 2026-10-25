@@ -44,8 +44,9 @@ Commands: `npm run bug:list` · `npm run bug:run -- <ID>` · `npm run bug:valida
 | BUG-0026 | MEDIUM | FIXED | complaints | After a guest rejected a fix, the electrician who did it saw the ticket as "Done" and could not pick it up again | `test/integration/ticket-resolve-verify.test.js` |
 | BUG-0027 | CRITICAL | FIXED | ele | The electrician API returned the guest's review token, name, phone, IP hash and user agent | `test/integration/ticket-resolve-verify.test.js` |
 | BUG-0028 | CRITICAL | FIXED | ele | Stored XSS: an org admin could plant script in names that ran for anyone opening the page, including a super-admin | `test/public-escaping.test.js` |
+| BUG-0029 | HIGH | FIXED | ele | `npm test` passed when a test file's describe() threw while collecting its tests | `test/report-tests.test.js` |
 
-Count: 28 bug scenario(s).
+Count: 29 bug scenario(s).
 
 ## BUG-0001 — Admin could set a ticket to RESOLVED_PENDING_VERIFY directly
 
@@ -547,4 +548,22 @@ Count: 28 bug scenario(s).
 1. As an org admin, create a location named `Q" data-bug0028="1` and an electrician named `E\');window.__bug0028=1;//`.
 2. Open admin-locations, then admin-workers and click the electrician's Locations button.
 3. Broken: an element carries data-bug0028 and window.__bug0028 is 1. Fixed: neither. Browser test: e2e/tests/forms.spec.js (BUG-0028).
+
+## BUG-0029 — `npm test` passed when a test file's describe() threw while collecting its tests
+
+- **Severity:** HIGH · **Status:** FIXED · **Module:** ele · **Category:** qa-tooling
+- **Origin:** PAR-10 fixes 2026-10-25 (found while writing the BUG-0028 test)
+- **Introduced:** pre-audit · **Fixed:** 2026-10-25
+- **Description:** On Node 24, when a describe() body throws (a broken require, a bad helper call), node --test prints the suite as failed but exits 0 and counts "fail 0": none of that suite's tests run. scripts/run-tests.js decided its exit code from the child's status and those counts, so CI was green with the tests silently missing. Found while writing the BUG-0028 test.
+- **Root cause:** scripts/report-tests.js decideExit() trusted node:test's counts, which leave out a suite that fails during collection; the JUnit XML and the events stream both record it.
+- **Expected behavior:** A suite that throws while collecting its tests makes the run exit 1, with the suite named in the reasons and in test-summary.md.
+- **Broken behavior:** Exit 0; the summary said 0 failed.
+- **Scenario dependencies:** —
+- **Regression test:** `test/report-tests.test.js`
+
+**Reproduction steps:**
+
+1. Add a test file whose describe() callback throws before registering any test.
+2. Run node scripts/run-tests.js on it.
+3. Broken: "[run-tests] exit 0". Fixed: exit 1, "1 failure(s) the runner did not count …".
 

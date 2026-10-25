@@ -48,6 +48,14 @@ see `docs/DEPLOYMENT.md` for how a change reaches production.
     old pages.
   - Names that contain quotes now show in full in tooltips; nothing else is visible to users.
   - CSP `'unsafe-inline'` (PRA-07 M1) is unchanged.
+- **`[BUG-0029]` `npm test` passed when a test file's `describe()` threw while collecting its
+  tests.** Node 24 prints that suite as failed, but exits 0 and counts `fail 0`, so none of its
+  tests ran and CI stayed green. Found while writing the BUG-0028 test.
+  - `scripts/report-tests.js` now reads the failure from the JUnit XML and the events stream,
+    makes the run exit 1, and names the suite.
+  - New real Node 24 fixture: `test/fixtures/junit/node24-suite-throws.*`.
+  - `apps/api/test/README.md` documents the rule.
+  - No test in the current suite was affected.
 
 ### 2026-10-24 (product and architecture review — documentation only)
 

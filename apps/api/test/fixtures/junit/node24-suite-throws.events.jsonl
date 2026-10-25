@@ -1,0 +1,2 @@
+{"result":"fail","name":"probe suite that throws while collecting","nesting":0,"file":"C:\\ci\\electrical-platform\\apps\\api\\test\\probe\\suite-throws.test.js","kind":"suite","failureType":"testCodeFailure","cause":"window.addEventListener is not a function"}
+{"result":"pass","name":"probe passing suite","nesting":0,"file":"C:\\ci\\electrical-platform\\apps\\api\\test\\probe\\suite-throws.test.js","kind":"suite","failureType":null,"cause":null}
