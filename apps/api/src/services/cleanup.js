@@ -7,6 +7,19 @@ const { runExclusive, LOCK_KEYS } = require('../lib/scheduler-lock');
 const RETENTION_DAYS = 30;
 
 /**
+ * Which of a ticket's stored photos are past retention, each counted from when it was taken:
+ * the complaint photo at the ticket's creation, the proof photo at resolution (resolvedAt;
+ * the creation time if that is missing). [BUG-0033]
+ */
+function expiredTicketPhotos(ticket, cutoff) {
+  const stored = (url) => Boolean(url) && url.startsWith('/images/');
+  const fields = [];
+  if (stored(ticket.imageUrl) && ticket.createdAt < cutoff) fields.push('imageUrl');
+  if (stored(ticket.resolvedImageUrl) && (ticket.resolvedAt || ticket.createdAt) < cutoff) fields.push('resolvedImageUrl');
+  return fields;
+}
+
+/**
  * Deletes images older than RETENTION_DAYS from R2 storage and nulls out the URLs in the DB.
  * Covers electrical inspection images, ticket photos, and resolution proof photos.
  * Metadata is kept forever — only image binaries and URLs are removed.
@@ -41,27 +54,26 @@ async function cleanupExpiredImages(logger) {
     }
   }
 
-  // 2) Ticket photos (initial complaint image + resolved proof image)
+  // 2) Ticket photos, each counted from when it was taken: the complaint photo at ticket
+  // creation, the proof photo at resolution (resolvedAt). Counting both from the ticket's
+  // creation deleted a proof photo uploaded late in an old ticket's life within a day,
+  // before anyone could verify it. [BUG-0033]
   const expiredTickets = await prisma.ticket.findMany({
     where: {
-      createdAt: { lt: cutoff },
       OR: [
-        { imageUrl: { not: null, startsWith: '/images/' } },
-        { resolvedImageUrl: { not: null, startsWith: '/images/' } }
+        { createdAt: { lt: cutoff }, imageUrl: { not: null, startsWith: '/images/' } },
+        { resolvedAt: { lt: cutoff }, resolvedImageUrl: { not: null, startsWith: '/images/' } },
+        { resolvedAt: null, createdAt: { lt: cutoff }, resolvedImageUrl: { not: null, startsWith: '/images/' } }
       ]
     },
-    select: { id: true, imageUrl: true, resolvedImageUrl: true }
+    select: { id: true, createdAt: true, resolvedAt: true, imageUrl: true, resolvedImageUrl: true }
   });
 
   for (const t of expiredTickets) {
     const updates = {};
-    if (t.imageUrl && t.imageUrl.startsWith('/images/')) {
-      try { await deleteFromR2(t.imageUrl); updates.imageUrl = null; deleted++; }
-      catch (err) { failed++; logger.error(`[cleanup] Failed ticket img ${t.id}: ${err.message}`); }
-    }
-    if (t.resolvedImageUrl && t.resolvedImageUrl.startsWith('/images/')) {
-      try { await deleteFromR2(t.resolvedImageUrl); updates.resolvedImageUrl = null; deleted++; }
-      catch (err) { failed++; logger.error(`[cleanup] Failed ticket resolve img ${t.id}: ${err.message}`); }
+    for (const field of expiredTicketPhotos(t, cutoff)) {
+      try { await deleteFromR2(t[field]); updates[field] = null; deleted++; }
+      catch (err) { failed++; logger.error(`[cleanup] Failed ticket ${field} ${t.id}: ${err.message}`); }
     }
     if (Object.keys(updates).length > 0) {
       try { await prisma.ticket.update({ where: { id: t.id }, data: updates }); }
@@ -189,4 +201,4 @@ function startCleanupScheduler(logger) {
   return { startupTimeout, dailyInterval };
 }
 
-module.exports = { cleanupExpiredImages, startCleanupScheduler };
+module.exports = { cleanupExpiredImages, expiredTicketPhotos, startCleanupScheduler };

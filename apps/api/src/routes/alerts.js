@@ -4,6 +4,7 @@ const { z } = require('zod');
 const { prisma } = require('../lib/prisma');
 const { authenticateJWT, requirePolicy } = require('../middleware/auth');
 const { generateAiInsights, runScheduledChecks, runEscalationChecks } = require('../services/automation');
+const { runExclusive, LOCK_KEYS } = require('../lib/scheduler-lock');
 
 const VALID_TRIGGERS = [
   'INSPECTION_FAULT', 'INSPECTION_LATE', 'INSPECTION_MISSED',
@@ -394,24 +395,28 @@ async function alertRoutes(fastify) {
     return { success: true, message: 'Insight generation started. Check back in a moment.' };
   });
 
-  // ── Trigger scheduled checks now (admin manual trigger) ──
+  // ── Manual triggers (admin): the caller's org only, under the scheduled job's own advisory
+  // lock — a manual run never touches another tenant, and never overlaps the scheduled run
+  // (which could escalate the same alert twice). 409 while that run holds the lock. [BUG-0032]
+
   fastify.post('/alerts/run-checks', {
     preHandler: [requirePolicy('ORG_ADMIN')]
-  }, async (request) => {
-    runScheduledChecks(fastify.log).catch(err =>
-      fastify.log.error({ err }, 'Manual scheduled check failed')
-    );
-    return { success: true, message: 'Scheduled rule checks started.' };
+  }, async (request, reply) => {
+    const orgId = request.user.orgId;
+    if (!orgId) return reply.code(400).send({ error: 'Select an organization first' });
+    const { ran } = await runExclusive(prisma, LOCK_KEYS.SCHEDULED_CHECKS, () => runScheduledChecks(fastify.log, { orgId }), fastify.log);
+    if (!ran) return reply.code(409).send({ error: 'The scheduled checks are running right now. Try again in a minute.' });
+    return { success: true, message: 'Scheduled rule checks completed.' };
   });
 
-  // ── Trigger escalation checks now (admin manual trigger) ──
   fastify.post('/alerts/run-escalations', {
     preHandler: [requirePolicy('ORG_ADMIN')]
-  }, async (request) => {
-    runEscalationChecks(fastify.log).catch(err =>
-      fastify.log.error({ err }, 'Manual escalation check failed')
-    );
-    return { success: true, message: 'Escalation checks started.' };
+  }, async (request, reply) => {
+    const orgId = request.user.orgId;
+    if (!orgId) return reply.code(400).send({ error: 'Select an organization first' });
+    const { ran } = await runExclusive(prisma, LOCK_KEYS.ESCALATION_CHECKS, () => runEscalationChecks(fastify.log, { orgId }), fastify.log);
+    if (!ran) return reply.code(409).send({ error: 'The escalation checks are running right now. Try again in a minute.' });
+    return { success: true, message: 'Escalation checks completed.' };
   });
 }
 

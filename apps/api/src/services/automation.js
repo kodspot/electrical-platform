@@ -269,9 +269,10 @@ async function executeAction(action, alert, orgId, data, logger) {
 // Run periodically to detect time-based conditions
 // ─────────────────────────────────────────────
 
-async function runScheduledChecks(logger) {
+// With { orgId }, one org only — what an admin's manual "run checks" may touch. [BUG-0032]
+async function runScheduledChecks(logger, { orgId } = {}) {
   const orgs = await prisma.organization.findMany({
-    where: { status: 'ACTIVE' },
+    where: { status: 'ACTIVE', ...(orgId ? { id: orgId } : {}) },
     select: { id: true, enabledModules: true }
   });
 
@@ -657,13 +658,17 @@ ${recentAlerts.map(a => '- [' + a.severity + '] ' + a.title).join('\n') || '- No
 // Checks unacknowledged alerts past their escalation window
 // ─────────────────────────────────────────────
 
-async function runEscalationChecks(logger) {
+// With { orgId }, one org only — what an admin's manual "run escalations" may touch.
+// Suspended and deleted orgs never escalate. [BUG-0032]
+async function runEscalationChecks(logger, { orgId } = {}) {
   try {
     // Find all active rules that have escalation configured
     const rules = await prisma.alertRule.findMany({
       where: {
         isActive: true,
-        escalateAfterMinutes: { not: null }
+        escalateAfterMinutes: { not: null },
+        org: { status: 'ACTIVE' },
+        ...(orgId ? { orgId } : {})
       },
       select: {
         id: true, orgId: true, escalateAfterMinutes: true,

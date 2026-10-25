@@ -47,8 +47,10 @@ Commands: `npm run bug:list` · `npm run bug:run -- <ID>` · `npm run bug:valida
 | BUG-0029 | HIGH | FIXED | ele | `npm test` passed when a test file's describe() threw while collecting its tests | `test/report-tests.test.js` |
 | BUG-0030 | CRITICAL | FIXED | ele | Supervisors' Aadhaar numbers and blood groups were stored in plain text and copied into audit logs | `test/integration/supervisor-pii.test.js` |
 | BUG-0031 | HIGH | FIXED | ele | Worker detail, create and update responses carried the PIN hash and a pending PIN-reset token | `test/integration/worker-credentials.test.js` |
+| BUG-0032 | HIGH | FIXED | ele | An org admin's "run escalations" escalated every tenant's alerts, outside the scheduler lock | `test/integration/alert-manual-checks.test.js` |
+| BUG-0033 | HIGH | FIXED | ele | A proof photo uploaded late in an old ticket's life was deleted the next night | `test/integration/image-cleanup.test.js` |
 
-Count: 31 bug scenario(s).
+Count: 33 bug scenario(s).
 
 ## BUG-0001 — Admin could set a ticket to RESOLVED_PENDING_VERIFY directly
 
@@ -604,4 +606,40 @@ Count: 31 bug scenario(s).
 1. Create an electrician with a PIN and a pending PIN-reset token.
 2. As the org admin, GET /api/workers/:id.
 3. Broken: pinHash and resetToken are in the response. Fixed: neither key is present.
+
+## BUG-0032 — An org admin's "run escalations" escalated every tenant's alerts, outside the scheduler lock
+
+- **Severity:** HIGH · **Status:** FIXED · **Module:** ele · **Category:** admin-workflow
+- **Origin:** Product and architecture review 2026-10 (PAR-10/01, PAR-10/42)
+- **Introduced:** pre-audit · **Fixed:** 2026-10-25
+- **Description:** POST /api/alerts/run-checks and /api/alerts/run-escalations (ORG_ADMIN) started the platform-wide jobs: every organization's scheduled checks and escalations. They ran outside the scheduler's advisory lock, so next to the 5-minute scheduled run the same alert could escalate twice. The escalation scan also escalated alerts of suspended and deleted organizations. Found by the 2026-10 product and architecture review (PAR-10/01, PAR-10/42).
+- **Root cause:** The routes called runScheduledChecks / runEscalationChecks with no org scope and without runExclusive; the escalation rule query had no organization-status filter.
+- **Expected behavior:** A manual run covers the caller's org only, under the scheduled job's lock (409 while it is held); suspended and deleted orgs never escalate.
+- **Broken behavior:** Org A's admin calling run-escalations escalated org B's overdue alert.
+- **Scenario dependencies:** —
+- **Regression test:** `test/integration/alert-manual-checks.test.js`
+
+**Reproduction steps:**
+
+1. Create two orgs, each with a rule that escalates after 1 minute and an unacknowledged alert 30 minutes old.
+2. As org A's admin, POST /api/alerts/run-escalations.
+3. Broken: org B's alert reaches escalation level 1. Fixed: it stays at 0; org A's escalates.
+
+## BUG-0033 — A proof photo uploaded late in an old ticket's life was deleted the next night
+
+- **Severity:** HIGH · **Status:** FIXED · **Module:** ele · **Category:** ticket-workflow
+- **Origin:** Product and architecture review 2026-10 (PAR-10/18)
+- **Introduced:** pre-audit · **Fixed:** 2026-10-25
+- **Description:** The daily image cleanup keeps photos for 30 days, but it counted a ticket's proof photo (resolvedImageUrl) from the TICKET's creation. When work on a ticket older than 30 days was finished, its new proof photo was deleted at the next cleanup — before the supervisor verified it or the resident saw it. Found by the 2026-10 product and architecture review (PAR-10/18).
+- **Root cause:** cleanupExpiredImages selected tickets by createdAt < cutoff and removed both photos.
+- **Expected behavior:** Each photo is kept for 30 days from when it was taken: the complaint photo from the ticket's creation, the proof photo from resolvedAt.
+- **Broken behavior:** A proof photo resolved 2 days ago on a 40-day-old ticket was deleted.
+- **Scenario dependencies:** —
+- **Regression test:** `test/integration/image-cleanup.test.js`
+
+**Reproduction steps:**
+
+1. Create a ticket 40 days ago that was resolved 2 days ago with a proof photo.
+2. Run the image cleanup (services/cleanup.js cleanupExpiredImages).
+3. Broken: resolvedImageUrl is null. Fixed: it is kept. Full test with real files and the real query: test/integration/image-cleanup.test.js.
 

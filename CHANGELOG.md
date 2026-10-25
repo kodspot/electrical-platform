@@ -73,6 +73,30 @@ see `docs/DEPLOYMENT.md` for how a change reaches production.
   PIN-reset token** (PAR-10/16). This affected the org-admin and super-admin routes. They now
   return `WORKER_PROFILE_SELECT` (`lib/security.js`): the profile, and no credential
   material. Not visible to users.
+- **`[BUG-0032]` An org admin's "run checks / run escalations" ran every tenant's jobs,
+  outside the scheduler lock** (PAR-10/01, PAR-10/42).
+  - What happened: `POST /api/alerts/run-checks` and `/run-escalations` started the
+    platform-wide scheduled checks and escalations. A test showed org A's call escalating
+    org B's overdue alert. The manual run also bypassed the advisory lock, so next to the
+    5-minute scheduled run one alert could escalate twice. The escalation scan also
+    escalated alerts of suspended and deleted orgs.
+  - Now: both jobs take `{ orgId }`, and the routes run the caller's org only, awaited
+    under the job's own lock. They answer `409` while the scheduled run holds that lock,
+    and `400` for a super-admin who has not entered an org. Escalations skip orgs that are
+    not `ACTIVE`.
+  - Tests: `alert-escalation.test.js` and the BUG-0019 scenario now run escalations for
+    their own org, so parallel test files no longer escalate each other's alerts.
+  - Documented in `docs/architecture/resilience.md`. No page calls these routes.
+- **`[BUG-0033]` A proof photo uploaded late in an old ticket's life was deleted the next
+  night** (PAR-10/18).
+  - What happened: the daily image cleanup counted a ticket's proof photo from the ticket's
+    creation, so finishing work on a ticket more than 30 days old lost the new photo before
+    anyone verified it.
+  - Now: each photo is kept for 30 days from when it was taken — the complaint photo from the
+    ticket's creation, the proof photo from `resolvedAt` (`expiredTicketPhotos` in
+    `services/cleanup.js`).
+  - The 30-day period itself is unchanged; the privacy page's "7 days" is PAR-10/28.
+    Documented in `docs/architecture/resilience.md`.
 
 ### 2026-10-24 (product and architecture review — documentation only)
 
