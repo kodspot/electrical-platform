@@ -324,6 +324,23 @@ see `docs/DEPLOYMENT.md` for how a change reaches production.
   - Documented in `docs/reference/environment.md` (`TZ`).
   - Not in this change: analytics charts still group by UTC day (BUG-0056), and there is
     still one zone for every organization.
+- **`[BUG-0056]` Analytics charts counted inspections between midnight and 05:30 under the
+  day before** (PAR-10/07).
+  - Affected: the inspection and fault trends, the report's daily trend and period, the room
+    heatmap, the location history, and the super-admin activity and AI-usage charts.
+  - They grouped by UTC day: SQL `DATE(col)` on columns that hold UTC, and `toISOString()`
+    date keys. The report's labels were shifted by one, starting a day before the range
+    and leaving out its last day.
+  - They now group by the local day: `localDateKey()` in JavaScript, and in SQL
+    `DATE(col AT TIME ZONE 'UTC' AT TIME ZONE <server zone>)` (`lib/dates.js`
+    `serverTimeZone`), grouped by position because the bound zone parameter differs between
+    `SELECT` and `GROUP BY`.
+  - With BUG-0055 this closes PAR-10/07's inconsistent day boundaries. A per-organization
+    time zone, needed only if organizations span zones, is left to the owner.
+  - The BUG-0012 and BUG-0039 scenarios asked the report for a range ending on
+    `toISOString()`'s date, so between 00:00 and 05:30 IST they missed the inspection they
+    had just made and failed, whatever the code. They use `localDateKey()` now. This was
+    found at 01:12 IST.
 
 ### 2026-10-24 (product and architecture review — documentation only)
 

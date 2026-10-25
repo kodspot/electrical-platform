@@ -37,4 +37,16 @@ function localDateKey(d = new Date()) {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }
 
-module.exports = { dayRange, localDateKey };
+/**
+ * The server's IANA time zone (from TZ), for grouping by local day in SQL. Timestamps are
+ * stored as UTC in `timestamp` columns, so the local day of a column is
+ * DATE(col AT TIME ZONE 'UTC' AT TIME ZONE <zone>), not DATE(col). Bound as a parameter,
+ * the expression differs between SELECT and GROUP BY, so such queries group by position
+ * (GROUP BY 1). [BUG-0056]
+ * @returns {string}
+ */
+function serverTimeZone() {
+  return Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+}
+
+module.exports = { dayRange, localDateKey, serverTimeZone };

@@ -1,7 +1,7 @@
 'use strict';
 
 const { prisma } = require('../lib/prisma');
-const { dayRange } = require('../lib/dates');
+const { dayRange, localDateKey, serverTimeZone } = require('../lib/dates');
 const { authenticateJWT, requirePolicy } = require('../middleware/auth');
 const { ACTIVE_TICKET_STATUSES } = require('../services/ticket-status');
 
@@ -106,18 +106,19 @@ async function analyticsRoutes(fastify, opts) {
     since.setHours(0, 0, 0, 0);
 
     const trend = await prisma.$queryRaw`
-      SELECT DATE("inspectedAt") as date, COUNT(*)::int as count
+      SELECT DATE("inspectedAt" AT TIME ZONE 'UTC' AT TIME ZONE ${serverTimeZone()}) as date, COUNT(*)::int as count
        FROM "ElectricalInspection"
        WHERE "orgId"::text = ${orgId} AND "inspectedAt" >= ${since}
-       GROUP BY DATE("inspectedAt")
-       ORDER BY date ASC`;
+       GROUP BY 1
+       ORDER BY 1 ASC`;
 
     const allDays = [];
     for (let i = days - 1; i >= 0; i--) {
       const d = new Date();
       d.setDate(d.getDate() - i);
-      allDays.push(d.toISOString().split('T')[0]);
+      allDays.push(localDateKey(d));
     }
+    // A SQL DATE comes back as UTC midnight, so its ISO date is that day.
     const countMap = new Map((trend || []).map(d => {
       const dateStr = typeof d.date === 'string' ? d.date.split('T')[0] : new Date(d.date).toISOString().split('T')[0];
       return [dateStr, d.count];
@@ -134,18 +135,19 @@ async function analyticsRoutes(fastify, opts) {
     since.setHours(0, 0, 0, 0);
 
     const trend = await prisma.$queryRaw`
-      SELECT DATE("inspectedAt") as date, COUNT(*)::int as count
+      SELECT DATE("inspectedAt" AT TIME ZONE 'UTC' AT TIME ZONE ${serverTimeZone()}) as date, COUNT(*)::int as count
        FROM "ElectricalInspection"
        WHERE "orgId"::text = ${orgId} AND "inspectedAt" >= ${since} AND "faultyCount" > 0
-       GROUP BY DATE("inspectedAt")
-       ORDER BY date ASC`;
+       GROUP BY 1
+       ORDER BY 1 ASC`;
 
     const allDays = [];
     for (let i = days - 1; i >= 0; i--) {
       const d = new Date();
       d.setDate(d.getDate() - i);
-      allDays.push(d.toISOString().split('T')[0]);
+      allDays.push(localDateKey(d));
     }
+    // A SQL DATE comes back as UTC midnight, so its ISO date is that day.
     const countMap = new Map((trend || []).map(d => {
       const dateStr = typeof d.date === 'string' ? d.date.split('T')[0] : new Date(d.date).toISOString().split('T')[0];
       return [dateStr, d.count];
@@ -522,7 +524,7 @@ async function analyticsRoutes(fastify, opts) {
     const dayMap = new Map();
     const faultDayMap = new Map();
     for (const r of inspections) {
-      const day = r.inspectedAt.toISOString().split('T')[0];
+      const day = localDateKey(r.inspectedAt);
       dayMap.set(day, (dayMap.get(day) || 0) + 1);
       if (r.faultyCount > 0) faultDayMap.set(day, (faultDayMap.get(day) || 0) + 1);
     }
@@ -530,7 +532,7 @@ async function analyticsRoutes(fastify, opts) {
     const faultTrend = [];
     const d = new Date(periodStart);
     while (d <= periodEnd) {
-      const key = d.toISOString().split('T')[0];
+      const key = localDateKey(d);
       trend.push({ date: key, count: dayMap.get(key) || 0 });
       faultTrend.push({ date: key, count: faultDayMap.get(key) || 0 });
       d.setDate(d.getDate() + 1);
@@ -625,7 +627,7 @@ async function analyticsRoutes(fastify, opts) {
     })).sort((a, b) => b.inspections - a.inspections).slice(0, 10);
 
     return {
-      period: { from: periodStart.toISOString().split('T')[0], to: periodEnd.toISOString().split('T')[0], days: daysInPeriod },
+      period: { from: localDateKey(periodStart), to: localDateKey(periodEnd), days: daysInPeriod },
       summary: {
         totalInspections,
         prevInspections: prevInspectionCount,
@@ -682,12 +684,12 @@ async function analyticsRoutes(fastify, opts) {
     const dates = [];
     const d = new Date(periodStart);
     while (d <= periodEnd) {
-      dates.push(d.toISOString().split('T')[0]);
+      dates.push(localDateKey(d));
       d.setDate(d.getDate() + 1);
     }
     if (dates.length === 0) return { dates: [], locations: [] };
 
-    const todayStr = new Date().toISOString().split('T')[0];
+    const todayStr = localDateKey();
 
     // Fetch all leaf locations
     const locations = await prisma.location.findMany({
@@ -710,7 +712,7 @@ async function analyticsRoutes(fastify, opts) {
     // Build lookup: locationId → dateStr → { count, faults }
     const inspMap = new Map();
     for (const insp of inspections) {
-      const dateStr = insp.inspectedAt.toISOString().split('T')[0];
+      const dateStr = localDateKey(insp.inspectedAt);
       const key = insp.locationId + '|' + dateStr;
       if (!inspMap.has(key)) inspMap.set(key, { count: 0, faults: 0 });
       const entry = inspMap.get(key);
@@ -797,19 +799,19 @@ async function analyticsRoutes(fastify, opts) {
     // Build per-day breakdown
     const dailyMap = new Map();
     for (const r of inspections) {
-      const dateKey = r.inspectedAt.toISOString().split('T')[0];
+      const dateKey = localDateKey(r.inspectedAt);
       if (!dailyMap.has(dateKey)) dailyMap.set(dateKey, { count: 0, faults: 0 });
       const entry = dailyMap.get(dateKey);
       entry.count++;
       entry.faults += r.faultyCount;
     }
 
-    const todayStr = new Date().toISOString().split('T')[0];
+    const todayStr = localDateKey();
     const dailyStatus = [];
     for (let i = 0; i < days; i++) {
       const d2 = new Date();
       d2.setDate(d2.getDate() - i);
-      const dateKey = d2.toISOString().split('T')[0];
+      const dateKey = localDateKey(d2);
       const data = dailyMap.get(dateKey) || { count: 0, faults: 0 };
 
       let status;

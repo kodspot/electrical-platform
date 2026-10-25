@@ -33,7 +33,9 @@
 - **Date filters cover the whole day.** Choosing a day, or a range of days, in tickets,
   alerts, the audit log, inspections, assets and analytics now includes everything from
   midnight. Before, anything between midnight and 5:30 in the morning was counted under the
-  day before. *Today* is also correct just after midnight.
+  day before. *Today* is also correct just after midnight. The charts in *Analytics* and the
+  room heatmap count each inspection on the day it was done; the report's days are no
+  longer shifted by one.
 - **A purchase cost of 0 is kept.** Assets that cost nothing, such as donations, keep 0 as
   their cost instead of showing it as unknown.
 - **Photos show in the asset, failure and inspection details.** Photos attached to an asset, a

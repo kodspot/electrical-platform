@@ -71,8 +71,9 @@ Commands: `npm run bug:list` · `npm run bug:run -- <ID>` · `npm run bug:valida
 | BUG-0053 | LOW | FIXED | ele | The profile of an electrician said "Admin" | `e2e/tests/forms.spec.js` |
 | BUG-0054 | MEDIUM | FIXED | ele | On a shared phone, an inspection saved offline was sent in as whoever else was signed in | `test/shared-device-sessions.test.js` |
 | BUG-0055 | MEDIUM | FIXED | ele | Date filters started each day at 05:30 in India (UTC midnight), and pages took "today" from UTC | `test/integration/date-filters-local-day.test.js` |
+| BUG-0056 | MEDIUM | FIXED | ele | Analytics charts counted inspections between midnight and 05:30 under the day before | `test/integration/analytics-local-days.test.js` |
 
-Count: 55 bug scenario(s).
+Count: 56 bug scenario(s).
 
 ## BUG-0001 — Admin could set a ticket to RESOLVED_PENDING_VERIFY directly
 
@@ -1059,4 +1060,22 @@ Count: 55 bug scenario(s).
 1. With TZ=Asia/Kolkata, raise a ticket at 01:00 IST.
 2. GET /api/tickets?from=<that day>&to=<that day>. Broken: missing (and listed under the day before). Fixed: listed.
 3. Regression: test/integration/date-filters-local-day.test.js (runs in Asia/Kolkata).
+
+## BUG-0056 — Analytics charts counted inspections between midnight and 05:30 under the day before
+
+- **Severity:** MEDIUM · **Status:** FIXED · **Module:** ele · **Category:** admin-workflow
+- **Origin:** Product and architecture review 2026-10 (PAR-10/07)
+- **Introduced:** pre-audit · **Fixed:** 2026-10-26
+- **Description:** The analytics trends, report, room heatmap and location history, and the super-admin activity and AI-usage charts, grouped by UTC day: SQL DATE("inspectedAt") on a column holding UTC, and toISOString() date keys. In India an inspection between 00:00 and 05:30 counted on the previous day, and the report's day labels were shifted by one (its first label before the range, its last day missing). Found by the 2026-10 product and architecture review (PAR-10/07).
+- **Root cause:** Day keys taken in UTC while the server and its users are in IST.
+- **Expected behavior:** Every chart groups by the local day: localDateKey() in JS, DATE(col AT TIME ZONE 'UTC' AT TIME ZONE <server zone>) in SQL.
+- **Broken behavior:** An inspection at 01:00 counted on the day before; the report period started a day early.
+- **Scenario dependencies:** —
+- **Regression test:** `test/integration/analytics-local-days.test.js`
+
+**Reproduction steps:**
+
+1. With TZ=Asia/Kolkata, record inspections at 01:00 and 23:30 on one day.
+2. GET /api/analytics/report?from=<day>&to=<day>. Broken: trend keyed by the day before. Fixed: [{ date: <day>, count: 2 }].
+3. Regression: test/integration/analytics-local-days.test.js (runs in Asia/Kolkata).
 

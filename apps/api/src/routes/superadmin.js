@@ -4,6 +4,7 @@ const bcrypt = require('bcrypt');
 const QRCode = require('qrcode');
 const { z } = require('zod');
 const { prisma } = require('../lib/prisma');
+const { serverTimeZone } = require('../lib/dates');
 const { BCRYPT_COST, passwordSchema, WORKER_PROFILE_SELECT } = require('../lib/security');
 const { authenticateJWT, requirePolicy } = require('../middleware/auth');
 const { encryptWorkerPII, decryptWorkerPII, encryptField, decryptField } = require('../lib/crypto');
@@ -951,11 +952,11 @@ async function superadminRoutes(fastify, opts) {
     last7Days.setHours(0, 0, 0, 0);
 
     const dailyTrend = await prisma.$queryRaw`
-      SELECT DATE("inspectedAt") as date, COUNT(*)::int as count
+      SELECT DATE("inspectedAt" AT TIME ZONE 'UTC' AT TIME ZONE ${serverTimeZone()}) as date, COUNT(*)::int as count
       FROM "ElectricalInspection"
       WHERE "inspectedAt" >= ${last7Days}
-      GROUP BY DATE("inspectedAt")
-      ORDER BY date ASC
+      GROUP BY 1
+      ORDER BY 1 ASC
     `;
 
     const recordsLast7Days = (dailyTrend || []).reduce((sum, d) => sum + d.count, 0);
@@ -1239,12 +1240,12 @@ async function superadminRoutes(fastify, opts) {
         LIMIT 20
       `,
       prisma.$queryRaw`
-        SELECT DATE("createdAt") as date, COUNT(*)::int as requests,
+        SELECT DATE("createdAt" AT TIME ZONE 'UTC' AT TIME ZONE ${serverTimeZone()}) as date, COUNT(*)::int as requests,
                COALESCE(SUM("totalTokens"), 0)::int as tokens
         FROM "AiUsageLog"
         WHERE "createdAt" >= ${since}
-        GROUP BY DATE("createdAt")
-        ORDER BY date ASC
+        GROUP BY 1
+        ORDER BY 1 ASC
       `
     ]);
 
