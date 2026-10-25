@@ -502,6 +502,7 @@ $('inspectionForm').addEventListener('submit', async function(e) {
 
       var apiBase = (window.location.origin);
       App.enqueueRetry(null, {
+        scope: 'supervisor', // replayed with the supervisor's session, whoever else is signed in (BUG-0054)
         url: apiBase + '/api/electrical-inspections',
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

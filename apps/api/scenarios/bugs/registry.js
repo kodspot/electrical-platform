@@ -61,7 +61,8 @@ const BUGS_LIST = [
   require('./bug-0050-rung-for-ticket-under-inactive-location'),
   require('./bug-0051-no-way-to-request-a-reset'),
   require('./bug-0052-no-signed-in-password-change'),
-  require('./bug-0053-electrician-profile-says-admin')
+  require('./bug-0053-electrician-profile-says-admin'),
+  require('./bug-0054-shared-device-wrong-session')
 ];
 
 const BUGS = Object.fromEntries(BUGS_LIST.map((b) => [b.id, b]));

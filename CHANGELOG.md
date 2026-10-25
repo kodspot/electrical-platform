@@ -291,6 +291,20 @@ see `docs/DEPLOYMENT.md` for how a change reaches production.
 - **`[BUG-0053]` The profile of an electrician said "Admin"** (found while fixing BUG-0052).
   `_renderProfileModal` labelled every role except super admin and supervisor as "Admin". It
   now maps `ELECTRICIAN` too.
+- **`[BUG-0054]` On a shared phone, a saved inspection was sent in as whoever else was signed
+  in** (PAR-10/49, in part).
+  - The offline queue was replayed, from any page that came back online, with the first token
+    found: admin, super admin, supervisor, then electrician.
+  - With a supervisor and an admin both signed in on one device, a supervisor's inspection
+    saved offline was recorded as the admin's.
+  - A queued entry now records its role (`scope`) and is replayed only with that role's token.
+    If that role is signed out, the entry waits. Entries saved before this change count as
+    the supervisor's: the supervisor inspection page is the only page that queues.
+  - `App.imgUrl` uses the page's own session instead of the first token found.
+  - Documented in `docs/architecture/frontend.md`.
+  - The rest of PAR-10/49, a server-side sign-out, is not done. Changing a password or PIN
+    now ends every other session (BUG-0052). A sign-out that ends one session needs a
+    session table, which is a decision for the owner.
 
 ### 2026-10-24 (product and architecture review — documentation only)
 

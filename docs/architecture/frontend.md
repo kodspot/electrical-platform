@@ -82,6 +82,16 @@ queue** (`kodspot-sync` DB):
 The security-relevant contract here: **queued requests never persist a bearer token**;
 authentication is re-established at replay time.
 
+**Each request uses its own role's session.** One phone can hold several sessions, for
+example a supervisor's and an admin's.
+- A queued entry records the role that queued it (`scope`; `App.enqueueRetry` fills in the
+  page's own role).
+- A queued entry is replayed only with that role's token. If that role is not signed in, the
+  entry waits.
+- Photo URLs (`App.imgUrl`) carry the session of the page they are on.
+- Before BUG-0054, both took the first token found. That could send a supervisor's inspection
+  in as the admin.
+
 ## Static delivery & caching
 
 Static files are served by `@fastify/static` from `public/` (`plugins/content.js`). Caddy

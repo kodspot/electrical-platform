@@ -69,8 +69,9 @@ Commands: `npm run bug:list` · `npm run bug:run -- <ID>` · `npm run bug:valida
 | BUG-0051 | MEDIUM | FIXED | ele | No sign-in page let anyone ask for a password or PIN reset; the super-admin "Run one-time setup" link was dead | `e2e/tests/forms.spec.js` |
 | BUG-0052 | MEDIUM | FIXED | ele | Nobody could change their own password or PIN while signed in | `e2e/tests/forms.spec.js` |
 | BUG-0053 | LOW | FIXED | ele | The profile of an electrician said "Admin" | `e2e/tests/forms.spec.js` |
+| BUG-0054 | MEDIUM | FIXED | ele | On a shared phone, an inspection saved offline was sent in as whoever else was signed in | `test/shared-device-sessions.test.js` |
 
-Count: 53 bug scenario(s).
+Count: 54 bug scenario(s).
 
 ## BUG-0001 — Admin could set a ticket to RESOLVED_PENDING_VERIFY directly
 
@@ -1021,4 +1022,22 @@ Count: 53 bug scenario(s).
 
 1. Sign in as an electrician; user menu → Profile.
 2. Broken: "Admin". Fixed: "Electrician". Browser test: e2e/tests/forms.spec.js (BUG-0053).
+
+## BUG-0054 — On a shared phone, an inspection saved offline was sent in as whoever else was signed in
+
+- **Severity:** MEDIUM · **Status:** FIXED · **Module:** ele · **Category:** supervisor-workflow
+- **Origin:** Product and architecture review 2026-10 (PAR-10/49)
+- **Introduced:** pre-audit · **Fixed:** 2026-10-25
+- **Description:** public/js/app.js replayed the offline queue, from any page that came back online, with the first token found (admin, super admin, supervisor, electrician — in that order). On a device where a supervisor and an admin were both signed in, a supervisor's inspection saved offline was submitted with the admin's session and recorded as the admin's. App.imgUrl put the first token found into photo URLs the same way. Found by the 2026-10 product and architecture review (PAR-10/49).
+- **Root cause:** The replay and imgUrl had no notion of which role a request belonged to.
+- **Expected behavior:** A queued entry records its role and is replayed only with that role's token (it waits if that role is signed out); photo URLs carry the page's own session.
+- **Broken behavior:** The inspection was recorded under the admin; it could also be sent with a session of another organization.
+- **Scenario dependencies:** —
+- **Regression test:** `test/shared-device-sessions.test.js`
+
+**Reproduction steps:**
+
+1. On one browser, sign in as an admin and as a supervisor.
+2. Go offline on supervisor-electrical, submit an inspection (it is saved), then come back online on an admin page.
+3. Broken: the inspection is submitted with the admin's token. Fixed: with the supervisor's. Test: test/shared-device-sessions.test.js.
 

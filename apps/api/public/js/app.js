@@ -115,6 +115,27 @@ window.App = (function () {
   function getSupToken() { return localStorage.getItem('sup_token'); }
   function getElecToken() { return localStorage.getItem('elec_token'); }
 
+  // One role's session, on a device that may hold several (an admin and a supervisor on a shared
+  // phone). Code that took "the first token found" acted as the wrong person. [BUG-0054]
+  function _scopeToken(scope) {
+    if (scope === 'admin') return getToken();
+    if (scope === 'sa') return getSAToken();
+    if (scope === 'supervisor') return getSupToken();
+    if (scope === 'electrician') return getElecToken();
+    return null;
+  }
+
+  // The role a page belongs to, from its name (…/admin-*, …/supervisor-*, …/electrician-*); an
+  // admin page a super admin entered runs on the super admin's session. Null elsewhere.
+  function _pageScope() {
+    var page = location.pathname.split('/').pop() || '';
+    if (page.indexOf('supervisor-') === 0) return 'supervisor';
+    if (page.indexOf('electrician-') === 0) return 'electrician';
+    if (page.indexOf('superadmin-') === 0) return 'sa';
+    if (page.indexOf('admin-') === 0) return getToken() ? 'admin' : 'sa';
+    return null;
+  }
+
   function getUser() {
     try { return JSON.parse(localStorage.getItem('user') || '{}'); }
     catch { return {}; }
@@ -927,6 +948,8 @@ window.App = (function () {
   // KodspotSync is loaded from /js/offline-sync.js before app.js
 
   function enqueueRetry(fn, requestData) {
+    // The role it is sent as when replayed — the page's own unless the caller says. [BUG-0054]
+    if (requestData && !requestData.scope) requestData.scope = _pageScope();
     // If we have serialisable request data, persist to IndexedDB
     if (requestData && window.KodspotSync) {
       window.KodspotSync.enqueue(requestData).then(function () {
@@ -972,10 +995,18 @@ window.App = (function () {
       return;
     }
     var entry = entries[idx];
-    // Re-attach current auth token
+    // Re-attach the token of the role that queued it, never another role's: replayed with the
+    // first token found, a supervisor's inspection went in as the admin signed in on the same
+    // phone. Entries saved before the role was recorded all came from the supervisor inspection
+    // page, the only page that queues. Without that role's session, the entry waits. [BUG-0054]
     var headers = entry.headers || {};
-    var token = getToken() || getSAToken() || getSupToken() || getElecToken();
-    if (token) headers['Authorization'] = 'Bearer ' + token;
+    var token = _scopeToken(entry.scope || 'supervisor');
+    if (!token) {
+      toast('A submission saved offline will be sent once its ' + ({ sa: 'super admin', electrician: 'electrician', admin: 'admin' }[entry.scope] || 'supervisor') + ' signs in on this device.', 'warning');
+      _replayEntries(entries, idx + 1);
+      return;
+    }
+    headers['Authorization'] = 'Bearer ' + token;
     fetch(entry.url, { method: entry.method, headers: headers, body: entry.body || undefined })
       .then(function (res) {
         if (res.ok || res.status === 409) {
@@ -1076,7 +1107,9 @@ window.App = (function () {
   // ─── Image URL with auth token ───
   function imgUrl(src) {
     if (!src) return '';
-    var t = getToken() || getSAToken() || getSupToken() || getElecToken();
+    // The page's own session; the first token found only on a page that belongs to no role. [BUG-0054]
+    var scope = _pageScope();
+    var t = scope ? _scopeToken(scope) : (getToken() || getSAToken() || getSupToken() || getElecToken());
     if (!t || !src.startsWith('/images/')) return src;
     // Image proxy lives at /api/images/* but stored URLs omit /api prefix
     return '/api' + src + (src.includes('?') ? '&' : '?') + 'token=' + t;

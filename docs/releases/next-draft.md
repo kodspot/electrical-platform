@@ -60,6 +60,9 @@
   device that is signed in to your account is signed out.
 - **Password and PIN reset links are better protected.** If you requested a reset link shortly
   before this update and it no longer works, request a new one.
+- **A shared phone keeps each person's work apart.** If a supervisor and an administrator
+  are both signed in on one phone, an inspection the supervisor saved without signal is now
+  sent in as the supervisor's. Before, it could be recorded as the administrator's.
 - **Names show in full.** Names containing quotation marks or apostrophes, such as
   *O'Brien Hostel*, now show correctly in tooltips and buttons.
 
