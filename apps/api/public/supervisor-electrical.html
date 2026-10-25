@@ -162,7 +162,7 @@
 </div>
 
 <script src="/js/offline-sync.js?v=1"></script>
-<script src="/js/app.js?v=14"></script>
+<script src="/js/app.js?v=16"></script>
 <script src="/js/custom-select.js"></script>
 <script>
 if (!App.initSupervisor()) throw '';
@@ -502,6 +502,7 @@ $('inspectionForm').addEventListener('submit', async function(e) {
 
       var apiBase = (window.location.origin);
       App.enqueueRetry(null, {
+        scope: 'supervisor', // replayed with the supervisor's session, whoever else is signed in (BUG-0054)
         url: apiBase + '/api/electrical-inspections',
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

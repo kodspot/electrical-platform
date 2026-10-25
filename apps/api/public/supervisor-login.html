@@ -28,12 +28,17 @@
     <button type="submit" class="btn btn-primary btn-block btn-lg" id="submitBtn">Sign In</button>
     <div id="error" class="error-msg mt-sm text-center"></div>
   </form>
+  <p style="margin-top:var(--sp-md);font-size:.85rem;text-align:center">
+    <a id="forgotLink" href="/reset-password" style="color:var(--text-muted);text-decoration:underline">Forgot password?</a>
+  </p>
 </div>
 <script src="/js/offline-sync.js?v=1"></script>
-<script src="/js/app.js?v=14"></script>
+<script src="/js/app.js?v=16"></script>
 <script>
 var orgSlug = App.getOrgSlug();
 var mod = App.getModule();
+// "Forgot password?" asks for a reset link for this organization's account. [BUG-0051]
+if (orgSlug) document.getElementById('forgotLink').href = '/reset-password?org=' + encodeURIComponent(orgSlug);
 
 // Redirect if already logged in as supervisor
 if (localStorage.getItem('sup_token')) location.href = App.orgPath('supervisor-scan');

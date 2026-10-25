@@ -72,19 +72,32 @@ function decryptField(ciphertext) {
   }
 }
 
-/** Encrypt sensitive worker fields in-place before database write */
-function encryptWorkerPII(data) {
-  if (data.aadharNo) data.aadharNo = encryptField(data.aadharNo);
-  if (data.bloodGroup) data.bloodGroup = encryptField(data.bloodGroup);
+/** The personal fields stored encrypted on Worker and User rows (Charter §6). */
+const PII_FIELDS = Object.freeze(['aadharNo', 'bloodGroup']);
+
+/** True if a stored value is already in encryptField's format ("v1:iv:ciphertext:tag", or the legacy "iv:ciphertext:tag"). */
+function isEncrypted(value) {
+  if (typeof value !== 'string') return false;
+  let parts = value.split(':');
+  if (parts[0] === KEY_VERSION && parts.length === 4) parts = parts.slice(1);
+  if (parts.length !== 3 || !parts.every((p) => /^[0-9a-f]+$/.test(p))) return false;
+  return parts[0].length === IV_LENGTH * 2 && parts[2].length === TAG_LENGTH * 2;
+}
+
+/** Encrypt the PII fields in-place before a database write (workers and users alike). */
+function encryptPII(data) {
+  for (const f of PII_FIELDS) if (data[f]) data[f] = encryptField(data[f]);
   return data;
 }
 
-/** Decrypt sensitive worker fields in-place after database read */
-function decryptWorkerPII(worker) {
-  if (!worker) return worker;
-  if (worker.aadharNo) worker.aadharNo = decryptField(worker.aadharNo) || worker.aadharNo;
-  if (worker.bloodGroup) worker.bloodGroup = decryptField(worker.bloodGroup) || worker.bloodGroup;
-  return worker;
+/** Decrypt the PII fields in-place after a database read. A value saved before encryption reads back as stored. */
+function decryptPII(row) {
+  if (!row) return row;
+  for (const f of PII_FIELDS) if (row[f]) row[f] = decryptField(row[f]) || row[f];
+  return row;
 }
 
-module.exports = { encryptField, decryptField, encryptWorkerPII, decryptWorkerPII };
+const encryptWorkerPII = encryptPII;
+const decryptWorkerPII = decryptPII;
+
+module.exports = { PII_FIELDS, isEncrypted, encryptField, decryptField, encryptPII, decryptPII, encryptWorkerPII, decryptWorkerPII };

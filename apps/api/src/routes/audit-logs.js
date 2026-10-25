@@ -1,6 +1,7 @@
 'use strict';
 
 const { prisma } = require('../lib/prisma');
+const { dayRange } = require('../lib/dates');
 const { authenticateJWT, requirePolicy } = require('../middleware/auth');
 
 async function auditLogRoutes(fastify, opts) {
@@ -16,11 +17,7 @@ async function auditLogRoutes(fastify, opts) {
     if (action) where.action = action;
     if (actorType) where.actorType = { equals: actorType, mode: 'insensitive' };
     if (entityType) where.entityType = { equals: entityType, mode: 'insensitive' };
-    if (from || to) {
-      where.createdAt = {};
-      if (from) where.createdAt.gte = new Date(from + 'T00:00:00Z');
-      if (to) where.createdAt.lte = new Date(to + 'T23:59:59Z');
-    }
+    if (from || to) where.createdAt = dayRange(from, to);
     if (search) {
       where.OR = [
         { action: { contains: search, mode: 'insensitive' } },

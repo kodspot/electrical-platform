@@ -310,7 +310,7 @@
 </div>
 
 <script src="/js/offline-sync.js?v=1"></script>
-<script src="/js/app.js?v=14"></script>
+<script src="/js/app.js?v=16"></script>
 <script src="/js/custom-select.js"></script>
 <script>
 if (!App.initAdmin('workers')) throw '';
@@ -393,15 +393,15 @@ async function loadWorkers(page) {
     var actions = '<div class="wk-actions">' +
       '<button class="btn btn-sm btn-outline" onclick="viewWorker(\'' + w.id + '\')" title="View details">View</button>' +
       '<button class="btn btn-sm btn-outline" onclick="openEdit(\'' + w.id + '\')" title="Edit electrician">Edit</button>' +
-      '<button class="btn btn-sm btn-outline" onclick="openFloors(\'' + w.id + '\',\'' + esc(w.name).replace(/'/g, "\\'") + '\')" title="Location assignments">Locations</button>' +
-      '<button class="btn btn-sm btn-outline" onclick="showStats(\'' + w.id + '\',\'' + esc(w.name).replace(/'/g, "\\'") + '\')" title="Inspection stats">Stats</button>' +
-      '<button class="btn btn-sm btn-outline" onclick="openSetPin(\'' + w.id + '\',\'' + esc(w.name).replace(/'/g, "\\'") + '\')" title="Set login PIN">🔑 PIN</button>';
+      '<button class="btn btn-sm btn-outline" onclick="openFloors(\'' + w.id + '\',\'' + App.escJs(w.name) + '\')" title="Location assignments">Locations</button>' +
+      '<button class="btn btn-sm btn-outline" onclick="showStats(\'' + w.id + '\',\'' + App.escJs(w.name) + '\')" title="Inspection stats">Stats</button>' +
+      '<button class="btn btn-sm btn-outline" onclick="openSetPin(\'' + w.id + '\',\'' + App.escJs(w.name) + '\')" title="Set login PIN">🔑 PIN</button>';
 
     if (w.isActive !== false) {
-      actions += '<button class="btn btn-sm btn-danger" onclick="deactivateWorker(\'' + w.id + '\',\'' + esc(w.name).replace(/'/g, "\\'") + '\')" title="Deactivate electrician">Deactivate</button>';
+      actions += '<button class="btn btn-sm btn-danger" onclick="deactivateWorker(\'' + w.id + '\',\'' + App.escJs(w.name) + '\')" title="Deactivate electrician">Deactivate</button>';
     } else {
       actions += '<button class="btn btn-sm btn-success" onclick="reactivateWorker(\'' + w.id + '\')" title="Reactivate electrician">Activate</button>' +
-        '<button class="btn btn-sm btn-danger" onclick="permanentDelete(\'' + w.id + '\',\'' + esc(w.name).replace(/'/g, "\\'") + '\')" title="Permanently delete">Delete</button>';
+        '<button class="btn btn-sm btn-danger" onclick="permanentDelete(\'' + w.id + '\',\'' + App.escJs(w.name) + '\')" title="Permanently delete">Delete</button>';
     }
     actions += '</div>';
 

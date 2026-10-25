@@ -4,13 +4,15 @@ const bcrypt = require('bcrypt');
 const QRCode = require('qrcode');
 const { z } = require('zod');
 const { prisma } = require('../lib/prisma');
-const { BCRYPT_COST, passwordSchema } = require('../lib/security');
+const { serverTimeZone } = require('../lib/dates');
+const { BCRYPT_COST, passwordSchema, WORKER_PROFILE_SELECT } = require('../lib/security');
 const { authenticateJWT, requirePolicy } = require('../middleware/auth');
 const { encryptWorkerPII, decryptWorkerPII, encryptField, decryptField } = require('../lib/crypto');
 const { APP_URL } = require('../config/env');
 const { isModuleEnabled } = require('../services/module-policy');
 const { validateActivationPlan, syncOrgModuleActivations } = require('../services/module-registry');
 const { ACTIVE_TICKET_STATUSES } = require('../services/ticket-status');
+const { planTicketHandover, applyTicketHandover, notifyTicketHandover } = require('../services/assignment-resolver');
 
 const VALID_MODULES = ['ele', 'civil', 'asset', 'complaints'];
 
@@ -665,11 +667,22 @@ async function superadminRoutes(fastify, opts) {
       if (dup && dup.id !== id) return reply.code(409).send({ error: 'Email already in use in the target organization' });
     }
 
-    const updated = await prisma.user.update({
-      where: { id },
-      data,
-      select: { id: true, name: true, email: true, phone: true, role: true, isActive: true, orgId: true }
+    // Deactivating or moving a user hands their open tickets in their (old) org to whoever
+    // else covers each location, or back to the pool; a move also drops their coverage there,
+    // so new complaints in that org stop reaching someone in another org. [BUG-0037]
+    const handoverOrgId = user.orgId && ((data.isActive === false && user.isActive) || orgChanged) ? user.orgId : null;
+    const plan = handoverOrgId ? await planTicketHandover(id, handoverOrgId) : [];
+    const updated = await prisma.$transaction(async (tx) => {
+      const u = await tx.user.update({
+        where: { id },
+        data,
+        select: { id: true, name: true, email: true, phone: true, role: true, isActive: true, orgId: true }
+      });
+      if (orgChanged && user.orgId) await tx.supervisorAssignment.deleteMany({ where: { supervisorId: id, orgId: user.orgId } });
+      await applyTicketHandover(tx, plan, { orgId: handoverOrgId, fromId: id, actorType: 'super_admin', actorId: request.user.id, reason: orgChanged ? 'user_transferred' : 'user_deactivated' });
+      return u;
     });
+    if (handoverOrgId) notifyTicketHandover(handoverOrgId, plan);
 
     const oldValue = { name: user.name, email: user.email };
     if (orgChanged) oldValue.orgId = user.orgId;
@@ -836,7 +849,7 @@ async function superadminRoutes(fastify, opts) {
     };
     encryptWorkerPII(workerData);
 
-    const worker = await prisma.worker.create({ data: workerData });
+    const worker = await prisma.worker.create({ data: workerData, select: WORKER_PROFILE_SELECT });
 
     await prisma.auditLog.create({
       data: {
@@ -897,7 +910,7 @@ async function superadminRoutes(fastify, opts) {
 
     encryptWorkerPII(data);
 
-    const updated = await prisma.worker.update({ where: { id }, data });
+    const updated = await prisma.worker.update({ where: { id }, data, select: WORKER_PROFILE_SELECT });
     return decryptWorkerPII(updated);
   });
 
@@ -939,11 +952,11 @@ async function superadminRoutes(fastify, opts) {
     last7Days.setHours(0, 0, 0, 0);
 
     const dailyTrend = await prisma.$queryRaw`
-      SELECT DATE("inspectedAt") as date, COUNT(*)::int as count
+      SELECT DATE("inspectedAt" AT TIME ZONE 'UTC' AT TIME ZONE ${serverTimeZone()}) as date, COUNT(*)::int as count
       FROM "ElectricalInspection"
       WHERE "inspectedAt" >= ${last7Days}
-      GROUP BY DATE("inspectedAt")
-      ORDER BY date ASC
+      GROUP BY 1
+      ORDER BY 1 ASC
     `;
 
     const recordsLast7Days = (dailyTrend || []).reduce((sum, d) => sum + d.count, 0);
@@ -1227,12 +1240,12 @@ async function superadminRoutes(fastify, opts) {
         LIMIT 20
       `,
       prisma.$queryRaw`
-        SELECT DATE("createdAt") as date, COUNT(*)::int as requests,
+        SELECT DATE("createdAt" AT TIME ZONE 'UTC' AT TIME ZONE ${serverTimeZone()}) as date, COUNT(*)::int as requests,
                COALESCE(SUM("totalTokens"), 0)::int as tokens
         FROM "AiUsageLog"
         WHERE "createdAt" >= ${since}
-        GROUP BY DATE("createdAt")
-        ORDER BY date ASC
+        GROUP BY 1
+        ORDER BY 1 ASC
       `
     ]);
 

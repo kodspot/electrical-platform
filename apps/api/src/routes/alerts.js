@@ -2,8 +2,12 @@
 
 const { z } = require('zod');
 const { prisma } = require('../lib/prisma');
+const { dayRange } = require('../lib/dates');
 const { authenticateJWT, requirePolicy } = require('../middleware/auth');
 const { generateAiInsights, runScheduledChecks, runEscalationChecks } = require('../services/automation');
+const { runExclusive, LOCK_KEYS } = require('../lib/scheduler-lock');
+const { TICKET_PRIORITIES } = require('../services/ticket-status');
+const { auditStaffAction } = require('../services/audit');
 
 const VALID_TRIGGERS = [
   'INSPECTION_FAULT', 'INSPECTION_LATE', 'INSPECTION_MISSED',
@@ -57,16 +61,16 @@ async function alertRoutes(fastify) {
     name: z.string().min(1).max(200).trim(),
     description: z.string().max(1000).optional(),
     trigger: z.enum(VALID_TRIGGERS),
-    conditions: z.record(z.unknown()).default({}),
+    conditions: z.record(z.string(), z.unknown()).default({}),
     actions: z.array(z.object({
       type: z.enum(VALID_ACTIONS),
-      priority: z.string().optional()
+      priority: z.enum(TICKET_PRIORITIES).optional()
     })).min(1).max(5),
     isActive: z.boolean().default(true),
     escalateAfterMinutes: z.number().int().min(1).max(10080).optional().nullable(),
     escalationActions: z.array(z.object({
       type: z.enum(VALID_ACTIONS),
-      priority: z.string().optional()
+      priority: z.enum(TICKET_PRIORITIES).optional()
     })).max(5).optional().nullable(),
     maxEscalations: z.number().int().min(1).max(10).optional().nullable()
   });
@@ -111,16 +115,16 @@ async function alertRoutes(fastify) {
   const updateRuleSchema = z.object({
     name: z.string().min(1).max(200).trim().optional(),
     description: z.string().max(1000).optional().nullable(),
-    conditions: z.record(z.unknown()).optional(),
+    conditions: z.record(z.string(), z.unknown()).optional(),
     actions: z.array(z.object({
       type: z.enum(VALID_ACTIONS),
-      priority: z.string().optional()
+      priority: z.enum(TICKET_PRIORITIES).optional()
     })).min(1).max(5).optional(),
     isActive: z.boolean().optional(),
     escalateAfterMinutes: z.number().int().min(1).max(10080).optional().nullable(),
     escalationActions: z.array(z.object({
       type: z.enum(VALID_ACTIONS),
-      priority: z.string().optional()
+      priority: z.enum(TICKET_PRIORITIES).optional()
     })).max(5).optional().nullable(),
     maxEscalations: z.number().int().min(1).max(10).optional().nullable()
   });
@@ -151,6 +155,7 @@ async function alertRoutes(fastify) {
       data: update
     });
 
+    await auditStaffAction(request, { action: 'alert_rule_updated', entityType: 'AlertRule', entityId: rule.id, oldValue: { name: existing.name, isActive: existing.isActive }, newValue: { changed: Object.keys(update) } });
     return rule;
   });
 
@@ -198,15 +203,7 @@ async function alertRoutes(fastify) {
     if (acknowledged === 'true') where.acknowledged = true;
     if (acknowledged === 'false') where.acknowledged = false;
 
-    if (from || to) {
-      where.createdAt = {};
-      if (from) where.createdAt.gte = new Date(from);
-      if (to) {
-        const toDate = new Date(to);
-        if (to.length === 10) toDate.setHours(23, 59, 59, 999);
-        where.createdAt.lte = toDate;
-      }
-    }
+    if (from || to) where.createdAt = dayRange(from, to);
 
     const take = Math.min(parseInt(limit) || 50, 100);
     const skip = ((parseInt(page) || 1) - 1) * take;
@@ -269,6 +266,7 @@ async function alertRoutes(fastify) {
         acknowledgedAt: new Date()
       }
     });
+    await auditStaffAction(request, { action: 'alert_acknowledged', entityType: 'Alert', entityId: alert.id, newValue: { title: alert.title } });
     return updated;
   });
 
@@ -284,6 +282,7 @@ async function alertRoutes(fastify) {
         acknowledgedAt: new Date()
       }
     });
+    await auditStaffAction(request, { action: 'alerts_acknowledged', entityType: 'Alert', newValue: { count: result.count } });
     return { success: true, count: result.count };
   });
 
@@ -394,24 +393,30 @@ async function alertRoutes(fastify) {
     return { success: true, message: 'Insight generation started. Check back in a moment.' };
   });
 
-  // ── Trigger scheduled checks now (admin manual trigger) ──
+  // ── Manual triggers (admin): the caller's org only, under the scheduled job's own advisory
+  // lock — a manual run never touches another tenant, and never overlaps the scheduled run
+  // (which could escalate the same alert twice). 409 while that run holds the lock. [BUG-0032]
+
   fastify.post('/alerts/run-checks', {
     preHandler: [requirePolicy('ORG_ADMIN')]
-  }, async (request) => {
-    runScheduledChecks(fastify.log).catch(err =>
-      fastify.log.error({ err }, 'Manual scheduled check failed')
-    );
-    return { success: true, message: 'Scheduled rule checks started.' };
+  }, async (request, reply) => {
+    const orgId = request.user.orgId;
+    if (!orgId) return reply.code(400).send({ error: 'Select an organization first' });
+    const { ran } = await runExclusive(prisma, LOCK_KEYS.SCHEDULED_CHECKS, () => runScheduledChecks(fastify.log, { orgId }), fastify.log);
+    if (!ran) return reply.code(409).send({ error: 'The scheduled checks are running right now. Try again in a minute.' });
+    await auditStaffAction(request, { action: 'alert_checks_run' });
+    return { success: true, message: 'Scheduled rule checks completed.' };
   });
 
-  // ── Trigger escalation checks now (admin manual trigger) ──
   fastify.post('/alerts/run-escalations', {
     preHandler: [requirePolicy('ORG_ADMIN')]
-  }, async (request) => {
-    runEscalationChecks(fastify.log).catch(err =>
-      fastify.log.error({ err }, 'Manual escalation check failed')
-    );
-    return { success: true, message: 'Escalation checks started.' };
+  }, async (request, reply) => {
+    const orgId = request.user.orgId;
+    if (!orgId) return reply.code(400).send({ error: 'Select an organization first' });
+    const { ran } = await runExclusive(prisma, LOCK_KEYS.ESCALATION_CHECKS, () => runEscalationChecks(fastify.log, { orgId }), fastify.log);
+    if (!ran) return reply.code(409).send({ error: 'The escalation checks are running right now. Try again in a minute.' });
+    await auditStaffAction(request, { action: 'alert_escalations_run' });
+    return { success: true, message: 'Escalation checks completed.' };
   });
 }
 

@@ -5,6 +5,9 @@
 (function () {
   var params = new URLSearchParams(location.search);
   var token = params.get('token') || '';
+  // The sign-in page's "Forgot password?" passes its organization, to reset that account only.
+  var org = params.get('org') || '';
+  if (!/^[a-z0-9][a-z0-9-]*$/.test(org)) org = '';
   if (location.search) history.replaceState(null, '', location.pathname);
 
   var form = document.getElementById('resetForm');
@@ -46,9 +49,50 @@
     doneEl.classList.add('show');
   }
 
+  // No token: the page was opened from "Forgot password?" (or a link was cut short), so it asks
+  // for the email and requests a link. The server answers the same whether or not an account
+  // matches. [BUG-0051]
+  function showRequestForm() {
+    var requestForm = document.getElementById('requestForm');
+    var requestBtn = document.getElementById('requestBtn');
+    document.getElementById('subtitle').textContent = 'Reset your password';
+    requestForm.style.display = '';
+    requestForm.addEventListener('submit', async function (e) {
+      e.preventDefault();
+      clearError();
+      var email = document.getElementById('email').value.trim();
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return showError('Enter a valid email address.');
+      var body = { email: email };
+      if (org) body.orgSlug = org;
+      requestBtn.disabled = true; requestBtn.textContent = 'Sending…';
+      try {
+        var res = await fetch('/api/auth/forgot-password', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body)
+        });
+        var data = {};
+        try { data = await res.json(); } catch (_) { /* non-JSON */ }
+        if (res.ok) {
+          requestForm.style.display = 'none';
+          doneEl.textContent = (data.message || 'If an account exists for this email, a password reset link has been sent.') +
+            ' The link works once, for 1 hour. If no email arrives, ask your administrator to reset your password.';
+          doneEl.classList.add('show');
+          return;
+        }
+        if (res.status === 429) return showError('Too many attempts. Please wait a few minutes and try again.');
+        showError(data.error || 'Could not send the reset link. Please try again.');
+      } catch (_) {
+        showError('Network error. Please check your connection and try again.');
+      } finally {
+        requestBtn.disabled = false; requestBtn.textContent = 'Send reset link';
+      }
+    });
+  }
+
   if (!token) {
     form.style.display = 'none';
-    showError('This reset link is incomplete. Please request a new password reset from the sign-in page.');
+    showRequestForm();
     return;
   }
 

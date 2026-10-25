@@ -70,6 +70,23 @@ describe('admin / supervisor forms — API contract', () => {
     assert.strictEqual((await prisma.asset.findUnique({ where: { id: asset.id } })).make, 'ABB');
   });
 
+  // `purchaseCost: data.purchaseCost || null` turned a cost of 0 (a donated or free asset)
+  // into "unknown". [BUG-0049]
+  it('BUG-0049: a purchase cost of 0 is stored as 0, on create and on edit', async (t) => {
+    if (!dbAvailable) return t.skip('No database available');
+    const created = await app.inject({
+      method: 'POST', url: '/api/assets', headers: adminAuth,
+      payload: { assetCode: `__wp1_test__-B49-${Date.now()}`, name: '__wp1_test__ Donated meter', category: 'Meter', locationId: floor.id, purchaseCost: 0 }
+    });
+    assert.strictEqual(created.statusCode, 201, created.body.slice(0, 160));
+    assert.strictEqual((await prisma.asset.findUnique({ where: { id: created.json().id } })).purchaseCost, 0);
+
+    const asset = await f.createTestAsset(org.id, floor.id, { purchaseCost: 12500 });
+    const res = await app.inject({ method: 'PATCH', url: `/api/assets/${asset.id}`, headers: adminAuth, payload: { purchaseCost: 0 } });
+    assert.strictEqual(res.statusCode, 200, res.body.slice(0, 160));
+    assert.strictEqual((await prisma.asset.findUnique({ where: { id: asset.id } })).purchaseCost, 0);
+  });
+
   it('BUG-0025: a roster for a floor suggests the electricians covering it — directly or from its building — and no one else', async (t) => {
     if (!dbAvailable) return t.skip('No database available');
     const res = await app.inject({ method: 'GET', url: `/api/duty-roster/suggested-workers?locationId=${floor.id}`, headers: supAuth });

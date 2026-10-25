@@ -7,6 +7,19 @@ const { runExclusive, LOCK_KEYS } = require('../lib/scheduler-lock');
 const RETENTION_DAYS = 30;
 
 /**
+ * Which of a ticket's stored photos are past retention, each counted from when it was taken:
+ * the complaint photo at the ticket's creation, the proof photo at resolution (resolvedAt;
+ * the creation time if that is missing). [BUG-0033]
+ */
+function expiredTicketPhotos(ticket, cutoff) {
+  const stored = (url) => Boolean(url) && url.startsWith('/images/');
+  const fields = [];
+  if (stored(ticket.imageUrl) && ticket.createdAt < cutoff) fields.push('imageUrl');
+  if (stored(ticket.resolvedImageUrl) && (ticket.resolvedAt || ticket.createdAt) < cutoff) fields.push('resolvedImageUrl');
+  return fields;
+}
+
+/**
  * Deletes images older than RETENTION_DAYS from R2 storage and nulls out the URLs in the DB.
  * Covers electrical inspection images, ticket photos, and resolution proof photos.
  * Metadata is kept forever — only image binaries and URLs are removed.
@@ -41,27 +54,26 @@ async function cleanupExpiredImages(logger) {
     }
   }
 
-  // 2) Ticket photos (initial complaint image + resolved proof image)
+  // 2) Ticket photos, each counted from when it was taken: the complaint photo at ticket
+  // creation, the proof photo at resolution (resolvedAt). Counting both from the ticket's
+  // creation deleted a proof photo uploaded late in an old ticket's life within a day,
+  // before anyone could verify it. [BUG-0033]
   const expiredTickets = await prisma.ticket.findMany({
     where: {
-      createdAt: { lt: cutoff },
       OR: [
-        { imageUrl: { not: null, startsWith: '/images/' } },
-        { resolvedImageUrl: { not: null, startsWith: '/images/' } }
+        { createdAt: { lt: cutoff }, imageUrl: { not: null, startsWith: '/images/' } },
+        { resolvedAt: { lt: cutoff }, resolvedImageUrl: { not: null, startsWith: '/images/' } },
+        { resolvedAt: null, createdAt: { lt: cutoff }, resolvedImageUrl: { not: null, startsWith: '/images/' } }
       ]
     },
-    select: { id: true, imageUrl: true, resolvedImageUrl: true }
+    select: { id: true, createdAt: true, resolvedAt: true, imageUrl: true, resolvedImageUrl: true }
   });
 
   for (const t of expiredTickets) {
     const updates = {};
-    if (t.imageUrl && t.imageUrl.startsWith('/images/')) {
-      try { await deleteFromR2(t.imageUrl); updates.imageUrl = null; deleted++; }
-      catch (err) { failed++; logger.error(`[cleanup] Failed ticket img ${t.id}: ${err.message}`); }
-    }
-    if (t.resolvedImageUrl && t.resolvedImageUrl.startsWith('/images/')) {
-      try { await deleteFromR2(t.resolvedImageUrl); updates.resolvedImageUrl = null; deleted++; }
-      catch (err) { failed++; logger.error(`[cleanup] Failed ticket resolve img ${t.id}: ${err.message}`); }
+    for (const field of expiredTicketPhotos(t, cutoff)) {
+      try { await deleteFromR2(t[field]); updates[field] = null; deleted++; }
+      catch (err) { failed++; logger.error(`[cleanup] Failed ticket ${field} ${t.id}: ${err.message}`); }
     }
     if (Object.keys(updates).length > 0) {
       try { await prisma.ticket.update({ where: { id: t.id }, data: updates }); }
@@ -79,16 +91,21 @@ async function cleanupExpiredImages(logger) {
 
 /**
  * DPDP Act compliance: Anonymize guest complaint PII after 180 days.
- * Nulls out guestName and guestPhone on public tickets older than cutoff.
+ * Nulls out guestName and guestPhone on public tickets older than cutoff, and the copy of the
+ * name in the complaint's audit row (its actorId and newValue.guestName), which used to stay —
+ * including rows of complaints anonymised before that. [BUG-0059]
+ * `orgId` limits a run to one organization (tests); the scheduled job runs for all.
  */
 const GUEST_RETENTION_DAYS = 180;
 
-async function anonymizeGuestData(logger) {
+async function anonymizeGuestData(logger, { orgId } = {}) {
   const cutoff = new Date();
   cutoff.setDate(cutoff.getDate() - GUEST_RETENTION_DAYS);
+  const scope = orgId ? { orgId } : {};
 
   const result = await prisma.ticket.updateMany({
     where: {
+      ...scope,
       source: 'PUBLIC',
       createdAt: { lt: cutoff },
       OR: [
@@ -102,8 +119,17 @@ async function anonymizeGuestData(logger) {
     }
   });
 
-  if (result.count > 0) {
-    logger.info(`[cleanup] Anonymized PII on ${result.count} guest complaints older than ${GUEST_RETENTION_DAYS} days`);
+  const named = await prisma.auditLog.findMany({
+    where: { ...scope, action: 'ticket_public_create', createdAt: { lt: cutoff }, NOT: { actorId: 'anonymous' } },
+    select: { id: true, newValue: true }
+  });
+  for (const row of named) {
+    const { guestName, ...rest } = row.newValue || {}; // eslint-disable-line no-unused-vars
+    await prisma.auditLog.update({ where: { id: row.id }, data: { actorId: 'anonymous', newValue: rest } });
+  }
+
+  if (result.count > 0 || named.length > 0) {
+    logger.info(`[cleanup] Anonymized PII on ${result.count} guest complaints and ${named.length} audit rows older than ${GUEST_RETENTION_DAYS} days`);
   }
   return result.count;
 }
@@ -189,4 +215,4 @@ function startCleanupScheduler(logger) {
   return { startupTimeout, dailyInterval };
 }
 
-module.exports = { cleanupExpiredImages, startCleanupScheduler };
+module.exports = { cleanupExpiredImages, expiredTicketPhotos, anonymizeGuestData, startCleanupScheduler };

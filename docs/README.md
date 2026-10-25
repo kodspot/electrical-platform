@@ -80,13 +80,18 @@ Engineering understanding, not code duplication. Each links to the code it descr
 - [`SCALING.md`](SCALING.md) — connection-pool sizing and scaling guidance.
 
 ### Decisions & History
-- [`releases/`](releases/) — release notes; [`v1.0.0-draft.md`](releases/v1.0.0-draft.md) is the
-  draft for the first tagged release (not yet tagged).
+- [`releases/`](releases/) — release notes; [`v1.0.0-draft.md`](releases/v1.0.0-draft.md) holds the
+  notes for v1.0.0 (tagged 2026-10-20); [`next-draft.md`](releases/next-draft.md)
+  collects the changes since v1.0.0.
 - [`adr/`](adr/) — Architecture Decision Records; see [`adr/README.md`](adr/README.md) for
   the index and process. Foundational: modular monolith, shared-DB tenancy, resilience
   primitives, offsite backup storage.
 - [`history/production-readiness-audit-2026-07.md`](history/production-readiness-audit-2026-07.md)
   — a frozen, dated snapshot of known production risks after WP17.
+- [`history/product-architecture-review-2026-10.md`](history/product-architecture-review-2026-10.md)
+  — a dated product and architecture review (findings `PAR-10/n`): how the product fits real
+  colleges and hostels, a prioritised backlog, and the decisions for the owner. Its proposals
+  are ADRs 0010 and 0011 (Proposed).
 
 ### Chronology
 - [`CHANGELOG.md`](../CHANGELOG.md) — every merged change, dated and Work-Package-tagged.

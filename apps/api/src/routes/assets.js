@@ -2,6 +2,7 @@
 
 const { z } = require('zod');
 const { prisma } = require('../lib/prisma');
+const { localDateKey } = require('../lib/dates');
 const { uploadToR2, deleteFromR2 } = require('../lib/r2');
 const { validateImageBuffer } = require('../errors');
 const { authenticateJWT, requirePolicy, requireModule } = require('../middleware/auth');
@@ -41,7 +42,7 @@ const createAssetSchema = z.object({
   nextMaintenanceDue: z.string().optional(),
   maintenanceCycleDays: z.number().int().min(1).max(3650).optional(),
   purchaseCost: z.number().min(0).optional(),
-  metadata: z.record(z.any()).optional()
+  metadata: z.record(z.string(), z.any()).optional()
 });
 
 // On edit, null clears the two numeric fields (the form sends null for a cleared one). [BUG-0021]
@@ -170,7 +171,7 @@ async function assetRoutes(fastify, opts) {
           warrantyExpiry: data.warrantyExpiry ? new Date(data.warrantyExpiry) : null,
           nextMaintenanceDue: data.nextMaintenanceDue ? new Date(data.nextMaintenanceDue) : null,
           maintenanceCycleDays: data.maintenanceCycleDays || null,
-          purchaseCost: data.purchaseCost || null,
+          purchaseCost: data.purchaseCost ?? null, // 0 is a real cost (donated, free) [BUG-0049]
           metadata: data.metadata || null
         },
         include: ASSET_INCLUDE
@@ -269,7 +270,7 @@ async function assetRoutes(fastify, opts) {
     if (data.warrantyExpiry !== undefined) updateData.warrantyExpiry = data.warrantyExpiry ? new Date(data.warrantyExpiry) : null;
     if (data.nextMaintenanceDue !== undefined) updateData.nextMaintenanceDue = data.nextMaintenanceDue ? new Date(data.nextMaintenanceDue) : null;
     if (data.maintenanceCycleDays !== undefined) updateData.maintenanceCycleDays = data.maintenanceCycleDays || null;
-    if (data.purchaseCost !== undefined) updateData.purchaseCost = data.purchaseCost || null;
+    if (data.purchaseCost !== undefined) updateData.purchaseCost = data.purchaseCost ?? null;
     if (data.metadata !== undefined) updateData.metadata = data.metadata || null;
 
     // Track status/condition changes for auto-event
@@ -551,7 +552,7 @@ async function assetRoutes(fastify, opts) {
 
     const csv = header + '\n' + rows.join('\n');
     reply.header('Content-Type', 'text/csv');
-    reply.header('Content-Disposition', 'attachment; filename="assets-' + new Date().toISOString().split('T')[0] + '.csv"');
+    reply.header('Content-Disposition', 'attachment; filename="assets-' + localDateKey() + '.csv"');
     return csv;
   });
 }

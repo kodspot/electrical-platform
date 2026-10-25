@@ -33,6 +33,9 @@
     </div>
     <button type="submit" class="btn btn-primary btn-block" id="btn">Sign In</button>
   </form>
+  <p style="margin-top:var(--sp-md);font-size:.85rem;text-align:center">
+    <a id="forgotLink" href="/reset-password" style="color:var(--primary)">Forgot password?</a>
+  </p>
 
   <p style="margin-top:var(--sp-lg);font-size:.8rem;color:var(--text-light);text-align:center">
     <a href="/" style="color:var(--primary)">&larr; Back to Home</a>
@@ -40,12 +43,14 @@
 </div>
 
 <script src="/js/offline-sync.js?v=1"></script>
-<script src="/js/app.js?v=14"></script>
+<script src="/js/app.js?v=16"></script>
 <script src="/js/custom-select.js"></script>
 <script>
 var $ = App.$;
 var orgSlug = App.getOrgSlug();
 var mod = App.getModule();
+// "Forgot password?" asks for a reset link for this organization's account. [BUG-0051]
+if (orgSlug) $('forgotLink').href = '/reset-password?org=' + encodeURIComponent(orgSlug);
 
 // Set dynamic manifest for this module
 App.initModulePWA();

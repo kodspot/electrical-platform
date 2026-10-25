@@ -5,6 +5,9 @@
 (function () {
   var params = new URLSearchParams(location.search);
   var token = params.get('token') || '';
+  // The sign-in page's "Forgot PIN?" passes its organization; otherwise the electrician types it.
+  var org = params.get('org') || '';
+  if (!/^[a-z0-9][a-z0-9-]*$/.test(org)) org = '';
   if (location.search) history.replaceState(null, '', location.pathname);
 
   var form = document.getElementById('resetForm');
@@ -42,9 +45,51 @@
     doneEl.classList.add('show');
   }
 
+  // No token: the page was opened from "Forgot PIN?" (or a link was cut short), so it asks for
+  // the Employee ID and requests a link. The server answers the same whether or not a worker
+  // with an email on file matches. [BUG-0051]
+  function showRequestForm() {
+    var requestForm = document.getElementById('requestForm');
+    var requestBtn = document.getElementById('requestBtn');
+    document.getElementById('subtitle').textContent = 'Electrician — reset your PIN';
+    if (org) document.getElementById('orgGroup').style.display = 'none';
+    requestForm.style.display = '';
+    requestForm.addEventListener('submit', async function (e) {
+      e.preventDefault();
+      clearError();
+      var orgSlug = org || document.getElementById('orgCode').value.trim().toLowerCase();
+      var employeeId = document.getElementById('employeeId').value.trim();
+      if (!/^[a-z0-9][a-z0-9-]*$/.test(orgSlug)) return showError('Enter your organization code.');
+      if (!employeeId) return showError('Enter your Employee ID.');
+      requestBtn.disabled = true; requestBtn.textContent = 'Sending…';
+      try {
+        var res = await fetch('/api/auth/worker-forgot-pin', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ orgSlug: orgSlug, employeeId: employeeId })
+        });
+        var data = {};
+        try { data = await res.json(); } catch (_) { /* non-JSON */ }
+        if (res.ok) {
+          requestForm.style.display = 'none';
+          doneEl.textContent = (data.message || 'If a matching worker account with an email on file exists, a PIN reset link has been sent.') +
+            ' The link works once, for 1 hour. If no email arrives, ask your administrator to set a new PIN.';
+          doneEl.classList.add('show');
+          return;
+        }
+        if (res.status === 429) return showError('Too many attempts. Please wait a few minutes and try again.');
+        showError(data.error || 'Could not send the reset link. Please try again.');
+      } catch (_) {
+        showError('Network error. Please check your connection and try again.');
+      } finally {
+        requestBtn.disabled = false; requestBtn.textContent = 'Send reset link';
+      }
+    });
+  }
+
   if (!token) {
     form.style.display = 'none';
-    showError('This reset link is incomplete. Please request a new PIN reset from the sign-in page.');
+    showRequestForm();
     return;
   }
 

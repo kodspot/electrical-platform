@@ -256,10 +256,11 @@ function collectCases(parsed, events) {
  * means killed by a signal), when the report could not be produced, or — under CI=true
  * or QA_STRICT=1 — when any test was skipped, todo, or cancelled (not executed).
  */
-function decideExit({ childStatus, reportOk, counts, ci, strict }) {
+function decideExit({ childStatus, reportOk, counts, ci, strict, uncounted = [] }) {
   const reasons = [];
   if (childStatus !== 0) reasons.push(childStatus === null ? 'test process was killed by a signal' : `test process exited ${childStatus}`);
   if (!reportOk) reasons.push(REPORT_FAILED);
+  if (uncounted.length) reasons.push(`${uncounted.length} suite failure(s) the runner did not count — a describe() body or a suite hook threw: ${uncounted.join(', ')}`);
   if ((ci || strict) && counts) {
     for (const key of ['skipped', 'todo', 'cancelled']) {
       if (counts[key] > 0) reasons.push(`${counts[key]} test(s) ${key} under ${ci ? 'CI=true' : 'QA_STRICT=1'}`);
@@ -271,6 +272,28 @@ function decideExit({ childStatus, reportOk, counts, ci, strict }) {
 
 function notExecuted(counts) {
   return counts.skipped + counts.todo + counts.cancelled;
+}
+
+/**
+ * Failures the runner left out of its own counts. Node (24) reports these suites as failed
+ * but exits 0 and counts "fail 0":
+ *   - a describe() body that throws while its tests are collected (none of them run) — the
+ *     JUnit XML itemises it as a failed testcase; events: kind suite, testCodeFailure [BUG-0029];
+ *   - a suite hook that throws, e.g. an after() cleanup — only the events stream records it
+ *     (kind suite, hookFailed); the XML shows a passing suite [BUG-0036].
+ * A suite failing because a test inside it failed (subtestsFailed) is already counted.
+ * Returns their names (scrubbed).
+ */
+function uncountedFailures(counts, cases, events) {
+  const fromEvents = events
+    .filter((e) => e.result === 'fail' && e.kind === 'suite' && (e.failureType === 'testCodeFailure' || e.failureType === 'hookFailed'))
+    .map((e) => scrub(e.name));
+  if (fromEvents.length) return fromEvents;
+  const failed = cases.filter((c) => c.status === 'failed');
+  const extra = failed.length - (counts.fail || 0);
+  if (extra <= 0) return [];
+  const roots = failed.filter((c) => c.trail.length === 0).map((c) => c.name);
+  return roots.length >= extra ? roots.slice(0, extra) : Array(extra).fill('(unnamed)');
 }
 
 // ── Summary ──
@@ -448,7 +471,8 @@ function generateReport({ rawJunitPath, eventsPath, outDir, baselinePath, childS
   const events = parseEvents(eventsPath && fs.existsSync(eventsPath) ? fs.readFileSync(eventsPath, 'utf8') : '');
   const cases = collectCases(parsed, events);
   const baseline = baselinePath && fs.existsSync(baselinePath) ? JSON.parse(fs.readFileSync(baselinePath, 'utf8')) : null;
-  const decision = decideExit({ childStatus, reportOk: true, counts: parsed.counts, ci, strict });
+  const uncounted = uncountedFailures(parsed.counts, cases, events);
+  const decision = decideExit({ childStatus, reportOk: true, counts: parsed.counts, ci, strict, uncounted });
   const summary = buildSummary({ counts: parsed.counts, cases, baseline, nodeVersion, ci, strict, decision });
   const jsonSummary = buildJsonSummary({ counts: parsed.counts, cases, nodeVersion, ci, strict, decision });
 

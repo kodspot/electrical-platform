@@ -80,11 +80,21 @@ window.App = (function () {
   // ─── DOM Helpers ───
   function $(id) { return document.getElementById(id); }
 
+  // HTML-escapes text for element content and for quoted attribute values: quotes too, since
+  // pages put org-entered names in title="…", data-name="…" and value="…". [BUG-0028]
   function esc(s) {
     if (!s) return '';
-    const d = document.createElement('div');
-    d.textContent = s;
-    return d.innerHTML;
+    return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  }
+
+  // A JS string argument inside an inline handler: onclick="fn('" + escJs(name) + "')". The
+  // browser HTML-decodes the attribute before running it, so escape for JS first (backslash,
+  // quotes, line breaks), then for HTML. [BUG-0028]
+  function escJs(s) {
+    if (s == null) return '';
+    return esc(String(s).replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/"/g, '\\"')
+      .replace(/\r/g, '\\r').replace(/\n/g, '\\n').replace(/\u2028/g, '\\u2028').replace(/\u2029/g, '\\u2029'));
   }
 
   function fmtDate(s) {
@@ -97,6 +107,14 @@ window.App = (function () {
     return new Date(s).toLocaleDateString();
   }
 
+  // The local calendar date as YYYY-MM-DD, for date inputs and filters. d.toISOString().slice(0, 10)
+  // is the UTC date: the day before, between 00:00 and 05:30 in India. [BUG-0055]
+  function localDate(d) {
+    d = d || new Date();
+    var pad = function (n) { return (n < 10 ? '0' : '') + n; };
+    return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
+  }
+
   // ─── Token Management ───
   // Admin uses 'token'/'user', SuperAdmin uses 'sa_token'/'sa_user',
   // Supervisor uses 'sup_token'/'sup_user', Electrician uses 'elec_token'/'elec_user'
@@ -104,6 +122,27 @@ window.App = (function () {
   function getSAToken() { return localStorage.getItem('sa_token'); }
   function getSupToken() { return localStorage.getItem('sup_token'); }
   function getElecToken() { return localStorage.getItem('elec_token'); }
+
+  // One role's session, on a device that may hold several (an admin and a supervisor on a shared
+  // phone). Code that took "the first token found" acted as the wrong person. [BUG-0054]
+  function _scopeToken(scope) {
+    if (scope === 'admin') return getToken();
+    if (scope === 'sa') return getSAToken();
+    if (scope === 'supervisor') return getSupToken();
+    if (scope === 'electrician') return getElecToken();
+    return null;
+  }
+
+  // The role a page belongs to, from its name (…/admin-*, …/supervisor-*, …/electrician-*); an
+  // admin page a super admin entered runs on the super admin's session. Null elsewhere.
+  function _pageScope() {
+    var page = location.pathname.split('/').pop() || '';
+    if (page.indexOf('supervisor-') === 0) return 'supervisor';
+    if (page.indexOf('electrician-') === 0) return 'electrician';
+    if (page.indexOf('superadmin-') === 0) return 'sa';
+    if (page.indexOf('admin-') === 0) return getToken() ? 'admin' : 'sa';
+    return null;
+  }
 
   function getUser() {
     try { return JSON.parse(localStorage.getItem('user') || '{}'); }
@@ -196,6 +235,12 @@ window.App = (function () {
 
   async function _doFetch(path, fetchOpts, loginRedirect, scope) {
     var lastErr;
+    // A request that may have reached the server before the connection dropped is retried
+    // only if repeating it is harmless: GET/HEAD. Retrying a POST/PATCH/DELETE could submit
+    // the same complaint, ticket or inspection twice. (A 503 is still retried: the server's
+    // circuit breaker refused it before doing anything.) [BUG-0047]
+    var method = String(fetchOpts.method || 'GET').toUpperCase();
+    var retryOnNetworkError = method === 'GET' || method === 'HEAD';
     for (var i = 0; i < 3; i++) {
       try {
         var res = await fetch(API + path, fetchOpts);
@@ -223,6 +268,7 @@ window.App = (function () {
         return res;
       } catch (err) {
         lastErr = err;
+        if (!retryOnNetworkError) break;
         if (i < 2) await _wait(1000 * Math.pow(2, i) + Math.random() * 500);
       }
     }
@@ -329,6 +375,14 @@ window.App = (function () {
       el.classList.add('removing');
       setTimeout(function () { el.remove(); }, 300);
     }, duration);
+  }
+
+  // An action the server refused says why — its own error message, else the fallback.
+  // Row actions used to act only on success and say nothing otherwise. [BUG-0048]
+  async function toastFailure(res, fallback) {
+    var d = {};
+    try { d = await res.json(); } catch (e) { /* not JSON */ }
+    toast((d && d.error) || fallback || 'That did not work. Please try again.', 'error');
   }
 
   // ─── Confirm Dialog ───
@@ -724,8 +778,11 @@ window.App = (function () {
     var name = data.name || 'User';
     var parts = name.trim().split(/\s+/);
     var initials = parts.length > 1 ? (parts[0][0] + parts[parts.length - 1][0]).toUpperCase() : parts[0].substring(0, 2).toUpperCase();
-    var roleLabel = data.role === 'SUPER_ADMIN' ? 'Super Admin' : data.role === 'SUPERVISOR' ? 'Supervisor' : 'Admin';
+    // Electricians were labelled "Admin": only these two were mapped. [BUG-0053]
+    var roleLabel = { SUPER_ADMIN: 'Super Admin', SUPERVISOR: 'Supervisor', ELECTRICIAN: 'Electrician' }[data.role] || 'Admin';
     var since = data.createdAt ? new Date(data.createdAt).toLocaleDateString('en-IN', { year: 'numeric', month: 'long', day: 'numeric' }) : '—';
+    // A super admin signs in with the admin key, so has nothing to change here. [BUG-0052]
+    var canChange = data.role !== 'SUPER_ADMIN';
 
     var html =
       '<div class="profile-card">' +
@@ -741,11 +798,98 @@ window.App = (function () {
           _profileRow('Member Since', since, 'M8 2v4|M16 2v4|M3 10h18|M21 8v13a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h14a2 2 0 012 2z') +
         '</div>' +
         '<div class="profile-footer">' +
+          (canChange ? '<button class="btn btn-outline btn-sm" id="profileChangeSecret" style="width:100%;margin-bottom:.5rem">Change ' + (role === 'electrician' ? 'PIN' : 'password') + '</button>' : '') +
           '<button class="btn btn-outline btn-sm" onclick="App.closeModal(\'profileModal\')" style="width:100%">Close</button>' +
         '</div>' +
       '</div>';
 
     $('profileContent').innerHTML = html;
+    if (canChange) $('profileChangeSecret').addEventListener('click', function() { _renderSecretForm(role); });
+  }
+
+  // ─── Change Password / PIN (signed in) ───
+  // PATCH /auth/password (admin, supervisor) or /auth/worker-pin (electrician). The server ends
+  // every session of the account and returns a fresh token, which replaces the stored one so
+  // this session goes on. Sent with fetch, not the role's fetch helper: /auth/worker-pin answers
+  // a wrong current PIN with 401, which the helper takes for a lost session and signs out on.
+  // Neither endpoint had a screen. [BUG-0052]
+  var SECRET_CHANGE = {
+    admin: { path: '/auth/password', key: 'token', headers: function() { return adminHeaders(); } },
+    supervisor: { path: '/auth/password', key: 'sup_token', headers: function() { return { ...supHeaders(), 'Content-Type': 'application/json' }; } },
+    electrician: { path: '/auth/worker-pin', key: 'elec_token', headers: function() { return elecHeaders(); } }
+  };
+
+  // Mirrors the server's passwordSchema (src/lib/security.js), as reset-password.js does.
+  function _passwordProblem(p) {
+    if (p.length < 8) return 'Password must be at least 8 characters.';
+    if (p.length > 100) return 'Password must be at most 100 characters.';
+    if (!/[A-Z]/.test(p)) return 'Password must contain at least one uppercase letter.';
+    if (!/[a-z]/.test(p)) return 'Password must contain at least one lowercase letter.';
+    if (!/\d/.test(p)) return 'Password must contain at least one number.';
+    return null;
+  }
+
+  function _renderSecretForm(role) {
+    var isPin = role === 'electrician';
+    var label = isPin ? 'PIN' : 'password';
+    var field = function(id, text, autocomplete, hint) {
+      return '<div class="form-group"><label class="form-label" for="' + id + '">' + text + '</label>' +
+        '<input class="form-input" type="password" id="' + id + '" autocomplete="' + autocomplete + '"' +
+        (isPin ? ' inputmode="numeric" maxlength="6"' : ' maxlength="100"') + '>' +
+        (hint ? '<div class="form-hint">' + hint + '</div>' : '') + '</div>';
+    };
+    $('profileContent').innerHTML =
+      '<form id="secretForm" novalidate>' +
+        '<h3 class="modal-title">Change ' + label + '</h3>' +
+        '<div class="error-msg" id="secretError" role="alert"></div>' +
+        field('secretCurrent', 'Current ' + label, 'current-password') +
+        field('secretNew', 'New ' + label, 'new-password', isPin ? 'Exactly 6 digits.' : 'At least 8 characters, with an uppercase letter, a lowercase letter and a number.') +
+        field('secretConfirm', 'Confirm new ' + label, 'new-password') +
+        '<div class="profile-footer" style="display:flex;gap:.5rem">' +
+          '<button type="button" class="btn btn-outline btn-sm" style="flex:1" onclick="App.closeModal(\'profileModal\')">Cancel</button>' +
+          '<button type="submit" class="btn btn-primary btn-sm" style="flex:1" id="secretSave">Save</button>' +
+        '</div>' +
+      '</form>';
+    $('secretForm').addEventListener('submit', function(e) { e.preventDefault(); _saveSecret(role); });
+  }
+
+  async function _saveSecret(role) {
+    var isPin = role === 'electrician';
+    var label = isPin ? 'PIN' : 'password';
+    var target = SECRET_CHANGE[role];
+    var current = $('secretCurrent').value;
+    var next = $('secretNew').value;
+    var errEl = $('secretError');
+    var fail = function(msg) { errEl.textContent = msg; errEl.classList.add('show'); };
+    errEl.classList.remove('show');
+    if (isPin ? !/^\d{6}$/.test(current) : !current) return fail('Enter your current ' + label + (isPin ? ' (6 digits).' : '.'));
+    var problem = isPin ? (/^\d{6}$/.test(next) ? null : 'The new PIN must be exactly 6 digits.') : _passwordProblem(next);
+    if (problem) return fail(problem);
+    if (next !== $('secretConfirm').value) return fail('The two new ' + label + 's do not match.');
+
+    var btn = $('secretSave');
+    btn.disabled = true; btn.textContent = 'Saving…';
+    try {
+      var res = await fetch(API + target.path, {
+        method: 'PATCH',
+        headers: target.headers(),
+        body: JSON.stringify(isPin ? { currentPin: current, newPin: next } : { currentPassword: current, newPassword: next })
+      });
+      var data = {};
+      try { data = await res.json(); } catch (_) { /* non-JSON */ }
+      if (res.ok && data.token) {
+        localStorage.setItem(target.key, data.token);
+        closeModal('profileModal');
+        toast((isPin ? 'PIN' : 'Password') + ' changed. Your other devices are signed out.', 'success');
+        return;
+      }
+      if (res.status === 429) return fail('Too many attempts. Please wait a few minutes and try again.');
+      fail((data.error === 'Validation failed' && data.details && data.details.join(' ')) || data.error || 'Could not change the ' + label + '. Please try again.');
+    } catch (_) {
+      fail('Network error. Please check your connection and try again.');
+    } finally {
+      btn.disabled = false; btn.textContent = 'Save';
+    }
   }
 
   function _profileRow(label, value, iconPaths) {
@@ -812,6 +956,8 @@ window.App = (function () {
   // KodspotSync is loaded from /js/offline-sync.js before app.js
 
   function enqueueRetry(fn, requestData) {
+    // The role it is sent as when replayed — the page's own unless the caller says. [BUG-0054]
+    if (requestData && !requestData.scope) requestData.scope = _pageScope();
     // If we have serialisable request data, persist to IndexedDB
     if (requestData && window.KodspotSync) {
       window.KodspotSync.enqueue(requestData).then(function () {
@@ -857,10 +1003,18 @@ window.App = (function () {
       return;
     }
     var entry = entries[idx];
-    // Re-attach current auth token
+    // Re-attach the token of the role that queued it, never another role's: replayed with the
+    // first token found, a supervisor's inspection went in as the admin signed in on the same
+    // phone. Entries saved before the role was recorded all came from the supervisor inspection
+    // page, the only page that queues. Without that role's session, the entry waits. [BUG-0054]
     var headers = entry.headers || {};
-    var token = getToken() || getSAToken() || getSupToken() || getElecToken();
-    if (token) headers['Authorization'] = 'Bearer ' + token;
+    var token = _scopeToken(entry.scope || 'supervisor');
+    if (!token) {
+      toast('A submission saved offline will be sent once its ' + ({ sa: 'super admin', electrician: 'electrician', admin: 'admin' }[entry.scope] || 'supervisor') + ' signs in on this device.', 'warning');
+      _replayEntries(entries, idx + 1);
+      return;
+    }
+    headers['Authorization'] = 'Bearer ' + token;
     fetch(entry.url, { method: entry.method, headers: headers, body: entry.body || undefined })
       .then(function (res) {
         if (res.ok || res.status === 409) {
@@ -961,7 +1115,9 @@ window.App = (function () {
   // ─── Image URL with auth token ───
   function imgUrl(src) {
     if (!src) return '';
-    var t = getToken() || getSAToken() || getSupToken() || getElecToken();
+    // The page's own session; the first token found only on a page that belongs to no role. [BUG-0054]
+    var scope = _pageScope();
+    var t = scope ? _scopeToken(scope) : (getToken() || getSAToken() || getSupToken() || getElecToken());
     if (!t || !src.startsWith('/images/')) return src;
     // Image proxy lives at /api/images/* but stored URLs omit /api prefix
     return '/api' + src + (src.includes('?') ? '&' : '?') + 'token=' + t;
@@ -1379,7 +1535,7 @@ window.App = (function () {
 
   // ─── Public API ───
   return {
-    $: $, esc: esc, fmtDate: fmtDate, fmtDateShort: fmtDateShort,
+    $: $, esc: esc, escJs: escJs, fmtDate: fmtDate, fmtDateShort: fmtDateShort, localDate: localDate,
     getOrgSlug: getOrgSlug, orgPath: orgPath,
     getModule: getModule, modulePath: modulePath,
     getEnabledModules: getEnabledModules, isModuleEnabled: isModuleEnabled,
@@ -1391,7 +1547,7 @@ window.App = (function () {
     supFetch: supFetch, supFetchJson: supFetchJson,
     elecFetch: elecFetch, elecFetchJson: elecFetchJson,
     logout: logout, logoutSA: logoutSA, logoutSup: logoutSup, logoutElec: logoutElec,
-    toast: toast, confirmDialog: confirmDialog,
+    toast: toast, toastFailure: toastFailure, confirmDialog: confirmDialog,
     initAdmin: initAdmin, initSupervisor: initSupervisor, initElectrician: initElectrician,
     initModulePWA: initModulePWA,
     buildUserMenu: _buildUserMenu,

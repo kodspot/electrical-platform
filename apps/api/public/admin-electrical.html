@@ -187,7 +187,7 @@
 </div>
 
 <script src="/js/offline-sync.js?v=1"></script>
-<script src="/js/app.js?v=14"></script>
+<script src="/js/app.js?v=16"></script>
 <script>
 if (!App.initAdmin('electrical')) throw '';
 App.initNotifications(App.apiFetch);
@@ -325,7 +325,9 @@ async function viewDetail(id) {
     html += '<div style="margin-top:.75rem;font-weight:600;font-size:.82rem">Photos (' + r.images.length + ')</div>';
     html += '<div style="display:flex;gap:.4rem;flex-wrap:wrap;margin-top:.35rem">';
     r.images.forEach(function(img) {
-      html += '<img src="' + esc(img.imageUrl) + '" style="width:64px;height:64px;object-fit:cover;border-radius:var(--radius-sm);cursor:pointer;border:1px solid var(--border)" onclick="openLightbox(\'' + esc(img.imageUrl) + '\')">';
+      // Stored photos are served through /api/images with the viewer's token (BUG-0040).
+      var src = App.imgUrl(img.imageUrl);
+      html += '<img src="' + esc(src) + '" style="width:64px;height:64px;object-fit:cover;border-radius:var(--radius-sm);cursor:pointer;border:1px solid var(--border)" onclick="openLightbox(\'' + App.escJs(src) + '\')">';
     });
     html += '</div>';
   }
@@ -355,6 +357,8 @@ async function toggleFlag(id, currentStatus) {
     App.toast(currentStatus === 'FLAGGED' ? 'Unflagged' : 'Flagged', 'success');
     App.closeModal('detailModal');
     loadRecords(currentPage);
+  } else if (res) {
+    App.toastFailure(res, 'Could not change the flag');
   }
 }
 
@@ -393,7 +397,7 @@ async function exportCSV() {
   var url = URL.createObjectURL(blob);
   var a = document.createElement('a');
   a.href = url;
-  a.download = 'electrical-inspections-' + new Date().toISOString().split('T')[0] + '.csv';
+  a.download = 'electrical-inspections-' + App.localDate(new Date()) + '.csv';
   a.click();
   URL.revokeObjectURL(url);
 }

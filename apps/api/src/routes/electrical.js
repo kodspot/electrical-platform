@@ -2,6 +2,7 @@
 
 const { z } = require('zod');
 const { prisma } = require('../lib/prisma');
+const { dayRange } = require('../lib/dates');
 const { uploadToR2 } = require('../lib/r2');
 const { validateImageBuffer } = require('../errors');
 const { authenticateJWT, requirePolicy, requireModule } = require('../middleware/auth');
@@ -280,15 +281,7 @@ async function electricalRoutes(fastify, opts) {
       where.supervisorId = supervisorId;
     }
 
-    if (from || to) {
-      where.inspectedAt = {};
-      if (from) where.inspectedAt.gte = new Date(from);
-      if (to) {
-        const toDate = new Date(to);
-        if (to.length === 10) { toDate.setHours(23, 59, 59, 999); }
-        where.inspectedAt.lte = toDate;
-      }
-    }
+    if (from || to) where.inspectedAt = dayRange(from, to);
 
     const take = Math.min(parseInt(limit) || 50, 100);
     const skip = ((parseInt(page) || 1) - 1) * take;
@@ -381,15 +374,7 @@ async function electricalRoutes(fastify, opts) {
     if (status) where.status = status;
     if (isLate === 'true') where.isLate = true;
     if (isLate === 'false') where.isLate = false;
-    if (from || to) {
-      where.inspectedAt = {};
-      if (from) where.inspectedAt.gte = new Date(from);
-      if (to) {
-        const toDate = new Date(to);
-        if (to.length === 10) toDate.setHours(23, 59, 59, 999);
-        where.inspectedAt.lte = toDate;
-      }
-    }
+    if (from || to) where.inspectedAt = dayRange(from, to);
 
     const records = await prisma.electricalInspection.findMany({
       where,

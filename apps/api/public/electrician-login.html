@@ -35,6 +35,9 @@
     </div>
     <button type="submit" class="btn btn-primary btn-block" id="btn">Sign In</button>
   </form>
+  <p style="margin-top:var(--sp-md);font-size:.85rem;text-align:center">
+    <a id="forgotLink" href="/worker-reset-pin" style="color:var(--primary)">Forgot PIN?</a>
+  </p>
 
   <p style="margin-top:var(--sp-lg);font-size:.8rem;color:var(--text-light);text-align:center">
     <a href="/" style="color:var(--primary)">&larr; Back to Home</a>
@@ -42,11 +45,13 @@
 </div>
 
 <script src="/js/offline-sync.js?v=1"></script>
-<script src="/js/app.js?v=14"></script>
+<script src="/js/app.js?v=16"></script>
 <script>
 var $ = App.$;
 var orgSlug = App.getOrgSlug();
 var mod = App.getModule();
+// "Forgot PIN?" asks for a PIN reset link in this organization. [BUG-0051]
+if (orgSlug) $('forgotLink').href = '/worker-reset-pin?org=' + encodeURIComponent(orgSlug);
 
 App.initModulePWA();
 

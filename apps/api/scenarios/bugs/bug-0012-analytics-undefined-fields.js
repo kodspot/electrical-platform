@@ -7,6 +7,7 @@
 const fs = require('fs');
 const path = require('path');
 const { createTestOrg, createTestUser, createTestLocation } = require('../factories');
+const { localDateKey } = require('../../src/lib/dates');
 
 const PAGE = path.join(__dirname, '..', '..', 'public', 'admin-analytics.html');
 
@@ -58,8 +59,9 @@ module.exports = {
   async validate(ctx) {
     const { admin } = ctx['BUG-0012'];
     const token = await ctx.loginAs(admin.email, admin.plaintextPassword);
-    const to = new Date().toISOString().slice(0, 10);
-    const from = new Date(Date.now() - 6 * 86_400_000).toISOString().slice(0, 10);
+    // The local date, as the report reads it: toISOString() is yesterday between 00:00 and 05:30 IST (BUG-0055).
+    const to = localDateKey();
+    const from = localDateKey(new Date(Date.now() - 6 * 86_400_000));
     const res = await ctx.app.inject({ method: 'GET', url: `/api/analytics/report?from=${from}&to=${to}`, headers: { authorization: `Bearer ${token}` } });
     if (res.statusCode !== 200) return { ok: false, detail: `GET /api/analytics/report answered ${res.statusCode}` };
     const data = res.json();

@@ -1,0 +1,1 @@
+{"result":"fail","name":"probe suite whose after() throws","nesting":0,"file":"C:\\ci\\electrical-platform\\apps\\api\\test\\probe\\after-throws.test.js","kind":"suite","failureType":"hookFailed","cause":"cleanup failed: foreign key constraint violated"}

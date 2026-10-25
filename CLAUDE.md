@@ -1,6 +1,6 @@
 # CLAUDE.md — AI assistant orientation
 
-Kodspot Electrical Platform: a multi-tenant (every row scoped by `orgId`) **Fastify 4 +
+Kodspot Electrical Platform: a multi-tenant (every row scoped by `orgId`) **Fastify 5 +
 Prisma 5 / PostgreSQL** SaaS for electrical-inspection and facility-ticket management,
 with server-rendered admin pages and an electrician/supervisor PWA under
 `apps/api/public/`. Roles: guest → electrician (worker) → supervisor → admin →

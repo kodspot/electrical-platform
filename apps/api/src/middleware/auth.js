@@ -3,6 +3,7 @@
 const jwt = require('jsonwebtoken');
 const { prisma } = require('../lib/prisma');
 const { stripQuery } = require('../lib/log-redaction');
+const { JWT_VERIFY_OPTIONS } = require('../lib/security');
 const { isModuleEnabled } = require('../services/module-policy');
 const { getPermissionPolicy } = require('./permission-policy');
 const { attachTenantContextFromUser, getTenantOrgId } = require('./tenant-context');
@@ -13,7 +14,7 @@ async function authenticateJWT(request, reply) {
     const token = request.headers.authorization?.replace('Bearer ', '');
     if (!token) return reply.code(401).send({ error: 'Unauthorized' });
 
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const decoded = jwt.verify(token, process.env.JWT_SECRET, JWT_VERIFY_OPTIONS);
     // A worker token (workerId) or any token without userId is not a staff session:
     // refuse it before querying (findUnique with id: undefined throws). [F15]
     if (!decoded.userId) return reply.code(401).send({ error: 'Unauthorized' });

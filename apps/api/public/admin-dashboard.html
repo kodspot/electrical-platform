@@ -388,7 +388,7 @@
 </div>
 
 <script src="/js/offline-sync.js?v=1"></script>
-<script src="/js/app.js?v=14"></script>
+<script src="/js/app.js?v=16"></script>
 <script>
 if (!App.initAdmin('dashboard')) throw '';
 App.initNotifications(App.apiFetch);
@@ -779,10 +779,10 @@ document.addEventListener('keydown', function(e) {
 });
 
 async function loadInspectionLog() {
-  var todayISO = new Date().toISOString().split('T')[0];
+  var todayISO = App.localDate(new Date());
   var data = await App.apiFetchJson('/electrical-inspections?from=' + todayISO + '&limit=100');
   if (!data) return;
-  var records = data.inspections || [];
+  var records = data.records || []; // GET /electrical-inspections sends `records` (BUG-0039)
   $('photoBadge').textContent = records.length + ' inspection' + (records.length !== 1 ? 's' : '');
   if (records.length === 0) {
     $('photoGallery').innerHTML = '<div class="dash-empty"><span class="dash-empty-icon">⚡</span><div class="dash-empty-text">No inspections logged today</div><div class="dash-empty-sub">Inspections appear here when supervisors submit reports</div></div>';

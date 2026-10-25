@@ -3,7 +3,8 @@
 const crypto = require('crypto');
 const { z } = require('zod');
 const { prisma } = require('../lib/prisma');
-const { uploadToR2 } = require('../lib/r2');
+const { dayRange } = require('../lib/dates');
+const { uploadToR2, deleteFromR2 } = require('../lib/r2');
 const { validateImageBuffer } = require('../errors');
 const { authenticateJWT, requirePolicy } = require('../middleware/auth');
 const { createNotification, notifyAdmins } = require('./notifications');
@@ -18,25 +19,14 @@ const {
   ACTIVE_TICKET_STATUSES,
   VERIFY_PENDING_TICKET_STATUSES,
   EDITABLE_TICKET_STATUSES,
-  isOpenLikeStatus
+  isOpenLikeStatus,
+  STALE_TICKET_ERROR,
+  updateTicketIfUnchanged
 } = require('../services/ticket-status');
+const { getSlaDeadline } = require('../services/ticket-status');
+// auditActorType tells a SuperAdmin acting via X-Org-Id apart from the org's own staff. [WP8]
+const { auditActorType, auditStaffAction } = require('../services/audit');
 
-// SLA deadlines by priority (milliseconds)
-const SLA_MS = { URGENT: 2 * 60 * 60 * 1000, HIGH: 4 * 60 * 60 * 1000, NORMAL: 24 * 60 * 60 * 1000, LOW: 72 * 60 * 60 * 1000 };
-
-function getSlaDeadline(priority) {
-  const ms = SLA_MS[priority] || SLA_MS.NORMAL;
-  return new Date(Date.now() + ms);
-}
-
-// Audit actorType for an org-scoped action — must distinguish a SuperAdmin
-// acting via X-Org-Id org-entry from a genuine org ADMIN/SUPERVISOR, or a
-// SuperAdmin's write gets silently mislabeled as 'supervisor'. [WP8]
-function auditActorType(role) {
-  if (role === 'ADMIN') return 'admin';
-  if (role === 'SUPER_ADMIN') return 'super_admin';
-  return 'supervisor';
-}
 
 const TICKET_INCLUDE = {
   location: { select: { id: true, name: true, type: true } },
@@ -182,6 +172,7 @@ async function ticketRoutes(fastify, opts) {
       include: TICKET_INCLUDE
     });
     if (supervisorLookupError) warnStep(ticket.id, 'resolve_supervisors')(supervisorLookupError);
+    await auditStaffAction(request, { action: 'ticket_created', entityType: 'Ticket', entityId: ticket.id, newValue: { title: ticket.title, priority: ticket.priority, assignedToId: firstSup } });
 
     if (firstSup) {
       createNotification({
@@ -254,11 +245,7 @@ async function ticketRoutes(fastify, opts) {
         where.OR = searchOR;
       }
     }
-    if (from || to) {
-      where.createdAt = {};
-      if (from) where.createdAt.gte = new Date(from + 'T00:00:00Z');
-      if (to) where.createdAt.lte = new Date(to + 'T23:59:59Z');
-    }
+    if (from || to) where.createdAt = dayRange(from, to);
 
     const take = Math.min(parseInt(limit) || 50, 100);
     const skip = ((parseInt(page) || 1) - 1) * take;
@@ -442,11 +429,12 @@ async function ticketRoutes(fastify, opts) {
       return reply.code(400).send({ error: 'Only OPEN/ACKNOWLEDGED/ASSIGNED tickets can be accepted' });
     }
 
-    const updated = await prisma.ticket.update({
-      where: { id },
+    const updated = await updateTicketIfUnchanged(prisma, ticket, {
+      where: { assignedToId: request.user.id },
       data: { status: TICKET_STATUSES.IN_PROGRESS },
       include: TICKET_INCLUDE
     });
+    if (!updated) return reply.code(409).send({ error: STALE_TICKET_ERROR });
 
     await prisma.auditLog.create({
       data: {
@@ -474,11 +462,14 @@ async function ticketRoutes(fastify, opts) {
     });
     if (!ticket) return reply.code(404).send({ error: 'Ticket not found or already assigned' });
 
-    const updated = await prisma.ticket.update({
-      where: { id },
+    // Still unassigned, in the status checked: two supervisors picking it up at once can't
+    // both get it. [BUG-0038]
+    const updated = await updateTicketIfUnchanged(prisma, ticket, {
+      where: { assignedToId: null },
       data: { assignedToId: request.user.id, status: TICKET_STATUSES.IN_PROGRESS },
       include: TICKET_INCLUDE
     });
+    if (!updated) return reply.code(409).send({ error: STALE_TICKET_ERROR });
 
     await prisma.auditLog.create({
       data: {
@@ -581,14 +572,17 @@ async function ticketRoutes(fastify, opts) {
       updateData.reviewStatus = 'PENDING';
     }
 
-    const updated = await prisma.ticket.update({
-      where: { id },
+    const updated = await updateTicketIfUnchanged(prisma, ticket, {
       data: updateData,
       include: {
         ...TICKET_INCLUDE,
         resolvedWorkers: { select: { id: true, name: true } }
       }
     });
+    if (!updated) {
+      deleteFromR2(resolvedImageUrl).catch(() => {}); // the photo for a write that did not land
+      return reply.code(409).send({ error: STALE_TICKET_ERROR });
+    }
 
     await prisma.auditLog.create({
       data: {
@@ -667,11 +661,11 @@ async function ticketRoutes(fastify, opts) {
       updateData.reviewStatus = 'PENDING';
     }
 
-    const updated = await prisma.ticket.update({
-      where: { id },
+    const updated = await updateTicketIfUnchanged(prisma, ticket, {
       data: updateData,
       include: TICKET_INCLUDE
     });
+    if (!updated) return reply.code(409).send({ error: STALE_TICKET_ERROR });
 
     await prisma.auditLog.create({
       data: {
@@ -732,8 +726,7 @@ async function ticketRoutes(fastify, opts) {
       return reply.code(403).send({ error: 'You can only reopen tickets assigned to you' });
     }
 
-    const updated = await prisma.ticket.update({
-      where: { id },
+    const updated = await updateTicketIfUnchanged(prisma, ticket, {
       data: {
         status: TICKET_STATUSES.IN_PROGRESS,
         resolvedAt: null,
@@ -743,6 +736,7 @@ async function ticketRoutes(fastify, opts) {
       },
       include: TICKET_INCLUDE
     });
+    if (!updated) return reply.code(409).send({ error: STALE_TICKET_ERROR });
 
     await prisma.auditLog.create({
       data: {

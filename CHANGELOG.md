@@ -14,13 +14,428 @@ this file is the terser, chronological "what changed and when."
 
 This changelog currently starts at `[WP7]` — the earliest work in the current
 production-hardening pass this project has a verified, dated record for (via the Charter's
-own Amendment Log). `apps/api/package.json` currently declares version `1.0.0`; nothing
-has been git-tagged yet, so everything below is grouped under **Unreleased**.
+own Amendment Log). `v1.0.0` was tagged on 2026-10-20 at `0651b26`. This file has not been
+split by release yet, so everything below is still grouped under **Unreleased**: the dated
+sections up to and including 2026-10-20 are in v1.0.0, and the later ones are not released.
 
 ## Unreleased
 
 Complete and merged into the working tree as of this writing, pending its next deploy —
 see `docs/DEPLOYMENT.md` for how a change reaches production.
+
+### 2026-10-25 (PAR-10 fixes: security and data exposure)
+
+- **`[BUG-0027]` The electrician API returned the guest's review token and personal data**
+  (PAR-10/14). Every electrician ticket route (list, detail, pool, my work, pickup, resolve)
+  read tickets with a bare `include`, so the JSON carried every column: the guest's secret
+  review token — enough for the electrician who did the work to "confirm as the resident" —
+  and their name, phone, IP hash, user agent and risk score. `worker-auth.js` now returns one
+  explicit field allow-list (`WORKER_TICKET_SELECT`) holding exactly what the electrician app
+  reads. Not visible to users. No data migration: a pending review link expires 30 minutes
+  after it is issued, so any token already exposed is short-lived.
+- **`[BUG-0028]` Stored XSS through names in attributes and inline handlers** (PAR-10/29).
+  `App.esc` (`textContent` → `innerHTML`) escaped `& < >` but not quotes. 42 places put its
+  output inside quoted attributes with names an org admin types, so a location named
+  `x" onmouseover="…` gained a live handler. 15 inline `onclick` handlers passed names as
+  `esc(name).replace(/'/g, "\\'")`, which a backslash or a double quote defeats. The CSP
+  allows inline handlers, and a super-admin who enters the org opens these pages.
+  - `App.esc` now escapes `& < > " '`.
+  - A new `App.escJs` escapes for JS first and HTML second, and every handler argument uses
+    it.
+  - One `textContent` assignment no longer double-escapes.
+  - The rule is in `docs/architecture/frontend.md`.
+  - Tests: `test/public-escaping.test.js` (the helpers, run in a sandbox, plus a static check
+    that the old idiom is gone) and a browser test in `e2e/tests/forms.spec.js`, red on the
+    old pages.
+  - Names that contain quotes now show in full in tooltips; nothing else is visible to users.
+  - CSP `'unsafe-inline'` (PRA-07 M1) is unchanged.
+- **`[BUG-0029]` `npm test` passed when a test file's `describe()` threw while collecting its
+  tests.** Node 24 prints that suite as failed, but exits 0 and counts `fail 0`, so none of its
+  tests ran and CI stayed green. Found while writing the BUG-0028 test.
+  - `scripts/report-tests.js` now reads the failure from the JUnit XML and the events stream,
+    makes the run exit 1, and names the suite.
+  - New real Node 24 fixture: `test/fixtures/junit/node24-suite-throws.*`.
+  - `apps/api/test/README.md` documents the rule.
+  - No test in the current suite was affected.
+- **`[BUG-0030]` Supervisors' Aadhaar numbers and blood groups were stored in plain text and
+  copied into audit logs** (PAR-10/15). Only electricians' values were encrypted; the
+  supervisor routes wrote them as typed, and each edit recorded the old and new values in
+  AuditLog as `{ from, to }`. That broke Charter §6, and `data-model.md` claimed otherwise.
+  - `lib/crypto.js` now has generic `encryptPII` / `decryptPII` (the worker helpers are
+    aliases) and `isEncrypted`.
+  - `supervisors.js` encrypts on create and update and decrypts for the admin.
+  - The audit diff runs on decrypted values and records `{ changed: true }` for these two
+    fields.
+  - A row saved before the fix still reads correctly and is encrypted when next saved.
+- **Deployment step (owner):** `scripts/migrate-user-pii.js` encrypts the older rows and strips
+  the values from old supervisor audit rows. It runs as a dry run by default; `--apply` writes.
+  Run it after a backup (`docs/DEPLOYMENT.md`). Not visible to users.
+- **`[BUG-0031]` Worker detail, create and update responses carried the PIN hash and a pending
+  PIN-reset token** (PAR-10/16). This affected the org-admin and super-admin routes. They now
+  return `WORKER_PROFILE_SELECT` (`lib/security.js`): the profile, and no credential
+  material. Not visible to users.
+- **`[BUG-0032]` An org admin's "run checks / run escalations" ran every tenant's jobs,
+  outside the scheduler lock** (PAR-10/01, PAR-10/42).
+  - What happened: `POST /api/alerts/run-checks` and `/run-escalations` started the
+    platform-wide scheduled checks and escalations. A test showed org A's call escalating
+    org B's overdue alert. The manual run also bypassed the advisory lock, so next to the
+    5-minute scheduled run one alert could escalate twice. The escalation scan also
+    escalated alerts of suspended and deleted orgs.
+  - Now: both jobs take `{ orgId }`, and the routes run the caller's org only, awaited
+    under the job's own lock. They answer `409` while the scheduled run holds that lock,
+    and `400` for a super-admin who has not entered an org. Escalations skip orgs that are
+    not `ACTIVE`.
+  - Tests: `alert-escalation.test.js` and the BUG-0019 scenario now run escalations for
+    their own org, so parallel test files no longer escalate each other's alerts.
+  - Documented in `docs/architecture/resilience.md`. No page calls these routes.
+- **`[BUG-0033]` A proof photo uploaded late in an old ticket's life was deleted the next
+  night** (PAR-10/18).
+  - What happened: the daily image cleanup counted a ticket's proof photo from the ticket's
+    creation, so finishing work on a ticket more than 30 days old lost the new photo before
+    anyone verified it.
+  - Now: each photo is kept for 30 days from when it was taken — the complaint photo from the
+    ticket's creation, the proof photo from `resolvedAt` (`expiredTicketPhotos` in
+    `services/cleanup.js`).
+  - The 30-day period itself is unchanged; the privacy page's "7 days" is PAR-10/28.
+    Documented in `docs/architecture/resilience.md`.
+- **`[BUG-0034]` Password and PIN reset tokens were stored as issued** (PAR-10/21).
+  - What happened: the database value itself reset the account. Anyone who could read the
+    database or a backup could take over any account with a pending reset.
+  - Now: only the SHA-256 digest is stored and looked up (`hashResetToken` in
+    `lib/security.js`); the e-mailed link is unchanged.
+  - Docs: Charter §6 recovery rule amended (Amendment Log 2026-10-25); `data-model.md`
+    updated.
+  - Tests: `account-recovery.test.js` and the J8 phone journey seed a known token instead of
+    reading it back.
+  - **On deploy:** reset links issued in the hour before the deploy stop working; the person
+    requests a new one. Not otherwise visible to users.
+- **`[BUG-0035]` Permanently deleting an electrician who was on a duty roster failed with a
+  500; attendance history was silently erased** (PAR-10/20).
+  - The [WP17] guard counted only inspections. Duty rosters reference the worker with
+    `RESTRICT` (hence the 500), and attendance records and resolved-ticket links cascade.
+  - `DELETE /api/workers/:id/permanent` now refuses with `409` and lists every history
+    (inspections, duty rosters, attendance records, resolved tickets).
+  - The admin sees the reason instead of an error. Documented in `data-model.md`, which also
+    notes the roster `RESTRICT` as a hazard for a future org purge.
+- **`[BUG-0036]` `npm test` passed when a suite's `after()` hook threw** — for example a
+  cleanup that left test data behind.
+  - Node 24 exits 0 with `fail 0`, and only the events stream records the failure.
+  - `scripts/report-tests.js` now fails the run for any suite-level `hookFailed`, as BUG-0029
+    did for a throwing `describe()`.
+  - Found when the BUG-0035 test's roster made the org cleanup fail while the run stayed
+    green.
+  - New fixture: `test/fixtures/junit/node24-after-throws.*`.
+- **User-visible (Release Notes, new [`docs/releases/next-draft.md`](docs/releases/next-draft.md)
+  for changes since v1.0.0):** a deactivated supervisor's open tickets are handed over.
+- **`[BUG-0037]` A deactivated or moved supervisor kept their open tickets, where no one else
+  could see them** (PAR-10/09).
+  - Applies to all three paths: `PATCH /api/supervisors/:id` with `isActive: false`,
+    `DELETE /api/supervisors/:id`, and the super-admin user edit (deactivate, or move to
+    another org).
+  - Each open ticket (active or pending verification) goes to the nearest active supervisor
+    covering its location — the rule a new complaint uses — or back to the pool. It happens
+    in the same transaction, with one `ticket_reassigned` audit row per ticket, and the new
+    assignee is notified (`planTicketHandover` / `applyTicketHandover` /
+    `notifyTicketHandover` in `services/assignment-resolver.js`).
+  - A move also deletes the user's coverage in the old org, so new complaints there stop
+    reaching someone in another tenant.
+  - The admin page's message says how many tickets moved. Finished tickets keep their
+    assignee.
+- **`[BUG-0038]` Two people acting on one ticket at once both "succeeded" — the last write
+  won** (PAR-10/05).
+  - What happened: every transition read, checked, then updated by id alone. A test showed
+    verify and reopen both answering 200 on one ticket, a double verify both landing (two
+    audit rows), and two supervisors "picking up" the same ticket.
+  - Now: each lifecycle route writes through `updateTicketIfUnchanged`
+    (`services/ticket-status.js`). That covers the staff accept, pick up, resolve, verify and
+    reopen; the electrician's pick up and resolve; and the guest's confirm and reject. The
+    update applies only if the status is still the one checked; the loser answers `409`
+    ("changed by someone else just now — reload").
+  - Electricians may still join one ticket at the same moment.
+  - A proof photo uploaded by a losing resolve is deleted.
+  - The admin's generic PATCH stays an explicit override.
+  - Documented in `data-model.md`.
+- **`[BUG-0039]` Analytics labelled every electrician and supervisor bar "undefined"; the
+  dashboard's "Today's Inspection Log" was always empty** (PAR-10/27).
+  - Both pages read field names the APIs do not send: `records` and `inspections` swapped.
+  - This was the cause of the 17 phone-explorer failures in full local e2e runs (also on
+    `origin/main`). They appear only once other tests have added inspections.
+  - Browser test: `e2e/tests/ui-fixes.spec.js`.
+- **User-visible (Release Notes):** the analytics performance bars show counts, and the
+  dashboard lists today's inspections.
+- **`[BUG-0040]` Asset, failure and inspection photos were broken images in the admin detail
+  views** (PAR-10/24).
+  - `admin-assets`, `admin-failures` and `admin-electrical` used raw `/images/...` paths;
+    photos are served only through `/api/images/...` with the viewer's token. All three now
+    go through `App.imgUrl`, including the inspection lightbox.
+  - Browser test in `e2e/tests/ui-fixes.spec.js` with a real stored photo.
+  - The BUG-0039 browser test now uses the explorer org's cached sign-in. It had used fresh
+    admins, which hit the per-IP login limit (429) in a full run.
+- **User-visible (Release Notes):** photos attached to assets, failures and inspections show
+  in the admin pages.
+- **`[BUG-0041]` The guest review page could not show the proof photo the resident was asked
+  to confirm** (PAR-10/23).
+  - What happened: the review response gave the raw `/images/...` path, which needs a staff
+    or electrician token.
+  - New route `GET /api/public/review/:token/photo`. It serves only that ticket's proof photo,
+    only while its review is open and in date, and is rate-limited.
+  - The review response now gives `photoUrl` instead of the storage path. `review.html` uses
+    it.
+  - The token in the path stays out of logs: the app logs the route template, and Caddy
+    already redacts `/review/...`.
+  - Route index regenerated. J5 now checks that the photo loads.
+- **User-visible (Release Notes):** residents see the proof photo on the review page.
+- **`[BUG-0042]` A ticket the guest rejected was open again but kept its resolution and
+  verification times** (PAR-10/55).
+  - Analytics counts any ticket with `resolvedAt` as resolved, so a reopened ticket counted
+    as resolved with a stale time.
+  - The REJECT now clears `resolvedAt`, `verifiedAt`, `verifiedById` and `verifyNote`, as
+    every other reopen does ([WP10]). The photo and the guest's note stay (BUG-0026).
+- **`[BUG-0043]` Editing an alert rule silently dropped its "notify the location's supervisors
+  / electricians" actions** (PAR-10/51).
+  - The form offered only three of the five action types the API accepts, and saving
+    rebuilt the actions from its checkboxes.
+  - Both lists (actions and escalation actions) now offer, load and save all of them, and the
+    rule list labels them.
+- **User-visible (Release Notes):** the alert-rule form can send alerts to the supervisors and
+  electricians of the location concerned.
+- **`[BUG-0044]` Tickets raised by an alert rule were unassigned, had no SLA deadline and no
+  audit row, and nobody was told** (PAR-10/06).
+  - The CREATE_TICKET action now assigns the supervisor covering the location, sets the SLA
+    deadline, writes `ticket_created_by_alert`, and notifies the assignee.
+  - It still does not raise `TICKET_HIGH_PRIORITY`, so a rule cannot loop on its own ticket.
+  - Rule saves refuse a ticket priority outside LOW, NORMAL, HIGH and URGENT (`400`). Before,
+    such a rule saved and then failed when it fired.
+  - The SLA table moved to `services/ticket-status.js` (`getSlaDeadline`), shared by both
+    paths.
+- **User-visible (Release Notes):** tickets created by alert rules go to the location's
+  supervisor.
+- **`[BUG-0045]` Missed-inspection alerts were mistimed and deduplicated too broadly**
+  (PAR-10/22).
+  - The NIGHT shift (22:00–06:00) was checked while it was running, so an alert fired minutes
+    after it began. After midnight only today's inspections counted, so a round done at 23:00
+    didn't. Nothing was checked once the shift ended.
+  - `fireAlert` deduplicated on trigger + entity + day. So a room that missed two rounds got
+    one alert, and of two rules on the same trigger only the first ever fired.
+  - Now each shift is checked after it ends. NIGHT is checked from 06:00, against
+    inspections since 22:00 the evening before.
+  - The dedup key now includes the rule and the shift. On the day of the deploy, an alert
+    raised that day under the old key may be raised once more.
+  - Shown by `test/integration/missed-inspection.test.js`, which mocks only `Date`.
+    `docs/architecture/resilience.md` updated.
+- **User-visible (Release Notes):** missed-inspection alerts arrive after each shift; none
+  arrive at the start of the night shift.
+- **`[BUG-0046]` Token verification accepted any HMAC algorithm** (PRA-07 L3, PAR-10/35).
+  - All four `jwt.verify` sites now pass `JWT_VERIFY_OPTIONS` (`{ algorithms: ['HS256'] }`,
+    `lib/security.js`): the staff API, the electrician API, the image proxy and the
+    electrician's live stream.
+  - A token signed HS384 or HS512 with the same secret answers 401.
+  - `auth-and-tenancy.md` updated. Not visible to users: the app signs HS256 only.
+- **`[BUG-0047]` The pages re-sent a submission after a network error** (PAR-10/54).
+  - `public/js/app.js` `_doFetch` retried every request three times on a network error,
+    POST, PATCH and DELETE included. On a weak connection, where the request had reached the
+    server but the reply was lost, one tap could create two complaints, tickets or
+    inspections.
+  - Now only GET and HEAD are retried after a network error. A submission fails once, with
+    the "Network error" message, and the person can try again knowingly.
+  - A 503 (the circuit breaker refused before doing anything) is still retried.
+  - Documented in `docs/architecture/frontend.md`.
+- **`[BUG-0048]` Row actions the server refused said nothing** (PAR-10/53).
+  - Deleting an alert rule, acknowledging one or all alerts, and flagging or unflagging an
+    inspection acted only on success. When the server refused, for example because another
+    admin had just removed the item, the page stayed silent.
+  - They now show the server's message through a new `App.toastFailure`.
+  - The asset page's `deleteAsset` got the same treatment, although no button calls it.
+    Admins decommission an asset through the edit form.
+- **`[BUG-0049]` An asset purchase cost of 0 was stored as "unknown"** (PAR-10/52). `|| null`
+  became `?? null` on create and edit.
+- **User-visible (Release Notes):** refused actions say why; a cost of 0 is kept.
+- **`[BUG-0050]` An electrician could be rung for a ticket they could not open** (PAR-10/50).
+  - An admin can deactivate a floor and keep the rooms under it active
+    (`DELETE /locations/:id?force=true`), and those rooms still take complaints.
+  - The ring (`getAssignedWorkerIds`) walked up through the inactive floor and reached the
+    electrician covering the building. The electrician app's coverage
+    (`getLocationDescendants`) walked down only through active locations, so it answered
+    404 for that ticket. It did the same for open tickets left at the deactivated floor.
+  - The descendant walk now passes through deactivated locations and includes them, as the
+    ancestor walk does. Coverage still ends at the electrician's own subtree and org.
+  - Documented in `docs/architecture/data-model.md`.
+- **User-visible (Release Notes):** electricians can open tickets under a deactivated floor.
+- **`[BUG-0051]` No sign-in page let anyone ask for a reset** (PAR-10/26, in part).
+  - `POST /auth/forgot-password` and `/auth/worker-forgot-pin` had no caller in the app.
+  - The reset pages, opened without a link, said to "request a new reset from the sign-in
+    page", and no sign-in page could.
+  - The admin and supervisor sign-in pages now have **Forgot password?**, and the electrician
+    page has **Forgot PIN?**. Each link passes the page's organization.
+  - The reset pages opened without a token now show a request form: email, or Employee ID
+    with the organization code when no organization is passed. The answer is the server's
+    generic message, plus who to ask if no email arrives.
+  - The super-admin sign-in page's **Run one-time setup** linked to `/superadmin-setup`.
+    The owner removed that page on purpose once production was set up (`b9d9d8a`), and the
+    link was left behind. The hint now says the operator creates the first super admin on
+    the server and links nowhere. `docs/DEPLOYMENT.md` gains that step: it runs inside the
+    container, so the key never appears on a command line. (The first version of this fix,
+    `7823390`, ran the bootstrap from the page. That brought back what the owner had
+    removed, so it was reverted.)
+  - No server change. The rest of PAR-10/26 is BUG-0052.
+- **User-visible (Release Notes):** "Forgot password?" and "Forgot PIN?" on the sign-in pages.
+- **`[BUG-0052]` Nobody could change their own password or PIN while signed in** (PAR-10/26).
+  - `PATCH /auth/password` and `PATCH /auth/worker-pin` had no screen.
+  - The profile modal (user menu → Profile) now has **Change password** for admins and
+    supervisors and **Change PIN** for electricians. A super admin, who signs in with the
+    admin key, gets neither.
+  - The server ends every session of the account and returns a fresh token, which replaces
+    the stored one, so the session on this device goes on.
+  - The form sends with `fetch`, not the role's fetch helper. `/auth/worker-pin` answers a
+    wrong current PIN with 401, and the helper treats any 401 as a lost session and signs out.
+- **User-visible (Release Notes):** change your password or PIN from your profile.
+- **`[BUG-0053]` The profile of an electrician said "Admin"** (found while fixing BUG-0052).
+  `_renderProfileModal` labelled every role except super admin and supervisor as "Admin". It
+  now maps `ELECTRICIAN` too.
+- **`[BUG-0054]` On a shared phone, a saved inspection was sent in as whoever else was signed
+  in** (PAR-10/49, in part).
+  - The offline queue was replayed, from any page that came back online, with the first token
+    found: admin, super admin, supervisor, then electrician.
+  - With a supervisor and an admin both signed in on one device, a supervisor's inspection
+    saved offline was recorded as the admin's.
+  - A queued entry now records its role (`scope`) and is replayed only with that role's token.
+    If that role is signed out, the entry waits. Entries saved before this change count as
+    the supervisor's: the supervisor inspection page is the only page that queues.
+  - `App.imgUrl` uses the page's own session instead of the first token found.
+  - Documented in `docs/architecture/frontend.md`.
+  - The rest of PAR-10/49, a server-side sign-out, is not done. Changing a password or PIN
+    now ends every other session (BUG-0052). A sign-out that ends one session needs a
+    session table, which is a decision for the owner.
+- **`[BUG-0055]` Date filters started each day at 05:30, and pages took "today" from UTC**
+  (PAR-10/07, in part).
+  - These filters parsed a date-only `from` as UTC midnight, which is 05:30 in India: tickets,
+    the audit log, alerts, asset events, asset failures (list and CSV), inspections (list and
+    export) and three analytics endpoints. A ticket raised at 01:00 was missing from that
+    day's list.
+  - The ticket and audit-log filters also ended `to` at 05:29 the next morning, and
+    `/analytics/workers`, `/locations` and `/supervisors` ended it at 05:30 on the last day.
+  - One rule now, `lib/dates.js` `dayRange`: a date-only value is the local day, 00:00 to
+    23:59:59.999 in the server's `TZ` (Asia/Kolkata). A full timestamp is used as given.
+  - The admin pages built "today" and their preset ranges with `toISOString()`, the UTC date,
+    which is yesterday between 00:00 and 05:30. Affected: Analytics, the audit log, the
+    dashboard's inspection log, and the CSV file names. They now use `App.localDate()`; the
+    server's CSV names use `localDateKey()`.
+  - Attendance and duty-roster dates are unchanged: they are calendar-date columns, keyed at
+    UTC midnight on purpose.
+  - Documented in `docs/reference/environment.md` (`TZ`).
+  - Not in this change: analytics charts still group by UTC day (BUG-0056), and there is
+    still one zone for every organization.
+- **`[BUG-0056]` Analytics charts counted inspections between midnight and 05:30 under the
+  day before** (PAR-10/07).
+  - Affected: the inspection and fault trends, the report's daily trend and period, the room
+    heatmap, the location history, and the super-admin activity and AI-usage charts.
+  - They grouped by UTC day: SQL `DATE(col)` on columns that hold UTC, and `toISOString()`
+    date keys. The report's labels were shifted by one, starting a day before the range
+    and leaving out its last day.
+  - They now group by the local day: `localDateKey()` in JavaScript, and in SQL
+    `DATE(col AT TIME ZONE 'UTC' AT TIME ZONE <server zone>)` (`lib/dates.js`
+    `serverTimeZone`), grouped by position because the bound zone parameter differs between
+    `SELECT` and `GROUP BY`.
+  - With BUG-0055 this closes PAR-10/07's inconsistent day boundaries. A per-organization
+    time zone, needed only if organizations span zones, is left to the owner.
+  - The BUG-0012 and BUG-0039 scenarios asked the report for a range ending on
+    `toISOString()`'s date, so between 00:00 and 05:30 IST they missed the inspection they
+    had just made and failed, whatever the code. They use `localDateKey()` now. This was
+    found at 01:12 IST.
+- **`[BUG-0057]` Supervisors could mark attendance for any future date, and for two days
+  back just after midnight** (found while fixing BUG-0055).
+  - `POST /attendance/bulk` and `POST /duty-roster` allow supervisors "today or yesterday",
+    but took "today" as the UTC date. Until 05:30 IST that is still the day before, so the
+    day before yesterday passed.
+  - The attendance check had no upper bound, so any future date passed.
+  - `GET /attendance/today` showed yesterday's attendance until 05:30.
+  - Both checks now compare local calendar dates (`localDateKey`), and attendance also
+    refuses a future date. Admins keep their override.
+  - Rosters for future dates are still accepted, as before. Planning ahead may be wanted, so
+    that is left to the owner.
+- **`[BUG-0058]` Many actions left no audit row** (PAR-10/13).
+  - **Now audited — accounts:** a successful sign-in (staff, super admin and electrician),
+    and changing or resetting a password or PIN.
+  - **Now audited — admin changes:** inspection templates (create, edit, duplicate,
+    deactivate, delete), duty rosters (start, change location, change electricians, remove),
+    attendance edits, alert-rule edits, acknowledging one or all alerts, running the alert
+    checks or escalations by hand, and raising a ticket as staff.
+  - New rows go through `services/audit.js`. `auditActorType` moved there from `tickets.js`
+    unchanged; it tells a super admin acting in an org apart from the org's own staff.
+  - No IP address or device is stored.
+  - **Not audited, on purpose:** failed sign-ins, since anyone can cause them (an owner
+    decision); requests for a reset link; and the super admin's one-time bootstrap, which
+    cannot be tested without removing the shared super admin.
+  - The existing alert-rule rows keep their `actorType: 'user'`.
+  - Documented in `docs/architecture/data-model.md`.
+- **`[BUG-0059]` After 180 days a guest's name was removed from the complaint but kept in its
+  audit row** (PAR-10/19, in part).
+  - A public complaint also writes the guest's name into its `ticket_public_create` audit row,
+    as `actorId` and as `newValue.guestName`. `anonymizeGuestData` cleared only the ticket.
+  - It now clears that copy too: `actorId` becomes `anonymous` and the name is dropped. The
+    first run also clears the rows of complaints anonymised before this change.
+  - `anonymizeGuestData` takes an optional `{ orgId }`, for tests.
+  - Still open, as owner decisions: the copy of the name in the admin notification email,
+    which cannot be recalled once sent, and whether the IP hash, user agent, description and
+    review note should go after 180 days too.
+- **zod 3 → 4.6.6 (security).**
+  - GHSA-mrhx-c7xc-m3w5 (high, published 2026-10-01): zod could exhaust memory while
+    validating oversized constrained collections. It affects every zod before 4.6.6.
+  - This failed the CI dependency-audit gate, which blocked every deploy.
+  - Two code changes were needed: `ZodError.errors` is `.issues` in zod 4 (`errors.js`, the
+    worker auth and worker routes), and `z.record` takes its key schema explicitly.
+  - Response shapes are unchanged; validation messages now use zod 4's default wording.
+  - Full gate 664/664 and full e2e 230/230 with zod 4.
+- **`[BUG-0060]` A guest's name and phone were accepted without their consent** (PAR-10/48).
+  - The privacy policy says a guest who gives a name or phone must tick a consent box.
+  - Only `scan.html` checked the box, and it never sent the answer. `POST /public/complaint`
+    took contact details from any client without consent, and nothing recorded that consent
+    was given.
+  - The server now answers 400 for a name or phone sent without `consent` (`true` in JSON,
+    `"true"` in the form). The page sends it, and the complaint's audit row records
+    `consent: true`.
+  - A complaint without contact details needs no consent.
+  - **API change:** a client that sends contact details must now send `consent`.
+  - A consent column on the ticket would need a migration. The audit row keeps the record
+    for now.
+- **Documentation drift (PAR-10/36), docs only.**
+  - `CLAUDE.md` and the architecture overview said Fastify 4; the app runs Fastify 5
+    (ADR 0008).
+  - The data model counted 31 models; there are 32.
+  - `docs/README.md`, this changelog's introduction and the v1.0.0 release notes said v1.0.0
+    was not tagged; it was tagged on 2026-10-20 at `0651b26`.
+  - The GitHub release body still carries the "DRAFT, not tagged" heading. Only the owner can
+    edit it.
+- **The fixes in `app.js` reach people on their first load after the deploy.**
+  - Every page still loaded `app.js?v=14`, or `v=15` on the Quality page. Browsers keep
+    `/js` for a day, and both service workers serve it from cache first.
+  - So this release's `app.js` changes would have reached people up to a day late. Those
+    changes include the escaping fix (BUG-0028), the retry rule (BUG-0047) and the sessions
+    on a shared phone (BUG-0054).
+  - Every page now loads `app.js?v=16`, matching both precache lists. The service-worker
+    caches are renamed (`kodspot-v18`, `kodspot-<module>-v8`), so the old entries are dropped.
+  - `docs/architecture/frontend.md` states the rule, and `test/asset-versions.test.js` checks
+    that every page and both workers name one version.
+
+### 2026-10-24 (product and architecture review — documentation only)
+
+- **Documentation only; no code, schema, dependency, workflow or setting changed.** Not
+  user-visible, so no Release Notes entry.
+- New `docs/history/product-architecture-review-2026-10.md` (findings `PAR-10/1`–`PAR-10/55`).
+  It is a dated review of how the product fits real colleges and hostels and covers:
+  - the inventory and role matrix;
+  - the ticket lifecycle;
+  - post-resolution options;
+  - modules versus feature settings;
+  - risks and scenarios;
+  - QA and release status;
+  - a P0–P3 backlog with an implementation sequence;
+  - external research;
+  - decisions for the owner.
+- New ADR drafts, both `Proposed`:
+  - [`docs/adr/0010-configurable-post-resolution-workflow.md`](docs/adr/0010-configurable-post-resolution-workflow.md);
+  - [`docs/adr/0011-tenant-feature-settings.md`](docs/adr/0011-tenant-feature-settings.md).
+- Indexed in `docs/adr/README.md` and `docs/README.md`.
 
 ### 2026-10-20 (bug hunt: every button and form)
 

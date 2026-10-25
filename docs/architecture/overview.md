@@ -28,7 +28,7 @@ the Charter §5 before proposing structural change.
 
 | Layer | Technology | Notes |
 |---|---|---|
-| HTTP / API | **Fastify 4** | `apps/api/index.js` assembles it; `trustProxy`, 30s request timeout |
+| HTTP / API | **Fastify 5** | `apps/api/index.js` assembles it; `trustProxy`, 30s request timeout |
 | ORM / DB | **Prisma 5 → PostgreSQL 15** | single shared client, `apps/api/src/lib/prisma.js` |
 | Frontend | **Server-rendered static HTML + vanilla JS PWA** | `apps/api/public/`; see [frontend.md](frontend.md) |
 | Reverse proxy / TLS | **Caddy** | `infrastructure/Caddyfile`, automatic HTTPS |

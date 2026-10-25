@@ -5,9 +5,10 @@ const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const { z } = require('zod');
 const { prisma } = require('../lib/prisma');
-const { BCRYPT_COST } = require('../lib/security');
+const { auditAccountAction } = require('../services/audit');
+const { BCRYPT_COST, hashResetToken, JWT_VERIFY_OPTIONS } = require('../lib/security');
 const { loginRateLimit, strictRateLimit } = require('../middleware/rateLimits');
-const { uploadToR2 } = require('../lib/r2');
+const { uploadToR2, deleteFromR2 } = require('../lib/r2');
 const { validateImageBuffer } = require('../errors');
 const { getLocationDescendants } = require('../services/assignment-resolver');
 const { normalizeEnabledModules } = require('../services/module-policy');
@@ -30,10 +31,40 @@ const {
   VERIFY_PENDING_TICKET_STATUSES,
   EDITABLE_TICKET_STATUSES,
   isOpenLikeStatus,
-  isActiveLikeStatus
+  isActiveLikeStatus,
+  STALE_TICKET_ERROR,
+  updateTicketIfUnchanged
 } = require('../services/ticket-status');
 
 const VALID_MODULES = ['ele', 'civil', 'asset', 'complaints'];
+
+// The ticket fields an electrician's app may see — an allow-list, not `include`. A bare
+// `include` returns every column, among them the guest's review token (which confirms the
+// work "as the resident"), and their name, phone, IP hash and user agent. [BUG-0027]
+const WORKER_TICKET_SELECT = Object.freeze({
+  id: true,
+  locationId: true,
+  title: true,
+  description: true,
+  imageUrl: true,
+  priority: true,
+  status: true,
+  source: true,
+  module: true,
+  issueType: true,
+  resolvedImageUrl: true,
+  resolvedNote: true,
+  resolvedAt: true,
+  acceptedAt: true,
+  verifiedAt: true,
+  verifyNote: true,
+  createdAt: true,
+  updatedAt: true,
+  location: { select: { id: true, name: true, type: true } },
+  assignedTo: { select: { id: true, name: true } },
+  resolvedWorkers: { select: { id: true, name: true } },
+  verifiedBy: { select: { id: true, name: true } }
+});
 
 // ── Worker JWT Authentication Middleware ──
 
@@ -42,7 +73,7 @@ async function authenticateWorkerJWT(request, reply) {
     const token = request.headers.authorization?.replace('Bearer ', '');
     if (!token) return reply.code(401).send({ error: 'Unauthorized' });
 
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const decoded = jwt.verify(token, process.env.JWT_SECRET, JWT_VERIFY_OPTIONS);
     if (!decoded.workerId) return reply.code(401).send({ error: 'Unauthorized' });
 
     const worker = await prisma.worker.findUnique({
@@ -122,7 +153,7 @@ async function workerAuthRoutes(fastify) {
 
     let data;
     try { data = schema.parse(request.body); } catch (err) {
-      return reply.code(400).send({ error: 'Invalid input', details: err.errors });
+      return reply.code(400).send({ error: 'Invalid input', details: err.issues });
     }
 
     // Find org by slug
@@ -157,6 +188,7 @@ async function workerAuthRoutes(fastify) {
       { expiresIn: '30d' }
     );
 
+    await auditAccountAction({ orgId: worker.orgId, actorType: 'worker', actorId: worker.id, action: 'signed_in', entityType: 'Worker' });
     return {
       token,
       worker: {
@@ -205,7 +237,7 @@ async function workerAuthRoutes(fastify) {
 
     let data;
     try { data = schema.parse(request.body); } catch (err) {
-      return reply.code(400).send({ error: 'Invalid input', details: err.errors });
+      return reply.code(400).send({ error: 'Invalid input', details: err.issues });
     }
 
     const worker = await prisma.worker.findUnique({
@@ -236,6 +268,7 @@ async function workerAuthRoutes(fastify) {
       { expiresIn: '30d' }
     );
 
+    await auditAccountAction({ orgId: request.worker.orgId, actorType: 'worker', actorId: request.worker.id, action: 'pin_changed', entityType: 'Worker' });
     return { success: true, token: newToken };
   });
 
@@ -252,7 +285,7 @@ async function workerAuthRoutes(fastify) {
 
     let data;
     try { data = schema.parse(request.body); } catch (err) {
-      return reply.code(400).send({ error: 'Invalid input', details: err.errors });
+      return reply.code(400).send({ error: 'Invalid input', details: err.issues });
     }
 
     const genericResponse = { success: true, message: 'If a matching worker account with an email on file exists, a PIN reset link has been sent.' };
@@ -271,9 +304,10 @@ async function workerAuthRoutes(fastify) {
       if (worker && worker.email) {
         const token = crypto.randomBytes(32).toString('hex');
         const resetTokenExpiresAt = new Date(Date.now() + RESET_TOKEN_TTL_MS);
+        // Only the hash is stored; the e-mailed token is the credential. [BUG-0034]
         await prisma.worker.update({
           where: { id: worker.id },
-          data: { resetToken: token, resetTokenExpiresAt }
+          data: { resetToken: hashResetToken(token), resetTokenExpiresAt }
         });
 
         const resetUrl = `${APP_URL}/worker-reset-pin?token=${token}`;
@@ -303,11 +337,11 @@ async function workerAuthRoutes(fastify) {
 
     let data;
     try { data = schema.parse(request.body); } catch (err) {
-      return reply.code(400).send({ error: 'Invalid input', details: err.errors });
+      return reply.code(400).send({ error: 'Invalid input', details: err.issues });
     }
 
     const worker = await prisma.worker.findUnique({
-      where: { resetToken: data.token },
+      where: { resetToken: hashResetToken(data.token) },
       select: { id: true, orgId: true, name: true, employeeId: true, isActive: true, resetTokenExpiresAt: true }
     });
 
@@ -334,6 +368,7 @@ async function workerAuthRoutes(fastify) {
       { expiresIn: '30d' }
     );
 
+    await auditAccountAction({ orgId: worker.orgId, actorType: 'worker', actorId: worker.id, action: 'pin_reset', entityType: 'Worker' });
     return {
       success: true,
       message: 'PIN reset successfully',
@@ -452,11 +487,7 @@ async function workerAuthRoutes(fastify) {
     const [tickets, total, grouped] = await Promise.all([
       prisma.ticket.findMany({
         where,
-        include: {
-          location: { select: { id: true, name: true, type: true } },
-          assignedTo: { select: { id: true, name: true } },
-          resolvedWorkers: { select: { id: true, name: true } }
-        },
+        select: WORKER_TICKET_SELECT,
         orderBy: [{ priority: 'desc' }, { createdAt: 'desc' }],
         take: limit,
         skip
@@ -492,11 +523,7 @@ async function workerAuthRoutes(fastify) {
 
     const ticket = await prisma.ticket.findFirst({
       where,
-      include: {
-        location: { select: { id: true, name: true, type: true } },
-        assignedTo: { select: { id: true, name: true } },
-        resolvedWorkers: { select: { id: true, name: true } }
-      }
+      select: WORKER_TICKET_SELECT
     });
     if (!ticket) return reply.code(404).send({ error: 'Ticket not found' });
     return ticket;
@@ -544,8 +571,7 @@ async function workerAuthRoutes(fastify) {
     }
 
     const alreadyConnected = ticket.resolvedWorkers.some(w => w.id === workerId);
-    const updated = await prisma.ticket.update({
-      where: { id: ticket.id },
+    const updated = await updateTicketIfUnchanged(prisma, ticket, {
       data: {
         status: TICKET_STATUSES.RESOLVED_PENDING_VERIFY,
         resolvedAt: new Date(),
@@ -553,11 +579,12 @@ async function workerAuthRoutes(fastify) {
         resolvedNote: note,
         resolvedWorkers: alreadyConnected ? undefined : { connect: [{ id: workerId }] }
       },
-      include: {
-        location: { select: { id: true, name: true, type: true } },
-        resolvedWorkers: { select: { id: true, name: true } }
-      }
+      select: WORKER_TICKET_SELECT
     });
+    if (!updated) {
+      deleteFromR2(resolvedImageUrl).catch(() => {}); // the photo for a write that did not land
+      return reply.code(409).send({ error: STALE_TICKET_ERROR });
+    }
 
     await prisma.auditLog.create({
       data: {
@@ -646,11 +673,7 @@ async function workerAuthRoutes(fastify) {
 
     const tickets = await prisma.ticket.findMany({
       where,
-      include: {
-        location: { select: { id: true, name: true, type: true } },
-        assignedTo: { select: { id: true, name: true } },
-        resolvedWorkers: { select: { id: true, name: true } }
-      },
+      select: WORKER_TICKET_SELECT,
       orderBy: [{ priority: 'desc' }, { createdAt: 'asc' }],
       take: 100
     });
@@ -676,18 +699,18 @@ async function workerAuthRoutes(fastify) {
     }
 
     const alreadyConnected = ticket.resolvedWorkers.some(w => w.id === workerId);
-    const updated = await prisma.ticket.update({
-      where: { id: ticket.id },
+    // Several electricians may join one ticket, so concurrent pickups both land; only a
+    // change to a status that can no longer be picked up (resolved, closed) refuses. [BUG-0038]
+    const updated = await updateTicketIfUnchanged(prisma, ticket, {
+      where: { status: { in: ACTIVE_TICKET_STATUSES } },
       data: {
         status: TICKET_STATUSES.IN_PROGRESS,
         acceptedAt: ticket.acceptedAt || new Date(),
         resolvedWorkers: alreadyConnected ? undefined : { connect: [{ id: workerId }] }
       },
-      include: {
-        location: { select: { id: true, name: true, type: true } },
-        resolvedWorkers: { select: { id: true, name: true } }
-      }
+      select: WORKER_TICKET_SELECT
     });
+    if (!updated) return reply.code(409).send({ error: STALE_TICKET_ERROR });
 
     await prisma.auditLog.create({
       data: {
@@ -739,11 +762,7 @@ async function workerAuthRoutes(fastify) {
 
     const tickets = await prisma.ticket.findMany({
       where,
-      include: {
-        location: { select: { id: true, name: true, type: true } },
-        assignedTo: { select: { id: true, name: true } },
-        verifiedBy: { select: { id: true, name: true } }
-      },
+      select: WORKER_TICKET_SELECT,
       orderBy: [{ resolvedAt: 'desc' }, { updatedAt: 'desc' }],
       take: 200
     });

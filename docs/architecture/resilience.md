@@ -74,8 +74,8 @@ in `runExclusive` + try/catch so one failure never crashes the scheduler:
 
 | Job | Scheduler | Cadence | Lock key |
 |---|---|---|---|
-| Image retention cleanup (30-day) | `services/cleanup.js` | daily | `IMAGE_CLEANUP` |
-| Guest-PII anonymization (180-day) | `services/cleanup.js` | daily | `GUEST_ANONYMIZATION` |
+| Image retention cleanup (30 days from when each photo was taken: a ticket's complaint photo from its creation, its proof photo from `resolvedAt`) | `services/cleanup.js` | daily | `IMAGE_CLEANUP` |
+| Guest-PII anonymization (180 days: the guest's name and phone on the ticket, and the copy of the name in the complaint's audit row, BUG-0059) | `services/cleanup.js` | daily | `GUEST_ANONYMIZATION` |
 | Default template seeding | `services/cleanup.js` | at startup | `TEMPLATE_SEEDING` |
 | Scheduled alert checks (missed/overdue) | `services/automation.js` | 30 min | `SCHEDULED_CHECKS` |
 | Escalation checks | `services/automation.js` | 5 min | `ESCALATION_CHECKS` |
@@ -84,9 +84,15 @@ in `runExclusive` + try/catch so one failure never crashes the scheduler:
 
 Missed-inspection alerting reads each org's configured `ShiftConfig` (via the shared
 `services/shift-config.js`) rather than a hardcoded deadline table, so orgs with custom
-shift windows get correctly-timed alerts (Charter §8.4, `[WP10]`). Alerts deduplicate per
-calendar day (`fireAlert`'s `dedupKey`), which is what makes a re-run of a skipped tick
-safe.
+shift windows get correctly-timed alerts (Charter §8.4, `[WP10]`). A shift is checked once it
+has ended. A shift that crosses midnight (NIGHT) is checked from its end until it starts
+again, against inspections since it began the evening before (BUG-0045). Alerts deduplicate
+per rule, entity, shift (when there is one) and calendar day (`fireAlert`'s `dedupKey`), which
+is what makes a re-run of a skipped tick safe.
+
+An admin's manual `POST /api/alerts/run-checks` and `/run-escalations` run the same jobs
+for the caller's org only, inside the same `runExclusive` lock. While the scheduled run
+holds that lock they answer `409`. Escalations skip orgs that are not `ACTIVE` (BUG-0032).
 
 All scheduler timer handles are returned to `index.js` and cleared on `SIGINT`/`SIGTERM`
 for a clean graceful shutdown.

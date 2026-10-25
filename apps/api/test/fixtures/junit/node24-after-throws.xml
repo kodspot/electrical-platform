@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<testsuites>
+	<testsuite name="probe suite whose after() throws" time="0.000908" disabled="0" errors="0" tests="1" failures="0" skipped="0" hostname="fixture-host">
+		<testcase name="passes" time="0.000325" classname="test" file="C:\ci\electrical-platform\apps\api\test\probe\after-throws.test.js"/>
+	</testsuite>
+	<!-- tests 1 -->
+	<!-- suites 1 -->
+	<!-- pass 1 -->
+	<!-- fail 0 -->
+	<!-- cancelled 0 -->
+	<!-- skipped 0 -->
+	<!-- todo 0 -->
+	<!-- duration_ms 71.2872 -->
+</testsuites>

@@ -48,6 +48,8 @@ Amendment Log is the lightweight record for everything below that bar.
 | [0007](0007-dependency-audit-gate.md) | A blocking dependency audit gate with expiring exceptions | Proposed |
 | [0008](0008-runtime-upgrade-node24-fastify5.md) | Runtime upgrade: Node 24, Fastify 5, bcrypt 6 | Proposed |
 | [0009](0009-post-deploy-production-smoke.md) | A read-only production smoke after every deploy and nightly | Proposed |
+| [0010](0010-configurable-post-resolution-workflow.md) | A post-resolution workflow that reaches the resident, with configurable alternatives | Proposed |
+| [0011](0011-tenant-feature-settings.md) | Tenant feature settings: one validated, versioned settings document per organization | Proposed |
 
 > ADRs 0002–0004 were backfilled to record foundational decisions the codebase already
 > embodies; they are dated to their authoring, and each notes that it documents a

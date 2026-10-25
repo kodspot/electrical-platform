@@ -16,8 +16,10 @@ Two authenticated identity types, plus the unauthenticated public:
 | Guest (public complainant) | — | none | none — org resolved server-side |
 
 Both JWTs are signed and verified with a single symmetric secret (`JWT_SECRET`, validated
-for length at boot — Charter §6). There is no refresh-token flow; a longer 30-day worker
-token reflects field devices that stay logged in.
+for length at boot — Charter §6). Every verify call pins the algorithm to HS256
+(`JWT_VERIFY_OPTIONS`, `lib/security.js`), so a token signed any other way is refused
+(BUG-0046). There is no refresh-token flow; a longer 30-day worker token reflects field
+devices that stay logged in.
 
 ## Authentication: verified on every request, not just at login
 

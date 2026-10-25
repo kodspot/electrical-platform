@@ -3,6 +3,7 @@
 const jwt = require('jsonwebtoken');
 const { prisma } = require('../lib/prisma');
 const { getFromR2 } = require('../lib/r2');
+const { JWT_VERIFY_OPTIONS } = require('../lib/security');
 
 const issuedBefore = (decoded, invalidBefore) =>
   Boolean(invalidBefore && decoded.iat && decoded.iat < Math.floor(invalidBefore.getTime() / 1000));
@@ -19,7 +20,7 @@ async function orgIsActive(orgId) {
  */
 async function resolveReader(token) {
   let decoded;
-  try { decoded = jwt.verify(token, process.env.JWT_SECRET); } catch { return { code: 401, error: 'Unauthorized' }; }
+  try { decoded = jwt.verify(token, process.env.JWT_SECRET, JWT_VERIFY_OPTIONS); } catch { return { code: 401, error: 'Unauthorized' }; }
 
   if (decoded.userId) {
     const user = await prisma.user.findUnique({

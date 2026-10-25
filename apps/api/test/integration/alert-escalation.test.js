@@ -100,11 +100,11 @@ describe('ESCALATION_CHECKS — an unacknowledged alert escalates on time, to th
     if (!dbAvailable) return t.skip('No database available');
     const alert = await raiseAlert('Sparking socket A');
 
-    await runEscalationChecks();
+    await runEscalationChecks(undefined, { orgId: org.id });
     assert.strictEqual((await prisma.alert.findUnique({ where: { id: alert.id } })).escalationLevel, 0, 'not yet due');
 
     await prisma.alert.update({ where: { id: alert.id }, data: { createdAt: minutesAgo(11) } });
-    await runEscalationChecks();
+    await runEscalationChecks(undefined, { orgId: org.id });
     const now = await prisma.alert.findUnique({ where: { id: alert.id } });
     assert.strictEqual(now.escalationLevel, 1);
     assert.ok(now.lastEscalatedAt);
@@ -118,7 +118,7 @@ describe('ESCALATION_CHECKS — an unacknowledged alert escalates on time, to th
     if (!dbAvailable) return t.skip('No database available');
     const alert = await raiseAlert('Sparking socket B');
     await prisma.alert.update({ where: { id: alert.id }, data: { createdAt: minutesAgo(11) } });
-    await runEscalationChecks();
+    await runEscalationChecks(undefined, { orgId: org.id });
 
     const forSupervisor = await prisma.notification.count({ where: { userId: supervisor.id, entityId: alert.id } });
     const forWorker = await prisma.notification.count({ where: { workerId: worker.id, entityId: alert.id } });
@@ -131,20 +131,47 @@ describe('ESCALATION_CHECKS — an unacknowledged alert escalates on time, to th
     assert.strictEqual(await prisma.notification.count({ where: { userId: otherSupervisor.id, entityId: alert.id } }), 0, 'a supervisor elsewhere is not');
   });
 
+  // A ticket raised by an alert rule's CREATE_TICKET action was bare: no assignee, no SLA
+  // deadline, no audit row and nobody told — unlike a ticket an admin raises — and the
+  // action's priority was never checked. [BUG-0044]
+  it('BUG-0044: the ticket an escalation raises is assigned to the location\'s supervisor, has an SLA deadline, is audited and the supervisor is told', async (t) => {
+    if (!dbAvailable) return t.skip('No database available');
+    const alert = await raiseAlert('Burning smell C');
+    await prisma.alert.update({ where: { id: alert.id }, data: { createdAt: minutesAgo(11) } });
+    await runEscalationChecks(undefined, { orgId: org.id });
+
+    const autoTicket = await prisma.ticket.findFirst({ where: { orgId: org.id, title: `[Auto] ${alert.title}` } });
+    assert.ok(autoTicket, 'CREATE_TICKET raised a ticket');
+    assert.strictEqual(autoTicket.assignedToId, supervisor.id, 'assigned to the supervisor covering the location');
+    assert.ok(autoTicket.slaDeadlineAt, 'it has an SLA deadline, as every other ticket does');
+    assert.strictEqual(await prisma.auditLog.count({ where: { orgId: org.id, entityId: autoTicket.id, action: 'ticket_created_by_alert' } }), 1, 'its creation is audited');
+    const told = await eventually(() => prisma.notification.findFirst({ where: { userId: supervisor.id, entityId: autoTicket.id, type: 'ticket_assigned' } }));
+    assert.ok(told, 'the supervisor is told about the ticket');
+  });
+
+  it('BUG-0044: a rule whose ticket action names an unknown priority is refused', async (t) => {
+    if (!dbAvailable) return t.skip('No database available');
+    const res = await app.inject({
+      method: 'POST', url: '/api/alert-rules', headers: { authorization: `Bearer ${adminToken}` },
+      payload: { name: 'Bad priority', trigger: 'TICKET_HIGH_PRIORITY', conditions: {}, actions: [{ type: 'CREATE_TICKET', priority: 'SUPER' }] }
+    });
+    assert.strictEqual(res.statusCode, 400, res.body);
+  });
+
   it('it re-escalates only after another full window, and stops at maxEscalations', async (t) => {
     if (!dbAvailable) return t.skip('No database available');
     const alert = await raiseAlert('Sparking socket C');
     await prisma.alert.update({ where: { id: alert.id }, data: { createdAt: minutesAgo(30) } });
-    await runEscalationChecks();
-    await runEscalationChecks();
+    await runEscalationChecks(undefined, { orgId: org.id });
+    await runEscalationChecks(undefined, { orgId: org.id });
     assert.strictEqual((await prisma.alert.findUnique({ where: { id: alert.id } })).escalationLevel, 1, 'the second run is inside the new window');
 
     await prisma.alert.update({ where: { id: alert.id }, data: { lastEscalatedAt: minutesAgo(11) } });
-    await runEscalationChecks();
+    await runEscalationChecks(undefined, { orgId: org.id });
     assert.strictEqual((await prisma.alert.findUnique({ where: { id: alert.id } })).escalationLevel, 2);
 
     await prisma.alert.update({ where: { id: alert.id }, data: { lastEscalatedAt: minutesAgo(60) } });
-    await runEscalationChecks();
+    await runEscalationChecks(undefined, { orgId: org.id });
     assert.strictEqual((await prisma.alert.findUnique({ where: { id: alert.id } })).escalationLevel, 2, 'maxEscalations = 2');
     assert.strictEqual(await prisma.notification.count({ where: { userId: admin.id, entityId: alert.id, type: 'escalation' } }), 2);
   });
@@ -160,7 +187,7 @@ describe('ESCALATION_CHECKS — an unacknowledged alert escalates on time, to th
     await prisma.alert.update({ where: { id: off.id }, data: { createdAt: minutesAgo(60) } });
     await prisma.alertRule.update({ where: { id: off.ruleId }, data: { isActive: false } });
     try {
-      await runEscalationChecks();
+      await runEscalationChecks(undefined, { orgId: org.id });
     } finally {
       await prisma.alertRule.update({ where: { id: off.ruleId }, data: { isActive: true } });
     }

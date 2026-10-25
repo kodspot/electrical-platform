@@ -3,13 +3,14 @@
 const crypto = require('crypto');
 const { z } = require('zod');
 const { prisma } = require('../lib/prisma');
-const { uploadToR2 } = require('../lib/r2');
+const { uploadToR2, getFromR2 } = require('../lib/r2');
 const { validateImageBuffer } = require('../errors');
 const { notifyAdmins, notifySupervisors, notifyWorkers, createNotification } = require('./notifications');
 const { notify } = require('../services/notification-service');
 const { escHtml } = require('../lib/email');
 const { getAssignedSupervisorIds, getAssignedWorkerIds, getLocationBreadcrumb } = require('../services/assignment-resolver');
 const { normalizeEnabledModules, isModuleEnabled } = require('../services/module-policy');
+const { STALE_TICKET_ERROR, updateTicketIfUnchanged } = require('../services/ticket-status');
 const {
   VALID_MODULES,
   DEFAULT_MODULE_ISSUES,
@@ -207,7 +208,8 @@ async function publicRoutes(fastify, opts) {
         module: fieldValue(request.body.module) || 'ele',
         description: fieldValue(request.body.description)?.trim() || null,
         guestName: fieldValue(request.body.guestName)?.trim() || null,
-        guestPhone: fieldValue(request.body.guestPhone)?.trim() || null
+        guestPhone: fieldValue(request.body.guestPhone)?.trim() || null,
+        consent: fieldValue(request.body.consent) === 'true'
       };
 
       const imageFile = request.body.image;
@@ -236,7 +238,8 @@ async function publicRoutes(fastify, opts) {
         module: z.string().max(20).default('ele'),
         description: z.string().max(500).optional(),
         guestName: z.string().max(100).optional(),
-        guestPhone: z.string().max(20).optional()
+        guestPhone: z.string().max(20).optional(),
+        consent: z.boolean().optional()
       });
       data = schema.parse(request.body);
     }
@@ -250,6 +253,12 @@ async function publicRoutes(fastify, opts) {
     const uuidRe = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
     if (!uuidRe.test(data.locationId)) {
       return reply.code(400).send({ error: 'Invalid locationId format' });
+    }
+
+    // A name or phone only with the guest's consent — checked here, not just by the page, as the
+    // privacy policy promises; the consent is kept in the complaint's audit row. [BUG-0060]
+    if ((data.guestName || data.guestPhone) && data.consent !== true) {
+      return reply.code(400).send({ error: 'Please check the consent box to submit your contact info.' });
     }
 
     // Sanitize phone — only keep digits, +, -, spaces
@@ -443,7 +452,7 @@ async function publicRoutes(fastify, opts) {
         action: 'ticket_public_create',
         entityType: 'Ticket',
         entityId: ticket.id,
-        newValue: { issueType, locationName: location.name, guestName: data.guestName }
+        newValue: { issueType, locationName: location.name, guestName: data.guestName, consent: data.consent === true }
       }
     });
 
@@ -556,7 +565,9 @@ async function publicRoutes(fastify, opts) {
       ticket: {
         title: ticket.title,
         issueType: ticket.issueType,
-        resolvedImageUrl: ticket.resolvedImageUrl,
+        // The guest has no sign-in, so /api/images is closed to them: the review link itself
+        // serves the proof photo (route below). [BUG-0041]
+        photoUrl: ticket.resolvedImageUrl ? `/api/public/review/${token}/photo` : null,
         resolvedNote: ticket.resolvedNote,
         resolvedAt: ticket.resolvedAt,
         createdAt: ticket.createdAt,
@@ -566,6 +577,43 @@ async function publicRoutes(fastify, opts) {
       },
       expiresAt: ticket.reviewExpiresAt
     };
+  });
+
+  // ── Public: the proof photo of the resolution under review ──
+  // For the guest who holds the review link — only that ticket's photo, only while its review
+  // is open and in date. The token in the path never reaches a log line (the request logger
+  // records the route template; Caddy redacts /review/...). [BUG-0041]
+  fastify.get('/public/review/:token/photo', {
+    config: {
+      rateLimit: {
+        max: 30,
+        timeWindow: 900000,
+        keyGenerator: (req) => req.ip
+      }
+    }
+  }, async (request, reply) => {
+    const { token } = request.params;
+    if (!token || token.length !== 64) return reply.code(404).send({ error: 'Not found' });
+
+    const ticket = await prisma.ticket.findUnique({
+      where: { reviewToken: token },
+      select: { orgId: true, resolvedImageUrl: true, reviewStatus: true, reviewExpiresAt: true }
+    });
+    const open = ticket && ticket.reviewStatus === 'PENDING' && !(ticket.reviewExpiresAt && new Date() > ticket.reviewExpiresAt);
+    const key = open && ticket.resolvedImageUrl ? ticket.resolvedImageUrl.replace(/^\/images\//, '') : '';
+    if (!key || key.includes('..') || !key.startsWith(`uploads/${ticket.orgId}/`)) {
+      return reply.code(404).send({ error: 'Not found' });
+    }
+
+    try {
+      const image = await getFromR2(key);
+      reply.header('Content-Type', image.ContentType || 'image/webp');
+      reply.header('Cache-Control', 'private, max-age=300');
+      return reply.send(image.Body);
+    } catch (err) {
+      if (err.name === 'NoSuchKey' || err.$metadata?.httpStatusCode === 404) return reply.code(404).send({ error: 'Not found' });
+      throw err;
+    }
   });
 
   // ── Public: Submit review (confirm/reject resolution) ──
@@ -631,8 +679,10 @@ async function publicRoutes(fastify, opts) {
     const now = new Date();
 
     if (data.action === 'CONFIRM') {
-      await prisma.ticket.update({
-        where: { reviewToken: token },
+      // Only if the ticket and its review are still as read: a supervisor reopening it at the
+      // same moment withdraws the review instead of both landing. [BUG-0038]
+      const confirmed = await updateTicketIfUnchanged(prisma, ticket, {
+        where: { reviewToken: token, reviewStatus: 'PENDING' },
         data: {
           reviewStatus: 'CONFIRMED',
           reviewNote: data.note?.trim() || null,
@@ -640,6 +690,7 @@ async function publicRoutes(fastify, opts) {
           status: 'CLOSED'
         }
       });
+      if (!confirmed) return reply.code(409).send({ error: STALE_TICKET_ERROR });
 
       await prisma.auditLog.create({
         data: {
@@ -659,18 +710,25 @@ async function publicRoutes(fastify, opts) {
     // resolved it are disconnected too, as the supervisor's reopen does: still connected, the
     // ticket stayed out of their pool and their app showed it "Done" with no way to pick it
     // up again. The resolution itself (photo, note) and the guest's verdict stay. [BUG-0026]
+    // Its resolution and verification times go, as on every other reopen ([WP10]): an open
+    // ticket must not count as resolved in the reports. [BUG-0042]
     const resolverIds = (ticket.resolvedWorkers || []).map((w) => w.id);
-    await prisma.ticket.update({
-      where: { reviewToken: token },
+    const rejected = await updateTicketIfUnchanged(prisma, ticket, {
+      where: { reviewToken: token, reviewStatus: 'PENDING' },
       data: {
         reviewStatus: 'REJECTED',
         reviewNote: data.note?.trim() || null,
         reviewedAt: now,
         status: 'OPEN',
         assignedToId: null,
-        resolvedWorkers: { set: [] }
+        resolvedWorkers: { set: [] },
+        resolvedAt: null,
+        verifiedAt: null,
+        verifiedById: null,
+        verifyNote: null
       }
     });
+    if (!rejected) return reply.code(409).send({ error: STALE_TICKET_ERROR });
 
     await prisma.auditLog.create({
       data: {

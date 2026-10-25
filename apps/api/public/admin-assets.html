@@ -209,7 +209,7 @@
 </div>
 
 <script src="/js/offline-sync.js?v=1"></script>
-<script src="/js/app.js?v=14"></script>
+<script src="/js/app.js?v=16"></script>
 <script>
 if (!App.initAdmin('assets')) throw '';
 App.initNotifications(App.apiFetch);
@@ -320,7 +320,7 @@ async function viewDetail(id){
   if(a.images && a.images.length){
     h += '<div style="font-weight:600;font-size:.82rem;margin-bottom:.3rem">Photos ('+a.images.length+')</div>';
     h += '<div class="img-grid">';
-    a.images.forEach(function(img){ h+='<img src="'+esc(img.imageUrl)+'" title="'+(img.caption?esc(img.caption):'')+'">'; });
+    a.images.forEach(function(img){ h+='<img src="'+esc(App.imgUrl(img.imageUrl))+'" title="'+(img.caption?esc(img.caption):'')+'">'; });
     h += '</div>';
   }
 
@@ -443,6 +443,7 @@ async function deleteAsset(id, name){
   if(!confirm('Delete/decommission "'+name+'"?')) return;
   var res = await App.apiFetch('/assets/'+id, {method:'DELETE'});
   if(res && res.ok){ var d=await res.json(); App.toast(d.message,'success'); loadAssets(currentPage); }
+  else if(res) App.toastFailure(res, 'Could not delete the asset');
 }
 
 // ── CSV ──
@@ -455,7 +456,7 @@ async function exportCSV(){
   if(!res) return;
   var blob = await res.blob();
   var url = URL.createObjectURL(blob);
-  var a = document.createElement('a'); a.href=url; a.download='assets-'+new Date().toISOString().split('T')[0]+'.csv'; a.click();
+  var a = document.createElement('a'); a.href=url; a.download='assets-'+App.localDate(new Date())+'.csv'; a.click();
   URL.revokeObjectURL(url);
 }
 

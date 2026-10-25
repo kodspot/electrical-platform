@@ -46,12 +46,41 @@ const EDITABLE_TICKET_STATUSES = Object.freeze([
   TICKET_STATUSES.CLOSED
 ]);
 
+const TICKET_PRIORITIES = Object.freeze(['LOW', 'NORMAL', 'HIGH', 'URGENT']);
+
+// SLA deadlines by priority (milliseconds) — shared by every path that creates a ticket.
+const SLA_MS = Object.freeze({ URGENT: 2 * 60 * 60 * 1000, HIGH: 4 * 60 * 60 * 1000, NORMAL: 24 * 60 * 60 * 1000, LOW: 72 * 60 * 60 * 1000 });
+
+function getSlaDeadline(priority) {
+  const ms = SLA_MS[priority] || SLA_MS.NORMAL;
+  return new Date(Date.now() + ms);
+}
+
 function isOpenLikeStatus(status) {
   return OPEN_TICKET_STATUSES.includes(status);
 }
 
 function isActiveLikeStatus(status) {
   return ACTIVE_TICKET_STATUSES.includes(status);
+}
+
+const STALE_TICKET_ERROR = 'This ticket was changed by someone else just now. Reload it and try again.';
+
+/**
+ * Compare-and-set for ticket transitions: the update applies only if the ticket's status is
+ * still the one the route read and checked (plus any extra `where` conditions; a route may
+ * widen `status` to the set it accepts). When two people act on one ticket at once — verify
+ * vs reject, a double verify, two supervisors' pickups — only one write lands; the other gets
+ * null and answers 409 STALE_TICKET_ERROR. Before, every request "succeeded" and the last
+ * write won. [BUG-0038]
+ */
+async function updateTicketIfUnchanged(client, ticket, args) {
+  try {
+    return await client.ticket.update({ ...args, where: { status: ticket.status, ...(args.where || {}), id: ticket.id } });
+  } catch (err) {
+    if (err && err.code === 'P2025') return null; // the status (or a condition) no longer matches
+    throw err;
+  }
 }
 
 module.exports = {
@@ -62,5 +91,9 @@ module.exports = {
   DONE_TICKET_STATUSES,
   EDITABLE_TICKET_STATUSES,
   isOpenLikeStatus,
-  isActiveLikeStatus
+  isActiveLikeStatus,
+  STALE_TICKET_ERROR,
+  updateTicketIfUnchanged,
+  TICKET_PRIORITIES,
+  getSlaDeadline
 };

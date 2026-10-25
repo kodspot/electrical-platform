@@ -34,6 +34,24 @@ All API calls go through `App.apiFetch(path, opts)` (and its JSON variant). This
 owns: attaching the auth header for the active role, injecting `X-Org-Id` when a SuperAdmin
 has an org selected, and handling `401` centrally. New page code calls `apiFetch` rather
 than using `fetch` directly, so auth and tenant-context handling stay in a single place.
+After a network error it retries GET and HEAD only (up to three attempts). A submission
+(POST/PATCH/DELETE) may already have reached the server, so it is not repeated: the call
+fails with "Network error" (BUG-0047). A `503` is retried for every method, because the
+server's circuit breaker refused it before doing any work.
+
+## Escaping text into markup
+
+Pages build HTML strings from data that org admins and guests type (names, notes, titles),
+and super-admins open those pages for every org. Two helpers in `public/js/app.js` cover the
+two contexts:
+- **`App.esc(text)`** for element content and for quoted attribute values
+  (`title="…"`, `data-name="…"`, `value="…"`). It escapes `& < > " '`.
+- **`App.escJs(text)`** for a JS string argument inside an inline handler, as in
+  `onclick="fn('" + App.escJs(name) + "')"`. The browser HTML-decodes the attribute before
+  running it, so this escapes for JS first and then for HTML.
+
+Never pass `esc()` output to an inline handler. Text set through `textContent` or `.value`
+needs no escaping. `test/public-escaping.test.js` enforces this (BUG-0028).
 
 ## Module-scoped routing & PWA {#module-scoped-routing--pwa}
 
@@ -64,12 +82,31 @@ queue** (`kodspot-sync` DB):
 The security-relevant contract here: **queued requests never persist a bearer token**;
 authentication is re-established at replay time.
 
+**Each request uses its own role's session.** One phone can hold several sessions, for
+example a supervisor's and an admin's.
+- A queued entry records the role that queued it (`scope`; `App.enqueueRetry` fills in the
+  page's own role).
+- A queued entry is replayed only with that role's token. If that role is not signed in, the
+  entry waits.
+- Photo URLs (`App.imgUrl`) carry the session of the page they are on.
+- Before BUG-0054, both took the first token found. That could send a supervisor's inspection
+  in as the admin.
+
 ## Static delivery & caching
 
 Static files are served by `@fastify/static` from `public/` (`plugins/content.js`). Caddy
 sets the caching policy (`infrastructure/Caddyfile`): long cache for `/css` and `/js`,
 `no-store` for org-scoped admin/supervisor/superadmin pages and for every service worker and
-manifest, so a client never runs a stale SW. CSP is set by Helmet in the backend
+manifest, so a client never runs a stale SW.
+
+**When a file in `public/js/` or `public/css/` changes, bump its `?v=`.**
+- Browsers keep `/js` and `/css` for a day (`max-age=86400`).
+- Both service workers serve them from cache first, then refresh in the background.
+- So a changed file reaches people only through a new URL.
+- Bump the version on every page that loads the file, and in both precache lists:
+  `public/sw.js` and the module worker in `src/routes/pages.js`. Bump both `CACHE_NAME`s too,
+  so the old entries are dropped.
+- `test/asset-versions.test.js` fails when the pages and the workers disagree. CSP is set by Helmet in the backend
 (`plugins/security.js`), not duplicated in Caddy.
 
 ## Related

@@ -33,6 +33,7 @@ and `config/env.js`; this table describes behavior, not values.
 |---|---|---|
 | `NODE_ENV` | Query-log verbosity (`lib/prisma.js`), CORS restriction (`plugins/security.js`), HSTS (`plugins/security.js`) | Must be exactly `production` in real deploys. A value outside `production`/`development`/`test` triggers a startup **warning** (catches typos silently disabling prod-safe defaults). Unset = local-dev convention. |
 | `APP_URL`, `COOKIE_DOMAIN`, `PORT` | Public URL, cookie scope, listen port | `APP_URL` defaults to `http://localhost:$PORT` |
+| `TZ` | The server's time zone. A calendar day in every date filter (`from`/`to` = `YYYY-MM-DD`) is a day in this zone: `lib/dates.js` `dayRange` (BUG-0055) | Set to `Asia/Kolkata` by `docker-compose.yml`, the zone the users are in. One zone for every organization: there is no per-org time zone (PAR-10/07) |
 
 ## Image storage driver
 

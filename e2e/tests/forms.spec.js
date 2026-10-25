@@ -6,8 +6,12 @@
 // 409 rules) behave as the API says. Runs in the explorer org (asset module on), desktop project
 // only; every name is unique to the run. Asserts what the user sees AND the database behind it.
 
+const path = require('node:path');
 const { test, expect } = require('@playwright/test');
-const { seed, db, signIn, signInElectrician, orgPage, pickOption } = require('../support/app');
+const { seed, db, apiLogin, signIn, signInElectrician, orgPage, pickOption } = require('../support/app');
+
+// The app's own modules, for the tests that make an account or check a stored hash.
+const apiRequire = (rel) => require(path.join(__dirname, '..', '..', 'apps', 'api', rel));
 
 const confirmYes = (page) => page.locator('#_cfmYes').click();
 
@@ -178,6 +182,69 @@ test.describe('Forms — admin, supervisor, electrician', () => {
       const l = await db().location.findUnique({ where: { id: room.id } });
       return [l.notes || null, l.parentId];
     }).toEqual([null, null]);
+  });
+
+  // Row actions acted only on success: when the server refused (here: another admin removed
+  // the thing a moment earlier) the page said nothing and the row stayed. [BUG-0048]
+  test('BUG-0048: a row action the server refuses says why — acknowledge an alert, delete a rule, flag an inspection', async ({ page }) => {
+    const name = `Form Rule 48 ${s.run}`;
+    const rule = await db().alertRule.create({ data: { orgId: x.org.id, name, trigger: 'TICKET_HIGH_PRIORITY', conditions: {}, actions: [{ type: 'NOTIFY_ADMINS' }] } });
+    const alert = await db().alert.create({ data: { orgId: x.org.id, ruleId: rule.id, trigger: 'TICKET_HIGH_PRIORITY', severity: 'WARNING', title: `Form alert 48 ${s.run}` } });
+    const room = await db().location.create({ data: { orgId: x.org.id, name: `Form room 48 ${s.run}`, type: 'ROOM', qrCode: `F48${s.run}`.slice(0, 8).toUpperCase() } });
+    const inspection = await db().electricalInspection.create({ data: { orgId: x.org.id, locationId: room.id, supervisorId: x.supervisor.id, shift: 'GENERAL', status: 'SUBMITTED', inspectedAt: new Date() } });
+    page.on('dialog', (d) => d.accept());
+    await signIn(page, 'admin', x.admin, slug);
+
+    await page.goto(orgPage(slug, 'admin-alerts'));
+    await page.locator('.tab', { hasText: 'Alert History' }).click();
+    const alertCard = page.locator('.alert-card', { hasText: `Form alert 48 ${s.run}` });
+    await expect(alertCard).toBeVisible();
+    await db().alert.delete({ where: { id: alert.id } });
+    await alertCard.getByRole('button', { name: 'Acknowledge' }).click();
+    await expect(page.locator('.toast-error', { hasText: 'Alert not found' })).toBeVisible();
+
+    await page.locator('.tab', { hasText: 'Rules' }).first().click();
+    const ruleCard = page.locator('.rule-card', { hasText: name });
+    await expect(ruleCard).toBeVisible();
+    await db().alertRule.delete({ where: { id: rule.id } });
+    await ruleCard.getByRole('button', { name: 'Delete' }).click();
+    await expect(page.locator('.toast-error', { hasText: 'Rule not found' })).toBeVisible();
+
+    await page.goto(orgPage(slug, 'admin-electrical'));
+    await page.locator('tr', { hasText: `Form room 48 ${s.run}` }).getByRole('button', { name: 'View' }).click();
+    await expect(page.locator('#flagBtn')).toBeVisible();
+    await db().electricalInspection.delete({ where: { id: inspection.id } });
+    await page.locator('#flagBtn').click();
+    await expect(page.locator('.toast-error', { hasText: 'Inspection not found' })).toBeVisible();
+    await db().location.delete({ where: { id: room.id } });
+  });
+
+  // The form offered only Notify Admins / Notify Supervisors / Create Ticket; the API also takes
+  // "notify the location's supervisors / electricians" (what BUG-0019 made escalations reach).
+  // Editing a rule that had them rebuilt the actions from the checkboxes and dropped them,
+  // silently. [BUG-0043]
+  test('BUG-0043: editing an alert rule keeps its "location\'s supervisors / electricians" actions', async ({ page }) => {
+    const name = `Form Rule 43 ${s.run}`;
+    await db().alertRule.create({
+      data: {
+        orgId: x.org.id, name, trigger: 'TICKET_HIGH_PRIORITY', conditions: {},
+        actions: [{ type: 'NOTIFY_ADMINS' }, { type: 'NOTIFY_ASSIGNED_SUPERVISORS' }],
+        escalateAfterMinutes: 30, maxEscalations: 1, escalationActions: [{ type: 'NOTIFY_ASSIGNED_WORKERS' }]
+      }
+    });
+    await signIn(page, 'admin', x.admin, slug);
+    await page.goto(orgPage(slug, 'admin-alerts'));
+    const card = page.locator('.rule-card', { hasText: name });
+    await expect(card).toContainText('Location Supervisors');
+    await card.getByRole('button', { name: 'Edit' }).click();
+    await expect(page.locator('#actNotifyAssignedSups')).toBeChecked();
+    await expect(page.locator('#escNotifyAssignedWorkers')).toBeChecked();
+    await page.locator('#rfDesc').fill('Edited');
+    await page.locator('#ruleSubmitBtn').click();
+    await expect.poll(async () => (await db().alertRule.findFirst({ where: { orgId: x.org.id, name } })).description).toBe('Edited');
+    const saved = await db().alertRule.findFirst({ where: { orgId: x.org.id, name } });
+    expect(saved.actions.map((a) => a.type).sort()).toEqual(['NOTIFY_ADMINS', 'NOTIFY_ASSIGNED_SUPERVISORS']);
+    expect(saved.escalationActions.map((a) => a.type)).toEqual(['NOTIFY_ASSIGNED_WORKERS']);
   });
 
   test('BUG-0021: an alert rule\'s description can be cleared; a rule needs a trigger; acknowledging an alert', async ({ page }) => {
@@ -434,4 +501,161 @@ test.describe('Forms — admin, supervisor, electrician', () => {
     await confirmYes(page);
     await expect.poll(async () => (await db().organization.findUnique({ where: { id: org.id } }))?.status ?? 'GONE').not.toBe('ACTIVE');
   });
+
+  test('BUG-0028: names with quotes, backslashes or markup render as text — no injected attribute or handler code runs', async ({ page, request }) => {
+    const { token } = await apiLogin(request, x.admin);
+    const headers = { authorization: `Bearer ${token}` };
+    const locName = `Loc28 ${s.run}" data-bug0028="1`;
+    const empId = `XSS-${s.run}`;
+    const elecName = `Elec28 ${s.run}\\');window.__bug0028=1;//`;
+    expect((await request.post('/api/locations', { headers, data: { name: locName, type: 'ROOM' } })).ok()).toBeTruthy();
+    expect((await request.post('/api/workers', { headers, data: { name: elecName, employeeId: empId } })).ok()).toBeTruthy();
+    try {
+      await signIn(page, 'admin', x.admin, slug);
+      await page.goto(orgPage(slug, 'admin-locations'));
+      await expect(page.getByText(locName).first()).toBeVisible();
+      await expect(page.locator('[data-bug0028]')).toHaveCount(0);
+
+      await page.goto(orgPage(slug, 'admin-workers'));
+      await page.locator('#workerBody tr', { hasText: empId }).getByRole('button', { name: 'Locations' }).click();
+      await expect(page.locator('#floorTitle')).toHaveText(`Assign Floors — ${elecName}`);
+      expect(await page.evaluate(() => window.__bug0028)).toBeUndefined();
+    } finally {
+      await db().worker.deleteMany({ where: { employeeId: empId } });
+      await db().location.deleteMany({ where: { orgId: x.org.id, name: locName } });
+    }
+  });
+
+  // The reset pages said "request a new reset from the sign-in page", but no sign-in page could:
+  // forgot-password and worker-forgot-pin had no caller in the app, and the super-admin page's
+  // "Run one-time setup" linked to a page that does not exist. [BUG-0051]
+  test('BUG-0051: a forgotten password or PIN can be requested from the sign-in pages', async ({ page, request }) => {
+    const { token } = await apiLogin(request, x.admin);
+    const empId = `FORGOT-${s.run}`;
+    const created = await request.post('/api/workers', { headers: { authorization: `Bearer ${token}` }, data: { name: `Forgot Elec ${s.run}`, employeeId: empId, email: `forgot-${s.run}@example.test` } });
+    expect(created.ok(), await created.text()).toBeTruthy();
+    try {
+      // Staff: "Forgot password?" on the admin sign-in page, then the email → the generic answer.
+      await page.goto(orgPage(slug, 'admin-login'));
+      await page.getByRole('link', { name: 'Forgot password?' }).click();
+      await expect(page).toHaveURL(/\/reset-password$/);
+      await page.locator('#email').fill(x.admin.email);
+      await page.getByRole('button', { name: 'Send reset link' }).click();
+      await expect(page.getByTestId('reset-done')).toContainText('If an account exists');
+      await expect.poll(async () => (await db().user.findUnique({ where: { id: x.admin.id }, select: { resetToken: true } })).resetToken).toMatch(/^[0-9a-f]{64}$/);
+
+      await page.goto(orgPage(slug, 'supervisor-login'));
+      await expect(page.getByRole('link', { name: 'Forgot password?' })).toHaveAttribute('href', `/reset-password?org=${slug}`);
+
+      // Electrician: "Forgot PIN?" then the Employee ID; the organization comes from the sign-in page.
+      await page.goto(orgPage(slug, 'electrician-login'));
+      await page.getByRole('link', { name: 'Forgot PIN?' }).click();
+      await expect(page).toHaveURL(/\/worker-reset-pin$/);
+      await expect(page.locator('#orgCode')).toBeHidden();
+      await page.locator('#employeeId').fill(empId);
+      await page.getByRole('button', { name: 'Send reset link' }).click();
+      await expect(page.getByTestId('reset-done')).toContainText('PIN reset link');
+      await expect.poll(async () => (await db().worker.findFirst({ where: { orgId: x.org.id, employeeId: empId }, select: { resetToken: true } })).resetToken).toMatch(/^[0-9a-f]{64}$/);
+    } finally {
+      await db().worker.deleteMany({ where: { orgId: x.org.id, employeeId: empId } });
+    }
+  });
+
+  // The setup page was removed on purpose once production was set up (b9d9d8a); only the
+  // hint's link to it was left. The hint now says who does the setup, and links nowhere.
+  test('BUG-0051: super admin, none set up yet: the hint says the operator sets it up — no dead link, no setup from the page', async ({ page }) => {
+    // Stubbed: the e2e database already has a super admin, and keeps it.
+    let bootstrapCalled = false;
+    await page.route('**/api/auth/login', (r) => r.fulfill({ status: 404, contentType: 'application/json', body: JSON.stringify({ error: 'No SuperAdmin account exists. Use /auth/bootstrap first.' }) }));
+    await page.route('**/api/auth/bootstrap', (r) => { bootstrapCalled = true; return r.abort(); });
+    await page.goto('/superadmin-login');
+    await page.locator('#adminKey').fill('a-key-typed-by-the-operator');
+    await page.getByRole('button', { name: 'Sign In' }).click();
+    const hint = page.locator('#setupHint');
+    await expect(hint).toContainText('The operator creates it once on the server');
+    await expect(hint.locator('a, button')).toHaveCount(0);
+    await expect(page.locator('a[href="/superadmin-setup"]')).toHaveCount(0);
+    expect(bootstrapCalled).toBe(false);
+  });
+
+  // The profile modal's badge mapped SUPER_ADMIN and SUPERVISOR and called everyone else
+  // "Admin" — electricians included. [BUG-0053]
+  test('BUG-0053: the profile of an electrician says Electrician, not Admin', async ({ page }) => {
+    await signInElectrician(page, x.worker, slug);
+    await page.goto(orgPage(slug, 'electrician-tickets'));
+    await page.locator('#userMenuTrigger').click();
+    await page.locator('#userMenuProfile').click();
+    await expect(page.locator('.profile-role-badge')).toHaveText('Electrician');
+  });
+
+  // PATCH /auth/password and /auth/worker-pin had no screen: nobody could change their own
+  // password or PIN while signed in. The profile modal now can; the session goes on with the
+  // token the server returns, and a wrong current PIN (401) says so instead of signing the
+  // electrician out. [BUG-0052]
+  for (const role of ['admin', 'supervisor', 'electrician']) {
+    test(`BUG-0052: ${role} › change my ${role === 'electrician' ? 'PIN' : 'password'} from the profile; a wrong current one is refused; the session goes on`, async ({ page }) => {
+      // A dedicated account, so no seeded password changes. Its session is signed here with the
+      // run's secret instead of a login: the suite stays inside the 10-logins-per-15-minutes limit.
+      const f = apiRequire('scenarios/factories');
+      const jwt = apiRequire('node_modules/jsonwebtoken');
+      const bcrypt = apiRequire('node_modules/bcrypt');
+      const isElec = role === 'electrician';
+      const [oldSecret, newSecret] = isElec ? ['246802', '135791'] : ['OldPass123', 'NewPass456'];
+      const account = isElec
+        ? await f.createTestWorker(x.org.id, { pin: oldSecret, name: `PIN Elec ${s.run}`, employeeId: `PIN-${s.run}` })
+        : await f.createTestUser(x.org.id, { role: role.toUpperCase(), password: oldSecret, name: `Pw ${role} ${s.run}`, email: `pw-${role}-${s.run}@example.test` });
+      const token = isElec
+        ? jwt.sign({ workerId: account.id, orgId: x.org.id }, process.env.JWT_SECRET, { expiresIn: '1h' })
+        : jwt.sign({ userId: account.id, orgId: x.org.id, role: account.role }, process.env.JWT_SECRET, { expiresIn: '1h' });
+      const key = { admin: 'token', supervisor: 'sup_token', electrician: 'elec_token' }[role];
+      const userKey = { admin: 'user', supervisor: 'sup_user', electrician: 'elec_user' }[role];
+      // Set once: a reload must keep the token the page stored after the change.
+      await page.addInitScript(({ key, userKey, token, user, slug }) => {
+        if (localStorage.getItem(key)) return;
+        localStorage.setItem(key, token);
+        localStorage.setItem(userKey, JSON.stringify(user));
+        localStorage.setItem('orgSlug', slug);
+        localStorage.setItem('activeModule', 'ele');
+      }, { key, userKey, token, slug, user: { id: account.id, name: account.name, role: account.role, orgId: x.org.id, orgSlug: slug } });
+      const home = { admin: 'admin-dashboard', supervisor: 'supervisor-tickets', electrician: 'electrician-tickets' }[role];
+      const label = isElec ? 'PIN' : 'password';
+      try {
+        await page.goto(orgPage(slug, home));
+        await page.locator('#userMenuTrigger').click();
+        await page.locator('#userMenuProfile').click();
+        await page.getByRole('button', { name: `Change ${label}` }).click();
+
+        await page.locator('#secretCurrent').fill(isElec ? '000000' : 'WrongPass1');
+        await page.locator('#secretNew').fill(newSecret);
+        await page.locator('#secretConfirm').fill(newSecret);
+        await page.getByRole('button', { name: 'Save' }).click();
+        await expect(page.locator('#secretError')).toContainText(`Current ${label} is incorrect`);
+        await expect(page).toHaveURL(new RegExp(`/${home}$`));
+
+        await page.locator('#secretCurrent').fill(oldSecret);
+        await page.getByRole('button', { name: 'Save' }).click();
+        await expect(page.locator('.toast-success', { hasText: `${isElec ? 'PIN' : 'Password'} changed` })).toBeVisible();
+        const row = isElec
+          ? await db().worker.findUnique({ where: { id: account.id }, select: { pinHash: true } })
+          : await db().user.findUnique({ where: { id: account.id }, select: { passwordHash: true } });
+        expect(await bcrypt.compare(newSecret, isElec ? row.pinHash : row.passwordHash)).toBe(true);
+        expect(await page.evaluate((k) => localStorage.getItem(k), key)).not.toBe(token);
+
+        // The old session ended with the change; the page goes on with the new token.
+        await page.reload();
+        await expect(page.locator('#userMenuTrigger')).toBeVisible();
+        const status = (t) => page.evaluate(async ({ url, t }) => (await fetch(url, { headers: { Authorization: `Bearer ${t}` } })).status,
+          { url: isElec ? '/api/auth/worker-me' : '/api/auth/me', t });
+        expect(await status(await page.evaluate((k) => localStorage.getItem(k), key))).toBe(200);
+        expect(await status(token)).toBe(401);
+        await expect(page).toHaveURL(new RegExp(`/${home}$`));
+      } finally {
+        if (isElec) await db().worker.deleteMany({ where: { id: account.id } });
+        else {
+          await db().auditLog.deleteMany({ where: { actorId: account.id } });
+          await db().user.deleteMany({ where: { id: account.id } });
+        }
+      }
+    });
+  }
 });

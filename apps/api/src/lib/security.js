@@ -30,9 +30,31 @@ function hashAdminKey(key) {
   return crypto.createHmac('sha256', process.env.COOKIE_SECRET).update(key).digest('hex');
 }
 
+// Options for every jwt.verify: the app signs HS256 only, so nothing else is accepted —
+// jsonwebtoken would otherwise take any HMAC algorithm for the secret (PRA-07 L3). [BUG-0046]
+const JWT_VERIFY_OPTIONS = Object.freeze({ algorithms: ['HS256'] });
+
+// Password/PIN reset tokens are stored as their SHA-256 digest: the e-mailed token is the
+// credential, and a database read (or a backup) must not hand it over. A 256-bit random
+// token needs no slow hash. [BUG-0034]
+function hashResetToken(token) {
+  return crypto.createHash('sha256').update(String(token)).digest('hex');
+}
+
+// The Worker fields an org admin or super-admin may see: the profile, never credential
+// material — the PIN hash, a pending reset token and its expiry, the session cut-off. [BUG-0031]
+const WORKER_PROFILE_SELECT = Object.freeze({
+  id: true, orgId: true, employeeId: true, name: true, phone: true, email: true, address: true,
+  department: true, designation: true, dateOfBirth: true, dateOfJoin: true, gender: true,
+  bloodGroup: true, aadharNo: true, notes: true, isActive: true, createdAt: true, updatedAt: true
+});
+
 module.exports = {
   BCRYPT_COST,
   COOKIE_CONFIG,
   hashAdminKey,
-  passwordSchema
+  hashResetToken,
+  JWT_VERIFY_OPTIONS,
+  passwordSchema,
+  WORKER_PROFILE_SELECT
 };

@@ -30,9 +30,11 @@
     <button type="submit" class="btn btn-sa btn-block" id="saBtn">Sign In</button>
   </form>
 
+  <!-- No setup screen: the one-time page was removed on purpose once production was set up
+       (b9d9d8a); this hint still linked to it. docs/DEPLOYMENT.md has the step. [BUG-0051] -->
   <div id="setupHint" style="display:none;margin-top:var(--sp-lg);font-size:.82rem;color:#3730A3;background:#EEF2FF;border:1px solid #C7D2FE;border-radius:8px;padding:.75rem 1rem;text-align:center">
-    No Super Admin account found.<br>
-    <a href="/superadmin-setup" style="color:#4338CA;font-weight:600">Run one-time setup &rarr;</a>
+    No Super Admin account exists yet.<br>
+    The operator creates it once on the server (see the deployment guide), then signs in here with the same key.
   </div>
 
   <p style="margin-top:var(--sp-lg);font-size:.8rem;color:var(--text-light);text-align:center">
@@ -41,7 +43,7 @@
 </div>
 
 <script src="/js/offline-sync.js?v=1"></script>
-<script src="/js/app.js?v=14"></script>
+<script src="/js/app.js?v=16"></script>
 <script>
 var $ = App.$;
 

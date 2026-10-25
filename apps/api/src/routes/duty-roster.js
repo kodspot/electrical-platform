@@ -2,6 +2,8 @@
 
 const { z } = require('zod');
 const { prisma } = require('../lib/prisma');
+const { localDateKey } = require('../lib/dates');
+const { auditStaffAction } = require('../services/audit');
 const { authenticateJWT, requirePolicy } = require('../middleware/auth');
 const { getAssignedWorkerIds } = require('../services/assignment-resolver');
 
@@ -95,14 +97,12 @@ async function dutyRosterRoutes(fastify) {
       return reply.code(400).send({ error: 'Invalid date' });
     }
 
-    // Only allow today or yesterday for supervisors
+    // Only allow today or yesterday for supervisors — yesterday as a local calendar date, not
+    // the UTC one (two days back, until 05:30 in India). [BUG-0057]
     const dateObj = new Date(data.date + 'T00:00:00Z');
-    const today = new Date();
-    today.setUTCHours(0, 0, 0, 0);
-    const yesterday = new Date(today);
-    yesterday.setDate(yesterday.getDate() - 1);
+    const yesterday = localDateKey(new Date(Date.now() - 86400000));
 
-    if (request.user.role !== 'ADMIN' && dateObj < yesterday) {
+    if (request.user.role !== 'ADMIN' && data.date < yesterday) {
       return reply.code(400).send({ error: 'Can only create rosters for today or yesterday' });
     }
 
@@ -141,6 +141,7 @@ async function dutyRosterRoutes(fastify) {
       }
     });
 
+    await auditStaffAction(request, { action: 'roster_created', entityType: 'DutyRoster', entityId: roster.id, newValue: { date: data.date, shift: data.shift, locationId: data.locationId } });
     return roster;
   });
 
@@ -179,6 +180,7 @@ async function dutyRosterRoutes(fastify) {
       }
     });
 
+    await auditStaffAction(request, { action: 'roster_location_changed', entityType: 'DutyRoster', entityId: id, oldValue: { locationId: roster.locationId }, newValue: { locationId: data.locationId } });
     return updated;
   });
 
@@ -234,6 +236,7 @@ async function dutyRosterRoutes(fastify) {
       }
     });
 
+    await auditStaffAction(request, { action: 'roster_workers_changed', entityType: 'DutyRoster', entityId: id, newValue: { workerIds: data.workerIds } });
     return updated;
   });
 
@@ -319,6 +322,7 @@ async function dutyRosterRoutes(fastify) {
     }
 
     await prisma.dutyRoster.delete({ where: { id } });
+    await auditStaffAction(request, { action: 'roster_deleted', entityType: 'DutyRoster', entityId: id, oldValue: { date: roster.date, shift: roster.shift, locationId: roster.locationId } });
     return { success: true };
   });
 }

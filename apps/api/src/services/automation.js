@@ -5,6 +5,7 @@ const { runExclusive, LOCK_KEYS } = require('../lib/scheduler-lock');
 const { resolveAiCredentials, callAiProvider } = require('../lib/ai-provider');
 const { getShiftConfigs } = require('./shift-config');
 const {
+  createNotification,
   notifyAdmins,
   notifySupervisors,
   notifySupervisorIds,
@@ -13,7 +14,7 @@ const {
 const { pushAlert } = require('./sse');
 const { getAssignedWorkerIds, getAssignedSupervisorIds, getLocationBreadcrumb } = require('./assignment-resolver');
 const { normalizeEnabledModules, isModuleEnabled } = require('./module-policy');
-const { ACTIVE_TICKET_STATUSES } = require('./ticket-status');
+const { ACTIVE_TICKET_STATUSES, TICKET_PRIORITIES, getSlaDeadline } = require('./ticket-status');
 
 // ── Severity ordinals ──
 const SEV_ORDER = ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'];
@@ -89,9 +90,12 @@ function deriveSeverity(trigger, data) {
 
 async function fireAlert(rule, orgId, trigger, data, logger) {
   const today = new Date().toISOString().slice(0, 10);
-  const dedupKey = `${trigger}:${data.entityId || 'scheduled'}:${today}`;
+  // One alert per rule, entity, shift (when there is one) and day: without the rule a second
+  // rule on the same trigger never fired; without the shift a missed afternoon round was
+  // swallowed by that morning's alert. A re-run of a skipped tick still dedupes. [BUG-0045]
+  const dedupKey = `${trigger}:${rule.id}:${data.entityId || 'scheduled'}${data.shift ? ':' + data.shift : ''}:${today}`;
 
-  // Deduplicate — skip if same trigger+entity+day already exists
+  // Deduplicate — skip if the same rule+trigger+entity(+shift)+day already exists
   const existing = await prisma.alert.findUnique({
     where: { orgId_dedupKey: { orgId, dedupKey } }
   });
@@ -242,20 +246,47 @@ async function executeAction(action, alert, orgId, data, logger) {
     }
 
     case 'CREATE_TICKET': {
-      // Auto-create a ticket from the alert
+      // Auto-create a ticket from the alert, as a staff-raised ticket would be: assigned to the
+      // supervisor covering the location, with an SLA deadline, audited, the assignee told.
+      // It does not raise TICKET_HIGH_PRIORITY itself, so a rule cannot loop on its own
+      // ticket. [BUG-0044]
       const locationId = data.locationId || null;
       if (!locationId) break; // Can't create ticket without a location
-      await prisma.ticket.create({
+      const priority = TICKET_PRIORITIES.includes(action.priority) ? action.priority : 'HIGH';
+      const [assignedToId = null] = await getAssignedSupervisorIds(locationId, orgId);
+      const ticket = await prisma.ticket.create({
         data: {
           orgId,
           locationId,
+          assignedToId,
           title: '[Auto] ' + alert.title,
           description: alert.body || null,
-          priority: action.priority || 'HIGH',
+          priority,
           module: data.module || 'ele',
-          source: 'INTERNAL'
+          source: 'INTERNAL',
+          slaDeadlineAt: getSlaDeadline(priority)
         }
       });
+      await prisma.auditLog.create({
+        data: {
+          orgId,
+          actorType: 'system',
+          action: 'ticket_created_by_alert',
+          entityType: 'Ticket',
+          entityId: ticket.id,
+          newValue: { alertId: alert.id, ruleId: alert.ruleId || null, priority, assignedToId }
+        }
+      });
+      if (assignedToId) {
+        await createNotification({
+          orgId,
+          userId: assignedToId,
+          type: 'ticket_assigned',
+          title: 'New ticket assigned to you',
+          body: ticket.title,
+          entityId: ticket.id
+        });
+      }
       break;
     }
 
@@ -269,9 +300,10 @@ async function executeAction(action, alert, orgId, data, logger) {
 // Run periodically to detect time-based conditions
 // ─────────────────────────────────────────────
 
-async function runScheduledChecks(logger) {
+// With { orgId }, one org only — what an admin's manual "run checks" may touch. [BUG-0032]
+async function runScheduledChecks(logger, { orgId } = {}) {
   const orgs = await prisma.organization.findMany({
-    where: { status: 'ACTIVE' },
+    where: { status: 'ACTIVE', ...(orgId ? { id: orgId } : {}) },
     select: { id: true, enabledModules: true }
   });
 
@@ -305,7 +337,7 @@ async function checkMissedInspections(orgId, logger) {
 
   const now = new Date();
   const todayStart = new Date(now); todayStart.setHours(0, 0, 0, 0);
-  const todayEnd = new Date(now); todayEnd.setHours(23, 59, 59, 999);
+  const yesterdayStart = new Date(todayStart); yesterdayStart.setDate(yesterdayStart.getDate() - 1);
   const currentHour = now.getHours();
 
   // Get all active locations
@@ -314,31 +346,35 @@ async function checkMissedInspections(orgId, logger) {
     select: { id: true, name: true }
   });
 
-  // Get all inspections for today
+  // Inspections since yesterday: a shift that crosses midnight began yesterday.
   const inspections = await prisma.electricalInspection.findMany({
-    where: { orgId, inspectedAt: { gte: todayStart, lte: todayEnd } },
-    select: { locationId: true, shift: true }
+    where: { orgId, inspectedAt: { gte: yesterdayStart, lte: now } },
+    select: { locationId: true, shift: true, inspectedAt: true }
   });
 
-  const inspectedSet = new Set(inspections.map(i => `${i.locationId}:${i.shift}`));
-
-  // Check each shift that should be complete by now — deadlines follow this
-  // org's configured ShiftConfig (falling back to the same defaults used
-  // here previously) instead of a hardcoded table, so orgs with custom
-  // shift windows get correctly-timed missed-inspection alerts. [WP10]
+  // Check each shift that has ended — deadlines follow this org's configured ShiftConfig
+  // (falling back to the defaults) instead of a hardcoded table, so orgs with custom shift
+  // windows get correctly-timed missed-inspection alerts. [WP10]
+  // A day shift (MORNING, AFTERNOON) is checked from its end until midnight, against today's
+  // inspections. A shift that crosses midnight (NIGHT, 22:00–06:00) ended this morning: it is
+  // checked from its end until it starts again, against inspections since it began yesterday
+  // evening. Before, NIGHT was checked during the night itself, against today only. [BUG-0045]
   const shiftConfigs = await getShiftConfigs(orgId);
-  const SHIFT_DEADLINES = {
-    MORNING: shiftConfigs.MORNING.endHour,
-    AFTERNOON: shiftConfigs.AFTERNOON.endHour,
-    NIGHT: shiftConfigs.NIGHT.endHour
-  };
-
-  for (const [shift, deadline] of Object.entries(SHIFT_DEADLINES)) {
-    if (currentHour < deadline && shift !== 'NIGHT') continue;
-    if (shift === 'NIGHT' && currentHour >= shiftConfigs.NIGHT.endHour && currentHour < shiftConfigs.NIGHT.startHour) continue;
+  for (const shift of ['MORNING', 'AFTERNOON', 'NIGHT']) {
+    const cfg = shiftConfigs[shift];
+    const crossesMidnight = cfg.endHour <= cfg.startHour;
+    let since;
+    if (!crossesMidnight) {
+      if (currentHour < cfg.endHour) continue;
+      since = todayStart;
+    } else {
+      if (currentHour < cfg.endHour || currentHour >= cfg.startHour) continue;
+      since = new Date(yesterdayStart); since.setHours(cfg.startHour, cfg.startMin || 0, 0, 0);
+    }
+    const inspected = new Set(inspections.filter((i) => i.shift === shift && i.inspectedAt >= since).map((i) => i.locationId));
 
     for (const loc of locations) {
-      if (inspectedSet.has(`${loc.id}:${shift}`)) continue;
+      if (inspected.has(loc.id)) continue;
 
       const data = {
         entityType: 'location',
@@ -657,13 +693,17 @@ ${recentAlerts.map(a => '- [' + a.severity + '] ' + a.title).join('\n') || '- No
 // Checks unacknowledged alerts past their escalation window
 // ─────────────────────────────────────────────
 
-async function runEscalationChecks(logger) {
+// With { orgId }, one org only — what an admin's manual "run escalations" may touch.
+// Suspended and deleted orgs never escalate. [BUG-0032]
+async function runEscalationChecks(logger, { orgId } = {}) {
   try {
     // Find all active rules that have escalation configured
     const rules = await prisma.alertRule.findMany({
       where: {
         isActive: true,
-        escalateAfterMinutes: { not: null }
+        escalateAfterMinutes: { not: null },
+        org: { status: 'ACTIVE' },
+        ...(orgId ? { orgId } : {})
       },
       select: {
         id: true, orgId: true, escalateAfterMinutes: true,

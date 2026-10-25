@@ -229,6 +229,83 @@ describe('ticket resolve → verify → reopen, every role', () => {
 
   // ── Regressions ──
 
+  it('BUG-0027: no electrician ticket response carries the guest\'s review token, name, phone, IP hash or user agent', async (t) => {
+    if (!dbAvailable) return t.skip('No database available');
+    const guestFields = { source: 'PUBLIC', guestName: 'BUG0027 Resident', guestPhone: '9000027027', sourceIp: 'bug0027ipaddrhash', userAgent: 'BUG0027-agent', riskScore: 40 };
+    const reviewToken = crypto.randomBytes(32).toString('hex');
+    const awaitingReview = await createTestTicket(org.id, location.id, {
+      ...guestFields, status: 'RESOLVED', resolvedAt: new Date(), verifiedAt: new Date(), verifiedById: supA.id,
+      reviewToken, reviewStatus: 'PENDING', reviewExpiresAt: new Date(Date.now() + 30 * 60 * 1000),
+      resolvedWorkers: { connect: [{ id: worker.id }] }
+    });
+    const inPool = await createTestTicket(org.id, location.id, { ...guestFields, status: 'OPEN' });
+
+    const get = (url) => app.inject({ method: 'GET', url, headers: auth(workerToken) });
+    const responses = {
+      list: await get('/api/worker/tickets?status=OPEN,IN_PROGRESS,RESOLVED_PENDING_VERIFY,RESOLVED,CLOSED&limit=100'),
+      detail: await get(`/api/worker/tickets/${awaitingReview.id}`),
+      pool: await get('/api/worker/tickets/pool'),
+      myWork: await get('/api/worker/my-work?days=30'),
+      pickup: await app.inject({ method: 'POST', url: `/api/worker/tickets/${inPool.id}/pickup`, headers: auth(workerToken) })
+    };
+    responses.resolve = await workerResolve(inPool.id);
+
+    const GUEST_ONLY = ['reviewToken', 'reviewExpiresAt', 'reviewStatus', 'reviewNote', 'reviewedAt', 'guestName', 'guestPhone', 'sourceIp', 'userAgent', 'riskScore'];
+    const keysOf = (value, keys = new Set()) => {
+      if (Array.isArray(value)) value.forEach((v) => keysOf(v, keys));
+      else if (value && typeof value === 'object') for (const [k, v] of Object.entries(value)) { keys.add(k); keysOf(v, keys); }
+      return keys;
+    };
+    for (const [name, res] of Object.entries(responses)) {
+      assert.strictEqual(res.statusCode, 200, `${name}: ${res.body.slice(0, 120)}`);
+      for (const secret of [reviewToken, guestFields.guestName, guestFields.guestPhone, guestFields.sourceIp, guestFields.userAgent]) {
+        assert.ok(!res.body.includes(secret), `${name} leaks a guest value`);
+      }
+      const keys = keysOf(res.json());
+      for (const k of GUEST_ONLY) assert.ok(!keys.has(k), `${name} returns ${k}`);
+    }
+
+    // What the electrician app shows is still there.
+    const listed = responses.list.json().tickets.find((x) => x.id === awaitingReview.id);
+    assert.ok(listed, 'the ticket awaiting review is listed');
+    for (const k of ['title', 'status', 'priority', 'createdAt', 'locationId']) assert.ok(listed[k] !== undefined, `list keeps ${k}`);
+    assert.ok(listed.location.name && listed.resolvedWorkers.some((w) => w.id === worker.id));
+    assert.ok(responses.pool.json().tickets.some((x) => x.id === inPool.id), 'the pool lists the open ticket');
+    const done = responses.myWork.json().tickets.find((x) => x.id === awaitingReview.id);
+    assert.ok(done && done.resolvedAt && done.verifiedBy.id === supA.id, 'my work keeps the resolution and who verified it');
+    assert.strictEqual(responses.resolve.json().status, 'RESOLVED_PENDING_VERIFY');
+    assert.match(responses.resolve.json().resolvedImageUrl, /^\/images\/uploads\//);
+  });
+
+  // The review page asked the resident to confirm a fix but could not show its proof photo:
+  // images need a staff or electrician token, and the guest has none. The review link now
+  // carries the photo — only that ticket's, only while its review is open. [BUG-0041]
+  it('BUG-0041: the guest review link serves the ticket\'s proof photo, and nothing else', async (t) => {
+    if (!dbAvailable) return t.skip('No database available');
+    const ticket = await createTestTicket(org.id, location.id, { status: 'IN_PROGRESS', source: 'PUBLIC' });
+    const resolved = await staffResolve(adminToken, ticket.id);
+    assert.strictEqual(resolved.statusCode, 200, resolved.body);
+    const token = tokenOf(resolved.json().reviewUrl);
+
+    const review = (await guest('GET', token)).json();
+    assert.strictEqual(review.status, 'pending');
+    assert.strictEqual(review.ticket.resolvedImageUrl, undefined, 'the storage path is not handed to the guest');
+    assert.strictEqual(review.ticket.photoUrl, `/api/public/review/${token}/photo`);
+
+    const photo = await app.inject({ method: 'GET', url: review.ticket.photoUrl, headers: { 'x-forwarded-for': nextIp() } });
+    assert.strictEqual(photo.statusCode, 200, photo.body.slice(0, 100));
+    assert.match(photo.headers['content-type'], /^image\//);
+    assert.ok(photo.rawPayload.equals(PNG), 'the proof photo itself');
+
+    const wrong = await app.inject({ method: 'GET', url: `/api/public/review/${'0'.repeat(64)}/photo`, headers: { 'x-forwarded-for': nextIp() } });
+    assert.strictEqual(wrong.statusCode, 404);
+
+    // Once the review is answered the link no longer serves it.
+    assert.strictEqual((await guest('POST', token, { action: 'CONFIRM' })).statusCode, 200);
+    const after = await app.inject({ method: 'GET', url: review.ticket.photoUrl, headers: { 'x-forwarded-for': nextIp() } });
+    assert.strictEqual(after.statusCode, 404);
+  });
+
   it('BUG-0015: an electrician cannot resolve a ticket that is already verified or waiting for verification', async (t) => {
     if (!dbAvailable) return t.skip('No database available');
     for (const status of ['RESOLVED', 'RESOLVED_PENDING_VERIFY', 'CLOSED', 'CANCELLED']) {
@@ -310,6 +387,25 @@ describe('ticket resolve → verify → reopen, every role', () => {
     const now = await ticketNow(ticket.id);
     assert.strictEqual(now.reviewStatus, 'REJECTED');
     assert.strictEqual(now.reviewNote, 'Still dark in the corner');
+  });
+
+  // The guest's rejection reopened the ticket but kept resolvedAt and verifiedAt, unlike every
+  // other reopen ([WP10]): analytics then counted an open ticket as resolved, with a stale
+  // resolution time. The photo and note stay on purpose (BUG-0026). [BUG-0042]
+  it('BUG-0042: a ticket the guest rejected is open again — no resolution or verification time stays on it', async (t) => {
+    if (!dbAvailable) return t.skip('No database available');
+    const ticket = await createTestTicket(org.id, location.id, { status: 'IN_PROGRESS', source: 'PUBLIC', assignedToId: supA.id });
+    assert.strictEqual((await workerResolve(ticket.id)).statusCode, 200);
+    const verified = await post(supAToken, `/api/tickets/${ticket.id}/verify`, { note: 'Looks fine' });
+    assert.strictEqual(verified.statusCode, 200, verified.body);
+    const reject = await guest('POST', tokenOf(verified.json().reviewUrl), { action: 'REJECT', note: 'Flickers again' });
+    assert.strictEqual(reject.statusCode, 200, reject.body);
+
+    const now = await ticketNow(ticket.id);
+    assert.strictEqual(now.status, 'OPEN');
+    for (const k of ['resolvedAt', 'verifiedAt', 'verifiedById', 'verifyNote']) assert.strictEqual(now[k], null, `${k} is cleared`);
+    assert.ok(now.resolvedImageUrl, 'the rejected fix\'s photo stays as context (BUG-0026)');
+    assert.strictEqual(now.reviewNote, 'Flickers again');
   });
 
   it('BUG-0018: the electrician who resolved a ticket is told when it is verified, and when it is sent back', async (t) => {

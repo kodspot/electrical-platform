@@ -57,7 +57,7 @@ module.exports = {
     }
     if (!alert) return { ok: false, detail: 'the HIGH ticket raised no alert' };
     await ctx.prisma.alert.update({ where: { id: alert.id }, data: { createdAt: new Date(Date.now() - 11 * 60 * 1000) } });
-    await runEscalationChecks();
+    await runEscalationChecks(undefined, { orgId: org.id });
     const reached = await ctx.prisma.notification.count({ where: { userId: supervisor.id, entityId: alert.id } });
     if (reached !== 1) return { ok: false, detail: `the location's supervisor got ${reached} escalation notifications` };
     return { ok: true, detail: 'the escalation reached the location\'s supervisor' };

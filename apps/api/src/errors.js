@@ -139,7 +139,7 @@ function registerErrorHandlers(fastify) {
     if (error.name === 'ZodError') {
       return reply.status(400).send({
         error: 'Validation failed',
-        details: error.errors.map(e => `${e.path.join('.')}: ${e.message}`),
+        details: error.issues.map(e => `${e.path.join('.')}: ${e.message}`),
         requestId: request.id
       });
     }

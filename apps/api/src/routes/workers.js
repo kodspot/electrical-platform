@@ -5,7 +5,7 @@ const { z } = require('zod');
 const { prisma } = require('../lib/prisma');
 const { authenticateJWT, requirePolicy } = require('../middleware/auth');
 const { encryptWorkerPII, decryptWorkerPII } = require('../lib/crypto');
-const { BCRYPT_COST } = require('../lib/security');
+const { BCRYPT_COST, WORKER_PROFILE_SELECT } = require('../lib/security');
 const { getAssignedWorkerIds } = require('../services/assignment-resolver');
 
 async function workerRoutes(fastify, opts) {
@@ -80,7 +80,8 @@ async function workerRoutes(fastify, opts) {
   }, async (request, reply) => {
     const { id } = request.params;
     const worker = await prisma.worker.findFirst({
-      where: { id, orgId: request.user.orgId }
+      where: { id, orgId: request.user.orgId },
+      select: WORKER_PROFILE_SELECT
     });
     if (!worker) return reply.code(404).send({ error: 'Worker not found' });
     return decryptWorkerPII(worker);
@@ -138,7 +139,7 @@ async function workerRoutes(fastify, opts) {
     };
     encryptWorkerPII(workerData);
 
-    const worker = await prisma.worker.create({ data: workerData });
+    const worker = await prisma.worker.create({ data: workerData, select: WORKER_PROFILE_SELECT });
 
     await prisma.auditLog.create({
       data: {
@@ -226,7 +227,7 @@ async function workerRoutes(fastify, opts) {
     // Encrypt sensitive fields before write
     encryptWorkerPII(data);
 
-    const updated = await prisma.worker.update({ where: { id }, data });
+    const updated = await prisma.worker.update({ where: { id }, data, select: WORKER_PROFILE_SELECT });
     return decryptWorkerPII(updated);
   });
 
@@ -333,11 +334,23 @@ async function workerRoutes(fastify, opts) {
     // would stop the old disconnect-then-delete), but disconnecting still
     // lost the historical worker↔inspection association with no warning to
     // the admin performing the delete.
-    const recordCount = await prisma.electricalInspection.count({ where: { workers: { some: { id } } } });
-    if (recordCount > 0) {
+    // The same rule covers every other history that names the worker: duty rosters (a
+    // RESTRICT foreign key — deleting failed with a 500), attendance records and resolved
+    // tickets (both cascaded, silently erasing that history). [BUG-0035]
+    const [electricalInspections, dutyRosters, attendanceRecords, resolvedTickets] = await Promise.all([
+      prisma.electricalInspection.count({ where: { workers: { some: { id } } } }),
+      prisma.dutyRosterWorker.count({ where: { workerId: id } }),
+      prisma.attendance.count({ where: { workerId: id } }),
+      prisma.ticket.count({ where: { resolvedWorkers: { some: { id } } } })
+    ]);
+    const history = [
+      [electricalInspections, 'inspection records'], [dutyRosters, 'duty rosters'],
+      [attendanceRecords, 'attendance records'], [resolvedTickets, 'resolved tickets']
+    ].filter(([n]) => n > 0).map(([n, label]) => `${n} ${label}`);
+    if (history.length > 0) {
       return reply.code(409).send({
-        error: 'Cannot permanently delete worker with ' + recordCount + ' inspection records. They will remain archived.',
-        electricalInspections: recordCount
+        error: 'Cannot permanently delete worker with ' + history.join(', ') + '. They will remain archived.',
+        electricalInspections, dutyRosters, attendanceRecords, resolvedTickets
       });
     }
 
@@ -496,7 +509,7 @@ async function workerRoutes(fastify, opts) {
 
     let data;
     try { data = schema.parse(request.body); } catch (err) {
-      return reply.code(400).send({ error: 'Invalid input', details: err.errors });
+      return reply.code(400).send({ error: 'Invalid input', details: err.issues });
     }
 
     const worker = await prisma.worker.findFirst({

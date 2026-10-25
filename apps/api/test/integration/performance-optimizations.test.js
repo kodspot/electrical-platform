@@ -88,7 +88,7 @@ describe('WP11 — location hierarchy queries (recursive CTE)', () => {
     assert.deepStrictEqual(ancestors, [leaf.id, l3.id, l2.id]);
   });
 
-  it('getLocationDescendants returns every descendant, scoped to org and active locations', async (t) => {
+  it('getLocationDescendants returns every descendant, scoped to org', async (t) => {
     if (!dbAvailable) return t.skip('No database available in this environment');
 
     const descendants = await getLocationDescendants(root.id, org.id);
@@ -96,15 +96,23 @@ describe('WP11 — location hierarchy queries (recursive CTE)', () => {
     assert.deepStrictEqual(ids, [l1.id, l2.id, l3.id, leaf.id].sort());
   });
 
-  it('getLocationDescendants excludes inactive locations', async (t) => {
+  // This pinned the pre-CTE walk, which skipped inactive locations and everything under them —
+  // while getLocationAncestors walks through them, so an electrician could be rung for a ticket
+  // their app would not open. Both walks now follow the same tree. [BUG-0050]
+  it('getLocationDescendants walks through inactive locations and includes them, as getLocationAncestors does', async (t) => {
     if (!dbAvailable) return t.skip('No database available in this environment');
 
     const inactiveChild = await createTestLocation(org.id, {
-      name: '__wp1_test__ Inactive Child', type: 'ROOM', parentId: root.id, isActive: false
+      name: '__wp1_test__ Inactive Child', type: 'FLOOR', parentId: root.id, isActive: false
+    });
+    const activeGrandchild = await createTestLocation(org.id, {
+      name: '__wp1_test__ Active Grandchild', type: 'ROOM', parentId: inactiveChild.id
     });
 
     const descendants = await getLocationDescendants(root.id, org.id);
-    assert.ok(!descendants.includes(inactiveChild.id), 'an inactive location must not appear as a descendant');
+    assert.ok(descendants.includes(inactiveChild.id), 'the inactive location is in the subtree');
+    assert.ok(descendants.includes(activeGrandchild.id), 'so is the active location under it');
+    assert.ok((await getLocationAncestors(activeGrandchild.id)).includes(root.id), 'the same tree, walked up');
   });
 
   it('getLocationDescendants is scoped to the given orgId, not cross-org', async (t) => {

@@ -13,6 +13,12 @@ actually emits.
   the tests can prove the report scrubs them before writing anything.
 - `malformed-*.xml` are derived from `node20-pass.xml` (truncated, an unknown element, the
   summary comments removed) to prove the parser throws instead of guessing.
+- `node24-suite-throws.*` (v24.11.1) is a describe() whose body throws while its tests are
+  collected, next to a passing suite. Node exits 0 and counts `fail 0`; the XML itemises the
+  suite as a failed `<testcase>`. It pins BUG-0029.
+- `node24-after-throws.*` (v24.11.1) is a suite whose `after()` hook throws after its test
+  passed. Node exits 0 and counts `fail 0`; the XML shows a passing suite, and only the events
+  stream records the failure. It pins BUG-0036.
 
 To regenerate: run the probe files with `node --test --test-reporter=junit
 --test-reporter-destination=<file> --test-reporter=./scripts/report-events.js

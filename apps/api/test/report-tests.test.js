@@ -214,6 +214,55 @@ describe('QA-1 report — exit decision', () => {
       assert.strictEqual(decideExit({ childStatus: 0, reportOk: true, counts: c, ci: false, strict: false }).code, 0, `lenient ${key}`);
     }
   });
+
+  // Node 24 exits 0 and counts "fail 0" when a describe() body throws while its tests are
+  // collected: none of that suite's tests run, yet the run looked green. [BUG-0029]
+  for (const withEvents of [true, false]) {
+    it(`BUG-0029: fails a run whose suite threw while collecting its tests (Node 24${withEvents ? '' : ', no events stream'})`, () => {
+      const out = fs.mkdtempSync(path.join(os.tmpdir(), 'qa1-report-'));
+      try {
+        const { counts: c, decision } = generateReport({
+          rawJunitPath: path.join(FIXTURES, 'node24-suite-throws.xml'),
+          eventsPath: withEvents ? path.join(FIXTURES, 'node24-suite-throws.events.jsonl') : null,
+          outDir: out, baselinePath: null, childStatus: 0, ci: false, strict: false, nodeVersion: 'v24'
+        });
+        assert.strictEqual(c.fail, 0, 'the runner itself counts no failure');
+        assert.strictEqual(decision.code, 1, `the run must fail: ${decision.reasons.join('; ')}`);
+        if (withEvents) assert.ok(decision.reasons.some((r) => r.includes('probe suite that throws while collecting')), decision.reasons.join('; '));
+        assert.match(fs.readFileSync(path.join(out, 'test-summary.md'), 'utf8'), /probe suite that throws while collecting/);
+      } finally {
+        fs.rmSync(out, { recursive: true, force: true });
+      }
+    });
+  }
+
+  // A failing after() hook (a cleanup that throws) is just as invisible: Node exits 0 with
+  // "fail 0", and only the events stream records it — the JUnit XML shows a passing suite.
+  it('BUG-0036: fails a run whose suite after() hook threw (Node 24)', () => {
+    const out = fs.mkdtempSync(path.join(os.tmpdir(), 'qa1-report-'));
+    try {
+      const { counts: c, decision } = generateReport({
+        rawJunitPath: path.join(FIXTURES, 'node24-after-throws.xml'),
+        eventsPath: path.join(FIXTURES, 'node24-after-throws.events.jsonl'),
+        outDir: out, baselinePath: null, childStatus: 0, ci: false, strict: false, nodeVersion: 'v24'
+      });
+      assert.strictEqual(c.fail, 0, 'the runner itself counts no failure');
+      assert.strictEqual(decision.code, 1, `the run must fail: ${decision.reasons.join('; ')}`);
+      assert.ok(decision.reasons.some((r) => r.includes('probe suite whose after() throws')), decision.reasons.join('; '));
+    } finally {
+      fs.rmSync(out, { recursive: true, force: true });
+    }
+  });
+
+  it('BUG-0029: a clean run with every failure counted still passes', () => {
+    const out = fs.mkdtempSync(path.join(os.tmpdir(), 'qa1-report-'));
+    try {
+      const { decision } = generateReport({ rawJunitPath: path.join(FIXTURES, 'node20-pass.xml'), eventsPath: null, outDir: out, baselinePath: null, childStatus: 0, ci: false, strict: false, nodeVersion: 'v20' });
+      assert.strictEqual(decision.code, 0, decision.reasons.join('; '));
+    } finally {
+      fs.rmSync(out, { recursive: true, force: true });
+    }
+  });
 });
 
 describe('QA-1 report — generateReport end to end', () => {

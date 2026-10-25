@@ -20,9 +20,24 @@
 <body class="auth-layout">
 <div class="auth-card">
   <h1 class="auth-title">Kodspot</h1>
-  <p class="auth-subtitle">Electrician — choose a new PIN</p>
+  <p class="auth-subtitle" id="subtitle">Electrician — choose a new PIN</p>
   <div id="error" class="error-msg" role="alert" data-testid="reset-error"></div>
   <div id="done" class="reset-done" role="status" data-testid="reset-done"></div>
+
+  <!-- Opened without a link (from "Forgot PIN?" on the sign-in page): ask for the link. -->
+  <form id="requestForm" novalidate style="display:none">
+    <p class="form-hint" style="margin-bottom:var(--sp-md)">Enter your Employee ID. We'll send a link to choose a new PIN to the email your administrator has on file for you. If they have none, ask them to set a new PIN.</p>
+    <div class="form-group" id="orgGroup">
+      <label class="form-label" for="orgCode">Organization code</label>
+      <input class="form-input" type="text" id="orgCode" maxlength="100" autocapitalize="none" autocomplete="organization">
+      <div class="form-hint">The first part of your sign-in address: …/<strong>code</strong>/ele/electrician-login</div>
+    </div>
+    <div class="form-group">
+      <label class="form-label" for="employeeId">Employee ID</label>
+      <input class="form-input" type="text" id="employeeId" required maxlength="50" autocomplete="username">
+    </div>
+    <button type="submit" class="btn btn-primary btn-block" id="requestBtn">Send reset link</button>
+  </form>
 
   <form id="resetForm" novalidate>
     <div class="form-group">
@@ -41,6 +56,6 @@
   </p>
 </div>
 
-<script src="/js/worker-reset-pin.js?v=1"></script>
+<script src="/js/worker-reset-pin.js?v=2"></script>
 </body>
 </html>

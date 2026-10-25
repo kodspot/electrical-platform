@@ -1,6 +1,8 @@
 'use strict';
 
 const { prisma } = require('../lib/prisma');
+const { ACTIVE_TICKET_STATUSES, VERIFY_PENDING_TICKET_STATUSES } = require('./ticket-status');
+const { createNotification } = require('./notification-service');
 
 /**
  * Location-aware assignment resolver.
@@ -47,18 +49,23 @@ async function getLocationAncestors(locationId, maxDepth = 10) {
  * subtree — this backs getWorkerCoverageLocationIds (worker-auth.js), which
  * runs on essentially every worker-app request (list/detail/pickup/resolve),
  * so this was the hottest N+1 path in the app. [WP11]
+ *
+ * Deactivated locations are walked through and included, like getLocationAncestors does:
+ * a location can be deactivated while its children stay active (and keep taking complaints),
+ * and its own open tickets stay open. Skipping them meant an electrician was rung for a
+ * ticket the app then refused to show. [BUG-0050]
  */
 async function getLocationDescendants(locationId, orgId, maxDepth = 10) {
   const rows = await prisma.$queryRaw`
     WITH RECURSIVE descendants AS (
       SELECT id, "parentId", 0 AS depth
       FROM "Location"
-      WHERE "parentId" = ${locationId} AND "orgId" = ${orgId} AND "isActive" = true
+      WHERE "parentId" = ${locationId} AND "orgId" = ${orgId}
       UNION ALL
       SELECT l.id, l."parentId", d.depth + 1
       FROM "Location" l
       INNER JOIN descendants d ON l."parentId" = d.id
-      WHERE l."orgId" = ${orgId} AND l."isActive" = true AND d.depth < ${maxDepth - 1}
+      WHERE l."orgId" = ${orgId} AND d.depth < ${maxDepth - 1}
     )
     SELECT id FROM descendants
   `;
@@ -179,10 +186,61 @@ async function getLocationBreadcrumb(locationId, maxDepth = 10) {
   return rows.map(r => r.name).join(', ');
 }
 
+/**
+ * Where a supervisor's open tickets go when they stop covering them — deactivated, or moved
+ * to another org: to the nearest active supervisor covering each ticket's location (the rule
+ * a new complaint uses), else back to the pool (null). The supervisor is excluded explicitly,
+ * so the plan can be made before the change that deactivates them is committed. Finished
+ * work (resolved, closed, cancelled) keeps its assignee as history. [BUG-0037]
+ * @returns {Promise<Array<{ id: string, title: string, to: string|null }>>}
+ */
+async function planTicketHandover(supervisorId, orgId) {
+  const tickets = await prisma.ticket.findMany({
+    where: { orgId, assignedToId: supervisorId, status: { in: [...ACTIVE_TICKET_STATUSES, ...VERIFY_PENDING_TICKET_STATUSES] } },
+    select: { id: true, title: true, locationId: true }
+  });
+  const nextByLocation = new Map();
+  const plan = [];
+  for (const t of tickets) {
+    if (!nextByLocation.has(t.locationId)) {
+      const ids = (await getAssignedSupervisorIds(t.locationId, orgId)).filter((id) => id !== supervisorId);
+      nextByLocation.set(t.locationId, ids[0] || null);
+    }
+    plan.push({ id: t.id, title: t.title, to: nextByLocation.get(t.locationId) });
+  }
+  return plan;
+}
+
+/** Tells each new assignee about the tickets handed to them (after the transaction commits). */
+function notifyTicketHandover(orgId, plan) {
+  for (const p of plan) {
+    if (!p.to) continue;
+    createNotification({ orgId, userId: p.to, type: 'ticket_reassigned', title: 'Ticket handed over to you', body: p.title, entityId: p.id }).catch(() => {});
+  }
+}
+
+/** Applies a planTicketHandover plan inside the caller's transaction, one audit row per ticket. */
+async function applyTicketHandover(tx, plan, { orgId, fromId, actorType, actorId, reason }) {
+  for (const p of plan) {
+    await tx.ticket.update({ where: { id: p.id }, data: { assignedToId: p.to } });
+  }
+  if (plan.length > 0) {
+    await tx.auditLog.createMany({
+      data: plan.map((p) => ({
+        orgId, actorType, actorId, action: 'ticket_reassigned', entityType: 'Ticket', entityId: p.id,
+        oldValue: { assignedToId: fromId }, newValue: { assignedToId: p.to, reason }
+      }))
+    });
+  }
+}
+
 module.exports = {
   getLocationAncestors,
   getLocationDescendants,
   getAssignedWorkerIds,
   getAssignedSupervisorIds,
-  getLocationBreadcrumb
+  getLocationBreadcrumb,
+  planTicketHandover,
+  applyTicketHandover,
+  notifyTicketHandover
 };

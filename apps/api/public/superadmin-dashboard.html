@@ -656,7 +656,7 @@
 </div>
 
 <script src="/js/offline-sync.js?v=1"></script>
-<script src="/js/app.js?v=14"></script>
+<script src="/js/app.js?v=16"></script>
 <script src="/js/custom-select.js"></script>
 <script>
 var esc = App.esc, $ = App.$, fmtDate = App.fmtDate;
@@ -1014,9 +1014,9 @@ async function loadOrgs() {
       '<td class="hide-mobile">' + ((o._count && o._count.users) || 0) + '</td>' +
       '<td class="hide-mobile">' + ((o._count && o._count.workers) || 0) + '</td>' +
       '<td class="actions-cell">' +
-        '<button class="btn btn-sm btn-sa" onclick="enterOrg(\'' + o.id + '\',\'' + esc(o.name).replace(/'/g, "\\'") + '\',\'' + esc(o.slug || '').replace(/'/g, "\\'") + '\')">Enter</button>' +
+        '<button class="btn btn-sm btn-sa" onclick="enterOrg(\'' + o.id + '\',\'' + App.escJs(o.name) + '\',\'' + App.escJs(o.slug || '') + '\')">Enter</button>' +
         '<button class="btn btn-sm btn-outline" onclick="editOrg(\'' + o.id + '\')">Edit</button>' +
-        '<button class="btn btn-sm btn-outline" onclick="openAiConfig(\'' + o.id + '\',\'' + esc(o.name).replace(/'/g, "\\'") + '\')" title="AI Assistant Config">🤖</button>' +
+        '<button class="btn btn-sm btn-outline" onclick="openAiConfig(\'' + o.id + '\',\'' + App.escJs(o.name) + '\')" title="AI Assistant Config">🤖</button>' +
         '<button class="btn btn-sm btn-outline" onclick="showLoginQR(\'' + o.id + '\')" title="Login QR Codes">QR</button>' +
         (o.status !== 'DELETED' ? '<button class="btn btn-sm btn-danger" onclick="deleteOrg(\'' + o.id + '\')">Delete</button>' : '') +
       '</td></tr>';
@@ -1159,8 +1159,8 @@ async function loadUsers(role) {
       '<td class="hide-mobile">' + esc(u.org ? u.org.name : '—') + '</td>' +
       '<td><span class="status-badge ' + statusCls + '">' + statusText + '</span></td>' +
       '<td class="actions-cell">' +
-        '<button class="btn btn-sm btn-outline" onclick="openEditUser(\'' + u.id + '\',\'' + esc(u.name).replace(/'/g, "\\'") + '\',\'' + esc(u.email).replace(/'/g, "\\'") + '\',\'' + esc(u.phone || '').replace(/'/g, "\\'") + '\',\'' + role + '\',\'' + (u.orgId || '') + '\')">Edit</button>' +
-        '<button class="btn btn-sm btn-outline" onclick="openPwReset(\'' + u.id + '\',\'' + esc(u.name).replace(/'/g, "\\'") + '\')">Reset PW</button>' +
+        '<button class="btn btn-sm btn-outline" onclick="openEditUser(\'' + u.id + '\',\'' + App.escJs(u.name) + '\',\'' + App.escJs(u.email) + '\',\'' + App.escJs(u.phone || '') + '\',\'' + role + '\',\'' + (u.orgId || '') + '\')">Edit</button>' +
+        '<button class="btn btn-sm btn-outline" onclick="openPwReset(\'' + u.id + '\',\'' + App.escJs(u.name) + '\')">Reset PW</button>' +
         (u.isActive !== false ?
           '<button class="btn btn-sm btn-danger" onclick="toggleUserActive(\'' + u.id + '\',false,\'' + role + '\')">Deactivate</button>' :
           '<button class="btn btn-sm btn-success" onclick="toggleUserActive(\'' + u.id + '\',true,\'' + role + '\')">Activate</button>') +
@@ -1278,7 +1278,7 @@ async function loadWorkers() {
       '<td class="hide-mobile">' + esc(w.department || '—') + '</td>' +
       '<td>' + ((w._count && w._count.electricalInspections) || 0) + '</td>' +
       '<td class="actions-cell">' +
-        '<button class="btn btn-sm btn-outline" onclick="openWorkerEdit(\'' + w.id + '\',\'' + esc(w.name).replace(/'/g, "\\'") + '\',\'' + esc(w.employeeId || '').replace(/'/g, "\\'") + '\',\'' + esc(w.phone || '').replace(/'/g, "\\'") + '\',\'' + esc(w.email || '').replace(/'/g, "\\'") + '\',\'' + esc(w.department || '').replace(/'/g, "\\'") + '\',\'' + esc(w.designation || '').replace(/'/g, "\\'") + '\')">Edit</button>' +
+        '<button class="btn btn-sm btn-outline" onclick="openWorkerEdit(\'' + w.id + '\',\'' + App.escJs(w.name) + '\',\'' + App.escJs(w.employeeId || '') + '\',\'' + App.escJs(w.phone || '') + '\',\'' + App.escJs(w.email || '') + '\',\'' + App.escJs(w.department || '') + '\',\'' + App.escJs(w.designation || '') + '\')">Edit</button>' +
         (w.isActive !== false ?
           '<button class="btn btn-sm btn-danger" onclick="toggleWorker(\'' + w.id + '\',false)">Deactivate</button>' :
           '<button class="btn btn-sm btn-success" onclick="toggleWorker(\'' + w.id + '\',true)">Activate</button>') +
@@ -1483,7 +1483,7 @@ async function showLoginQR(orgId) {
   if (!org) return;
   if (!org.slug) { App.toast('This organization has no URL slug configured', 'warning'); return; }
   var mods = org.enabledModules || ['ele'];
-  $('qrModalTitle').textContent = 'Login QR — ' + esc(org.name);
+  $('qrModalTitle').textContent = 'Login QR — ' + org.name;
   $('qrModalBody').innerHTML = '<div class="empty-state">Loading QR codes…</div>';
   App.openModal('loginQrModal');
 
