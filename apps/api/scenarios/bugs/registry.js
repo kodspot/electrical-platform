@@ -51,7 +51,8 @@ const BUGS_LIST = [
   require('./bug-0040-admin-detail-photos-broken'),
   require('./bug-0041-guest-cannot-see-proof-photo'),
   require('./bug-0042-rejected-ticket-keeps-resolution-times'),
-  require('./bug-0043-alert-form-drops-location-actions')
+  require('./bug-0043-alert-form-drops-location-actions'),
+  require('./bug-0044-alert-tickets-unassigned-unaudited')
 ];
 
 const BUGS = Object.fromEntries(BUGS_LIST.map((b) => [b.id, b]));

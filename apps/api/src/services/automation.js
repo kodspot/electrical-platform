@@ -5,6 +5,7 @@ const { runExclusive, LOCK_KEYS } = require('../lib/scheduler-lock');
 const { resolveAiCredentials, callAiProvider } = require('../lib/ai-provider');
 const { getShiftConfigs } = require('./shift-config');
 const {
+  createNotification,
   notifyAdmins,
   notifySupervisors,
   notifySupervisorIds,
@@ -13,7 +14,7 @@ const {
 const { pushAlert } = require('./sse');
 const { getAssignedWorkerIds, getAssignedSupervisorIds, getLocationBreadcrumb } = require('./assignment-resolver');
 const { normalizeEnabledModules, isModuleEnabled } = require('./module-policy');
-const { ACTIVE_TICKET_STATUSES } = require('./ticket-status');
+const { ACTIVE_TICKET_STATUSES, TICKET_PRIORITIES, getSlaDeadline } = require('./ticket-status');
 
 // ── Severity ordinals ──
 const SEV_ORDER = ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'];
@@ -242,20 +243,47 @@ async function executeAction(action, alert, orgId, data, logger) {
     }
 
     case 'CREATE_TICKET': {
-      // Auto-create a ticket from the alert
+      // Auto-create a ticket from the alert, as a staff-raised ticket would be: assigned to the
+      // supervisor covering the location, with an SLA deadline, audited, the assignee told.
+      // It does not raise TICKET_HIGH_PRIORITY itself, so a rule cannot loop on its own
+      // ticket. [BUG-0044]
       const locationId = data.locationId || null;
       if (!locationId) break; // Can't create ticket without a location
-      await prisma.ticket.create({
+      const priority = TICKET_PRIORITIES.includes(action.priority) ? action.priority : 'HIGH';
+      const [assignedToId = null] = await getAssignedSupervisorIds(locationId, orgId);
+      const ticket = await prisma.ticket.create({
         data: {
           orgId,
           locationId,
+          assignedToId,
           title: '[Auto] ' + alert.title,
           description: alert.body || null,
-          priority: action.priority || 'HIGH',
+          priority,
           module: data.module || 'ele',
-          source: 'INTERNAL'
+          source: 'INTERNAL',
+          slaDeadlineAt: getSlaDeadline(priority)
         }
       });
+      await prisma.auditLog.create({
+        data: {
+          orgId,
+          actorType: 'system',
+          action: 'ticket_created_by_alert',
+          entityType: 'Ticket',
+          entityId: ticket.id,
+          newValue: { alertId: alert.id, ruleId: alert.ruleId || null, priority, assignedToId }
+        }
+      });
+      if (assignedToId) {
+        await createNotification({
+          orgId,
+          userId: assignedToId,
+          type: 'ticket_assigned',
+          title: 'New ticket assigned to you',
+          body: ticket.title,
+          entityId: ticket.id
+        });
+      }
       break;
     }
 

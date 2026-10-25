@@ -46,6 +46,16 @@ const EDITABLE_TICKET_STATUSES = Object.freeze([
   TICKET_STATUSES.CLOSED
 ]);
 
+const TICKET_PRIORITIES = Object.freeze(['LOW', 'NORMAL', 'HIGH', 'URGENT']);
+
+// SLA deadlines by priority (milliseconds) — shared by every path that creates a ticket.
+const SLA_MS = Object.freeze({ URGENT: 2 * 60 * 60 * 1000, HIGH: 4 * 60 * 60 * 1000, NORMAL: 24 * 60 * 60 * 1000, LOW: 72 * 60 * 60 * 1000 });
+
+function getSlaDeadline(priority) {
+  const ms = SLA_MS[priority] || SLA_MS.NORMAL;
+  return new Date(Date.now() + ms);
+}
+
 function isOpenLikeStatus(status) {
   return OPEN_TICKET_STATUSES.includes(status);
 }
@@ -83,5 +93,7 @@ module.exports = {
   isOpenLikeStatus,
   isActiveLikeStatus,
   STALE_TICKET_ERROR,
-  updateTicketIfUnchanged
+  updateTicketIfUnchanged,
+  TICKET_PRIORITIES,
+  getSlaDeadline
 };

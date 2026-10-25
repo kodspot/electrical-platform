@@ -5,6 +5,7 @@ const { prisma } = require('../lib/prisma');
 const { authenticateJWT, requirePolicy } = require('../middleware/auth');
 const { generateAiInsights, runScheduledChecks, runEscalationChecks } = require('../services/automation');
 const { runExclusive, LOCK_KEYS } = require('../lib/scheduler-lock');
+const { TICKET_PRIORITIES } = require('../services/ticket-status');
 
 const VALID_TRIGGERS = [
   'INSPECTION_FAULT', 'INSPECTION_LATE', 'INSPECTION_MISSED',
@@ -61,13 +62,13 @@ async function alertRoutes(fastify) {
     conditions: z.record(z.unknown()).default({}),
     actions: z.array(z.object({
       type: z.enum(VALID_ACTIONS),
-      priority: z.string().optional()
+      priority: z.enum(TICKET_PRIORITIES).optional()
     })).min(1).max(5),
     isActive: z.boolean().default(true),
     escalateAfterMinutes: z.number().int().min(1).max(10080).optional().nullable(),
     escalationActions: z.array(z.object({
       type: z.enum(VALID_ACTIONS),
-      priority: z.string().optional()
+      priority: z.enum(TICKET_PRIORITIES).optional()
     })).max(5).optional().nullable(),
     maxEscalations: z.number().int().min(1).max(10).optional().nullable()
   });
@@ -115,13 +116,13 @@ async function alertRoutes(fastify) {
     conditions: z.record(z.unknown()).optional(),
     actions: z.array(z.object({
       type: z.enum(VALID_ACTIONS),
-      priority: z.string().optional()
+      priority: z.enum(TICKET_PRIORITIES).optional()
     })).min(1).max(5).optional(),
     isActive: z.boolean().optional(),
     escalateAfterMinutes: z.number().int().min(1).max(10080).optional().nullable(),
     escalationActions: z.array(z.object({
       type: z.enum(VALID_ACTIONS),
-      priority: z.string().optional()
+      priority: z.enum(TICKET_PRIORITIES).optional()
     })).max(5).optional().nullable(),
     maxEscalations: z.number().int().min(1).max(10).optional().nullable()
   });

@@ -22,14 +22,7 @@ const {
   STALE_TICKET_ERROR,
   updateTicketIfUnchanged
 } = require('../services/ticket-status');
-
-// SLA deadlines by priority (milliseconds)
-const SLA_MS = { URGENT: 2 * 60 * 60 * 1000, HIGH: 4 * 60 * 60 * 1000, NORMAL: 24 * 60 * 60 * 1000, LOW: 72 * 60 * 60 * 1000 };
-
-function getSlaDeadline(priority) {
-  const ms = SLA_MS[priority] || SLA_MS.NORMAL;
-  return new Date(Date.now() + ms);
-}
+const { getSlaDeadline } = require('../services/ticket-status');
 
 // Audit actorType for an org-scoped action — must distinguish a SuperAdmin
 // acting via X-Org-Id org-entry from a genuine org ADMIN/SUPERVISOR, or a

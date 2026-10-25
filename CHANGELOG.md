@@ -198,6 +198,17 @@ see `docs/DEPLOYMENT.md` for how a change reaches production.
     rule list labels them.
 - **User-visible (Release Notes):** the alert-rule form can send alerts to the supervisors and
   electricians of the location concerned.
+- **`[BUG-0044]` Tickets raised by an alert rule were unassigned, had no SLA deadline and no
+  audit row, and nobody was told** (PAR-10/06).
+  - The CREATE_TICKET action now assigns the supervisor covering the location, sets the SLA
+    deadline, writes `ticket_created_by_alert`, and notifies the assignee.
+  - It still does not raise `TICKET_HIGH_PRIORITY`, so a rule cannot loop on its own ticket.
+  - Rule saves refuse a ticket priority outside LOW, NORMAL, HIGH and URGENT (`400`). Before,
+    such a rule saved and then failed when it fired.
+  - The SLA table moved to `services/ticket-status.js` (`getSlaDeadline`), shared by both
+    paths.
+- **User-visible (Release Notes):** tickets created by alert rules go to the location's
+  supervisor.
 
 ### 2026-10-24 (product and architecture review — documentation only)
 

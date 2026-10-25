@@ -59,8 +59,9 @@ Commands: `npm run bug:list` · `npm run bug:run -- <ID>` · `npm run bug:valida
 | BUG-0041 | MEDIUM | FIXED | complaints | The guest review page asked the resident to confirm a fix but could not show its proof photo | `test/integration/ticket-resolve-verify.test.js` |
 | BUG-0042 | MEDIUM | FIXED | complaints | A ticket the guest rejected was open again but still carried its resolution and verification times | `test/integration/ticket-resolve-verify.test.js` |
 | BUG-0043 | MEDIUM | FIXED | ele | Editing an alert rule silently dropped its "notify the location's supervisors / electricians" actions | `e2e/tests/forms.spec.js` |
+| BUG-0044 | MEDIUM | FIXED | ele | Tickets raised by an alert rule were unassigned, had no SLA deadline, no audit row, and nobody was told | `test/integration/alert-escalation.test.js` |
 
-Count: 43 bug scenario(s).
+Count: 44 bug scenario(s).
 
 ## BUG-0001 — Admin could set a ticket to RESOLVED_PENDING_VERIFY directly
 
@@ -832,4 +833,22 @@ Count: 43 bug scenario(s).
 1. Create a rule (API) with NOTIFY_ASSIGNED_SUPERVISORS and an escalation NOTIFY_ASSIGNED_WORKERS.
 2. In admin-alerts, Edit the rule, change its description, save.
 3. Broken: both actions are gone. Fixed: kept. Browser test: e2e/tests/forms.spec.js (BUG-0043).
+
+## BUG-0044 — Tickets raised by an alert rule were unassigned, had no SLA deadline, no audit row, and nobody was told
+
+- **Severity:** MEDIUM · **Status:** FIXED · **Module:** ele · **Category:** ticket-workflow
+- **Origin:** Product and architecture review 2026-10 (PAR-10/06)
+- **Introduced:** pre-audit · **Fixed:** 2026-10-25
+- **Description:** An alert rule's CREATE_TICKET action (directly or on escalation) created a bare ticket: no assignee (so no supervisor saw it), no slaDeadlineAt, no AuditLog row, no notification — unlike every ticket staff raise. The action's priority was never checked, so a rule saved with an unknown priority failed at the moment it fired. Found by the 2026-10 product and architecture review (PAR-10/06).
+- **Root cause:** automation.js created the ticket with a bare prisma.ticket.create; alerts.js accepted any string as a ticket priority.
+- **Expected behavior:** The ticket is assigned to the supervisor covering the location, has an SLA deadline, is audited (ticket_created_by_alert) and the assignee is notified; rule saves refuse an unknown priority (400).
+- **Broken behavior:** assignedToId and slaDeadlineAt null; no audit row; a rule with priority "SUPER" saved (201).
+- **Scenario dependencies:** —
+- **Regression test:** `test/integration/alert-escalation.test.js`
+
+**Reproduction steps:**
+
+1. Create a rule on TICKET_HIGH_PRIORITY whose action is CREATE_TICKET, at a location a supervisor covers.
+2. Raise a HIGH ticket there so the rule fires.
+3. Broken: the [Auto] ticket has no assignee. Fixed: the covering supervisor holds it.
 
