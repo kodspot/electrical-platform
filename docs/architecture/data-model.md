@@ -6,7 +6,7 @@ How the domain is modelled and why. **The canonical, authoritative schema is
 the tenancy keying, and the lifecycle state machines that the schema alone doesn't make
 obvious. Read them together.
 
-31 models, 15 enums. Migrations live in `apps/api/prisma/migrations/` and are applied with
+32 models, 15 enums. Migrations live in `apps/api/prisma/migrations/` and are applied with
 `prisma migrate deploy` (Charter §8 — every schema change is a migration, no exceptions).
 
 ## Tenancy keying

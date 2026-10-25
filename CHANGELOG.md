@@ -14,8 +14,9 @@ this file is the terser, chronological "what changed and when."
 
 This changelog currently starts at `[WP7]` — the earliest work in the current
 production-hardening pass this project has a verified, dated record for (via the Charter's
-own Amendment Log). `apps/api/package.json` currently declares version `1.0.0`; nothing
-has been git-tagged yet, so everything below is grouped under **Unreleased**.
+own Amendment Log). `v1.0.0` was tagged on 2026-10-20 at `0651b26`. This file has not been
+split by release yet, so everything below is still grouped under **Unreleased**: the dated
+sections up to and including 2026-10-20 are in v1.0.0, and the later ones are not released.
 
 ## Unreleased
 
@@ -377,6 +378,14 @@ see `docs/DEPLOYMENT.md` for how a change reaches production.
   - Still open, as owner decisions: the copy of the name in the admin notification email,
     which cannot be recalled once sent, and whether the IP hash, user agent, description and
     review note should go after 180 days too.
+- **Documentation drift (PAR-10/36), docs only.**
+  - `CLAUDE.md` and the architecture overview said Fastify 4; the app runs Fastify 5
+    (ADR 0008).
+  - The data model counted 31 models; there are 32.
+  - `docs/README.md`, this changelog's introduction and the v1.0.0 release notes said v1.0.0
+    was not tagged; it was tagged on 2026-10-20 at `0651b26`.
+  - The GitHub release body still carries the "DRAFT, not tagged" heading. Only the owner can
+    edit it.
 - **The fixes in `app.js` reach people on their first load after the deploy.**
   - Every page still loaded `app.js?v=14`, or `v=15` on the Quality page. Browsers keep
     `/js` for a day, and both service workers serve it from cache first.
