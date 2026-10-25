@@ -170,6 +170,8 @@
         <div style="display:flex;flex-direction:column;gap:.35rem">
           <label class="form-check"><input type="checkbox" id="actNotifyAdmins" checked> Notify Admins</label>
           <label class="form-check"><input type="checkbox" id="actNotifySups"> Notify Supervisors</label>
+          <label class="form-check"><input type="checkbox" id="actNotifyAssignedSups"> Notify the location's supervisors</label>
+          <label class="form-check"><input type="checkbox" id="actNotifyAssignedWorkers"> Notify the location's electricians</label>
           <label class="form-check"><input type="checkbox" id="actCreateTicket"> Auto-create Ticket</label>
         </div>
         <div id="ticketPriorityWrap" style="display:none;margin-top:.35rem">
@@ -192,6 +194,8 @@
             <div style="display:flex;flex-direction:column;gap:.3rem">
               <label class="form-check"><input type="checkbox" id="escNotifyAdmins" checked> Notify Admins</label>
               <label class="form-check"><input type="checkbox" id="escNotifySups"> Notify Supervisors</label>
+              <label class="form-check"><input type="checkbox" id="escNotifyAssignedSups"> Notify the location's supervisors</label>
+              <label class="form-check"><input type="checkbox" id="escNotifyAssignedWorkers"> Notify the location's electricians</label>
               <label class="form-check"><input type="checkbox" id="escCreateTicket" onchange="toggleEscTicketPri()"> Auto-create Ticket</label>
             </div>
             <div id="escTicketPriWrap" style="display:none;margin-top:.35rem">
@@ -280,7 +284,7 @@ async function loadRules(){
   $('rulesList').innerHTML = rules.map(function(r){
     var t = TRIGGER_MAP[r.trigger]||{icon:'🔔',label:r.trigger};
     var actions = (r.actions||[]).map(function(a){
-      var labels = {NOTIFY_ADMINS:'Notify Admins',NOTIFY_SUPERVISORS:'Notify Supervisors',CREATE_TICKET:'Create Ticket'};
+      var labels = {NOTIFY_ADMINS:'Notify Admins',NOTIFY_SUPERVISORS:'Notify Supervisors',NOTIFY_ASSIGNED_SUPERVISORS:'Notify Location Supervisors',NOTIFY_ASSIGNED_WORKERS:'Notify Location Electricians',CREATE_TICKET:'Create Ticket'};
       return '<span class="rule-action-tag">'+(labels[a.type]||a.type)+'</span>';
     }).join('');
     return '<div class="rule-card'+(r.isActive?'':' inactive')+'">'+
@@ -368,6 +372,9 @@ async function editRule(id){
   var actionTypes = actions.map(function(a){return a.type});
   $('actNotifyAdmins').checked = actionTypes.indexOf('NOTIFY_ADMINS')!==-1;
   $('actNotifySups').checked = actionTypes.indexOf('NOTIFY_SUPERVISORS')!==-1;
+  // Load every action the API accepts, so saving an edit never drops one. [BUG-0043]
+  $('actNotifyAssignedSups').checked = actionTypes.indexOf('NOTIFY_ASSIGNED_SUPERVISORS')!==-1;
+  $('actNotifyAssignedWorkers').checked = actionTypes.indexOf('NOTIFY_ASSIGNED_WORKERS')!==-1;
   $('actCreateTicket').checked = actionTypes.indexOf('CREATE_TICKET')!==-1;
   var ticketAction = actions.find(function(a){return a.type==='CREATE_TICKET'});
   if(ticketAction) $('actTicketPriority').value = ticketAction.priority||'HIGH';
@@ -383,6 +390,8 @@ async function editRule(id){
     var escTypes = escActs.map(function(a){return a.type});
     $('escNotifyAdmins').checked = escTypes.indexOf('NOTIFY_ADMINS')!==-1;
     $('escNotifySups').checked = escTypes.indexOf('NOTIFY_SUPERVISORS')!==-1;
+    $('escNotifyAssignedSups').checked = escTypes.indexOf('NOTIFY_ASSIGNED_SUPERVISORS')!==-1;
+    $('escNotifyAssignedWorkers').checked = escTypes.indexOf('NOTIFY_ASSIGNED_WORKERS')!==-1;
     $('escCreateTicket').checked = escTypes.indexOf('CREATE_TICKET')!==-1;
     var escTicket = escActs.find(function(a){return a.type==='CREATE_TICKET'});
     if(escTicket) $('escTicketPriority').value = escTicket.priority||'URGENT';
@@ -422,6 +431,8 @@ $('ruleForm').addEventListener('submit', async function(e){
   var actions = [];
   if($('actNotifyAdmins').checked) actions.push({type:'NOTIFY_ADMINS'});
   if($('actNotifySups').checked) actions.push({type:'NOTIFY_SUPERVISORS'});
+  if($('actNotifyAssignedSups').checked) actions.push({type:'NOTIFY_ASSIGNED_SUPERVISORS'});
+  if($('actNotifyAssignedWorkers').checked) actions.push({type:'NOTIFY_ASSIGNED_WORKERS'});
   if($('actCreateTicket').checked) actions.push({type:'CREATE_TICKET', priority:$('actTicketPriority').value});
   if(!actions.length){ App.showError('ruleError','Select at least one action'); return; }
 
@@ -453,6 +464,8 @@ $('ruleForm').addEventListener('submit', async function(e){
     var escActions = [];
     if($('escNotifyAdmins').checked) escActions.push({type:'NOTIFY_ADMINS'});
     if($('escNotifySups').checked) escActions.push({type:'NOTIFY_SUPERVISORS'});
+    if($('escNotifyAssignedSups').checked) escActions.push({type:'NOTIFY_ASSIGNED_SUPERVISORS'});
+    if($('escNotifyAssignedWorkers').checked) escActions.push({type:'NOTIFY_ASSIGNED_WORKERS'});
     if($('escCreateTicket').checked) escActions.push({type:'CREATE_TICKET',priority:$('escTicketPriority').value});
     body.escalationActions = escActions.length ? escActions : null;
   } else {

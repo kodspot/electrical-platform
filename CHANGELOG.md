@@ -184,6 +184,20 @@ see `docs/DEPLOYMENT.md` for how a change reaches production.
     already redacts `/review/...`.
   - Route index regenerated. J5 now checks that the photo loads.
 - **User-visible (Release Notes):** residents see the proof photo on the review page.
+- **`[BUG-0042]` A ticket the guest rejected was open again but kept its resolution and
+  verification times** (PAR-10/55).
+  - Analytics counts any ticket with `resolvedAt` as resolved, so a reopened ticket counted
+    as resolved with a stale time.
+  - The REJECT now clears `resolvedAt`, `verifiedAt`, `verifiedById` and `verifyNote`, as
+    every other reopen does ([WP10]). The photo and the guest's note stay (BUG-0026).
+- **`[BUG-0043]` Editing an alert rule silently dropped its "notify the location's supervisors
+  / electricians" actions** (PAR-10/51).
+  - The form offered only three of the five action types the API accepts, and saving
+    rebuilt the actions from its checkboxes.
+  - Both lists (actions and escalation actions) now offer, load and save all of them, and the
+    rule list labels them.
+- **User-visible (Release Notes):** the alert-rule form can send alerts to the supervisors and
+  electricians of the location concerned.
 
 ### 2026-10-24 (product and architecture review — documentation only)
 

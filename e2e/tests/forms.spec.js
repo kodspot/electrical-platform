@@ -180,6 +180,34 @@ test.describe('Forms — admin, supervisor, electrician', () => {
     }).toEqual([null, null]);
   });
 
+  // The form offered only Notify Admins / Notify Supervisors / Create Ticket; the API also takes
+  // "notify the location's supervisors / electricians" (what BUG-0019 made escalations reach).
+  // Editing a rule that had them rebuilt the actions from the checkboxes and dropped them,
+  // silently. [BUG-0043]
+  test('BUG-0043: editing an alert rule keeps its "location\'s supervisors / electricians" actions', async ({ page }) => {
+    const name = `Form Rule 43 ${s.run}`;
+    await db().alertRule.create({
+      data: {
+        orgId: x.org.id, name, trigger: 'TICKET_HIGH_PRIORITY', conditions: {},
+        actions: [{ type: 'NOTIFY_ADMINS' }, { type: 'NOTIFY_ASSIGNED_SUPERVISORS' }],
+        escalateAfterMinutes: 30, maxEscalations: 1, escalationActions: [{ type: 'NOTIFY_ASSIGNED_WORKERS' }]
+      }
+    });
+    await signIn(page, 'admin', x.admin, slug);
+    await page.goto(orgPage(slug, 'admin-alerts'));
+    const card = page.locator('.rule-card', { hasText: name });
+    await expect(card).toContainText('Location Supervisors');
+    await card.getByRole('button', { name: 'Edit' }).click();
+    await expect(page.locator('#actNotifyAssignedSups')).toBeChecked();
+    await expect(page.locator('#escNotifyAssignedWorkers')).toBeChecked();
+    await page.locator('#rfDesc').fill('Edited');
+    await page.locator('#ruleSubmitBtn').click();
+    await expect.poll(async () => (await db().alertRule.findFirst({ where: { orgId: x.org.id, name } })).description).toBe('Edited');
+    const saved = await db().alertRule.findFirst({ where: { orgId: x.org.id, name } });
+    expect(saved.actions.map((a) => a.type).sort()).toEqual(['NOTIFY_ADMINS', 'NOTIFY_ASSIGNED_SUPERVISORS']);
+    expect(saved.escalationActions.map((a) => a.type)).toEqual(['NOTIFY_ASSIGNED_WORKERS']);
+  });
+
   test('BUG-0021: an alert rule\'s description can be cleared; a rule needs a trigger; acknowledging an alert', async ({ page }) => {
     await signIn(page, 'admin', x.admin, slug);
     await page.goto(orgPage(slug, 'admin-alerts'));

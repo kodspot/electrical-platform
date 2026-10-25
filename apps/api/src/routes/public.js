@@ -702,6 +702,8 @@ async function publicRoutes(fastify, opts) {
     // resolved it are disconnected too, as the supervisor's reopen does: still connected, the
     // ticket stayed out of their pool and their app showed it "Done" with no way to pick it
     // up again. The resolution itself (photo, note) and the guest's verdict stay. [BUG-0026]
+    // Its resolution and verification times go, as on every other reopen ([WP10]): an open
+    // ticket must not count as resolved in the reports. [BUG-0042]
     const resolverIds = (ticket.resolvedWorkers || []).map((w) => w.id);
     const rejected = await updateTicketIfUnchanged(prisma, ticket, {
       where: { reviewToken: token, reviewStatus: 'PENDING' },
@@ -711,7 +713,11 @@ async function publicRoutes(fastify, opts) {
         reviewedAt: now,
         status: 'OPEN',
         assignedToId: null,
-        resolvedWorkers: { set: [] }
+        resolvedWorkers: { set: [] },
+        resolvedAt: null,
+        verifiedAt: null,
+        verifiedById: null,
+        verifyNote: null
       }
     });
     if (!rejected) return reply.code(409).send({ error: STALE_TICKET_ERROR });

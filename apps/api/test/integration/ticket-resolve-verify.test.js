@@ -389,6 +389,25 @@ describe('ticket resolve → verify → reopen, every role', () => {
     assert.strictEqual(now.reviewNote, 'Still dark in the corner');
   });
 
+  // The guest's rejection reopened the ticket but kept resolvedAt and verifiedAt, unlike every
+  // other reopen ([WP10]): analytics then counted an open ticket as resolved, with a stale
+  // resolution time. The photo and note stay on purpose (BUG-0026). [BUG-0042]
+  it('BUG-0042: a ticket the guest rejected is open again — no resolution or verification time stays on it', async (t) => {
+    if (!dbAvailable) return t.skip('No database available');
+    const ticket = await createTestTicket(org.id, location.id, { status: 'IN_PROGRESS', source: 'PUBLIC', assignedToId: supA.id });
+    assert.strictEqual((await workerResolve(ticket.id)).statusCode, 200);
+    const verified = await post(supAToken, `/api/tickets/${ticket.id}/verify`, { note: 'Looks fine' });
+    assert.strictEqual(verified.statusCode, 200, verified.body);
+    const reject = await guest('POST', tokenOf(verified.json().reviewUrl), { action: 'REJECT', note: 'Flickers again' });
+    assert.strictEqual(reject.statusCode, 200, reject.body);
+
+    const now = await ticketNow(ticket.id);
+    assert.strictEqual(now.status, 'OPEN');
+    for (const k of ['resolvedAt', 'verifiedAt', 'verifiedById', 'verifyNote']) assert.strictEqual(now[k], null, `${k} is cleared`);
+    assert.ok(now.resolvedImageUrl, 'the rejected fix\'s photo stays as context (BUG-0026)');
+    assert.strictEqual(now.reviewNote, 'Flickers again');
+  });
+
   it('BUG-0018: the electrician who resolved a ticket is told when it is verified, and when it is sent back', async (t) => {
     if (!dbAvailable) return t.skip('No database available');
     const verified = await createTestTicket(org.id, location.id, { status: 'IN_PROGRESS', assignedToId: supA.id });

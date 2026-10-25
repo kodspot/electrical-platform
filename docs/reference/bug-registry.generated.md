@@ -57,8 +57,10 @@ Commands: `npm run bug:list` · `npm run bug:run -- <ID>` · `npm run bug:valida
 | BUG-0039 | MEDIUM | FIXED | ele | Analytics labelled every electrician and supervisor bar "undefined"; the dashboard's inspection log was always empty | `e2e/tests/ui-fixes.spec.js` |
 | BUG-0040 | MEDIUM | FIXED | asset | Asset, failure and inspection photos were broken images in the admin detail views | `e2e/tests/ui-fixes.spec.js` |
 | BUG-0041 | MEDIUM | FIXED | complaints | The guest review page asked the resident to confirm a fix but could not show its proof photo | `test/integration/ticket-resolve-verify.test.js` |
+| BUG-0042 | MEDIUM | FIXED | complaints | A ticket the guest rejected was open again but still carried its resolution and verification times | `test/integration/ticket-resolve-verify.test.js` |
+| BUG-0043 | MEDIUM | FIXED | ele | Editing an alert rule silently dropped its "notify the location's supervisors / electricians" actions | `e2e/tests/forms.spec.js` |
 
-Count: 41 bug scenario(s).
+Count: 43 bug scenario(s).
 
 ## BUG-0001 — Admin could set a ticket to RESOLVED_PENDING_VERIFY directly
 
@@ -794,4 +796,40 @@ Count: 41 bug scenario(s).
 1. Resolve a public ticket with a proof photo so a guest review link is issued.
 2. Open /review/:token as the guest.
 3. Broken: a broken image. Fixed: the photo shows. Browser test: e2e/tests/journeys.spec.js J5; API test: ticket-resolve-verify.test.js (BUG-0041).
+
+## BUG-0042 — A ticket the guest rejected was open again but still carried its resolution and verification times
+
+- **Severity:** MEDIUM · **Status:** FIXED · **Module:** complaints · **Category:** ticket-workflow
+- **Origin:** Product and architecture review 2026-10 (PAR-10/55)
+- **Introduced:** 2026-10-20 (BUG-0026 kept the resolution on purpose; the times came with it) · **Fixed:** 2026-10-25
+- **Description:** POST /api/public/review/:token with REJECT reopened the ticket (OPEN, back to the pool) but left resolvedAt, verifiedAt, verifiedById and verifyNote set. Every other reopen clears them ([WP10]). Analytics counts any ticket with resolvedAt as resolved, so a rejected, open ticket counted as resolved with a stale resolution time. The photo and note stay on purpose (BUG-0026). Found by the 2026-10 product and architecture review (PAR-10/55).
+- **Root cause:** The REJECT update cleared the assignee and electricians but not the resolution and verification timestamps.
+- **Expected behavior:** After a guest rejection the ticket is OPEN with resolvedAt, verifiedAt, verifiedById and verifyNote null; its photo and the guest's note stay.
+- **Broken behavior:** OPEN, with resolvedAt and verifiedAt from the rejected fix.
+- **Scenario dependencies:** —
+- **Regression test:** `test/integration/ticket-resolve-verify.test.js`
+
+**Reproduction steps:**
+
+1. Verify a public ticket so a guest review opens.
+2. POST /api/public/review/:token with { action: "REJECT" }.
+3. Broken: resolvedAt and verifiedAt still set. Fixed: both null.
+
+## BUG-0043 — Editing an alert rule silently dropped its "notify the location's supervisors / electricians" actions
+
+- **Severity:** MEDIUM · **Status:** FIXED · **Module:** ele · **Category:** admin-workflow
+- **Origin:** Product and architecture review 2026-10 (PAR-10/51)
+- **Introduced:** pre-audit · **Fixed:** 2026-10-25
+- **Description:** The alert-rule form offered only Notify Admins, Notify Supervisors and Create Ticket, but the API accepts NOTIFY_ASSIGNED_SUPERVISORS and NOTIFY_ASSIGNED_WORKERS (what BUG-0019 made escalations reach). On edit the form rebuilt the actions from its checkboxes, so saving any change — even the description — removed those two actions from the rule and its escalation. The rule list showed them as raw codes. Found by the 2026-10 product and architecture review (PAR-10/51).
+- **Root cause:** The form had no checkbox for two action types the API validates, and saved only what it had checkboxes for.
+- **Expected behavior:** Every action type the API accepts has a checkbox in both action lists, is loaded on edit and saved back; the list labels them.
+- **Broken behavior:** After an edit the rule had only NOTIFY_ADMINS; the escalation action was gone.
+- **Scenario dependencies:** —
+- **Regression test:** `e2e/tests/forms.spec.js`
+
+**Reproduction steps:**
+
+1. Create a rule (API) with NOTIFY_ASSIGNED_SUPERVISORS and an escalation NOTIFY_ASSIGNED_WORKERS.
+2. In admin-alerts, Edit the rule, change its description, save.
+3. Broken: both actions are gone. Fixed: kept. Browser test: e2e/tests/forms.spec.js (BUG-0043).
 
