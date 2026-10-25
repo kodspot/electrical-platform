@@ -43,7 +43,12 @@ describe('BUG-0037: a deactivated or moved supervisor\'s open tickets are handed
     assert.strictEqual(await assigneeOf(done), sup.id, 'finished work keeps its history');
     const audits = await prisma.auditLog.count({ where: { orgId: org.id, action: 'ticket_reassigned', entityId: { in: [open.id, working.id, toVerify.id] } } });
     assert.strictEqual(audits, 3, 'each handover is audited');
-    const told = await prisma.notification.count({ where: { userId: backup.id, entityId: { in: [open.id, working.id] } } });
+    // Sent after the handover commits, without delaying the response (notifyTicketHandover),
+    // so they can land a moment after it: wait for them rather than count once. A busy CI
+    // runner counted 1 of 2.
+    const countTold = () => prisma.notification.count({ where: { userId: backup.id, entityId: { in: [open.id, working.id] } } });
+    let told = await countTold();
+    for (const end = Date.now() + 3000; told < 2 && Date.now() < end; told = await countTold()) await new Promise((r) => setTimeout(r, 50));
     assert.strictEqual(told, 2, 'the new assignee is told');
   };
 
