@@ -3,6 +3,7 @@
 const { z } = require('zod');
 const PDFDocument = require('pdfkit');
 const { prisma } = require('../lib/prisma');
+const { localDateKey } = require('../lib/dates');
 const { authenticateJWT, requirePolicy } = require('../middleware/auth');
 
 const VALID_STATUSES = ['PRESENT', 'ABSENT', 'LEAVE', 'HALF_DAY'];
@@ -216,15 +217,14 @@ async function attendanceRoutes(fastify, opts) {
       return reply.code(400).send({ error: 'Invalid date' });
     }
 
-    // Only allow today or yesterday (admins can override)
+    // Only allow today or yesterday (admins can override), as local calendar dates: "today"
+    // was the UTC date (the day before, until 05:30 in India) and a future date passed. [BUG-0057]
     const dateObj = new Date(data.date + 'T00:00:00Z');
-    const today = new Date();
-    today.setUTCHours(0, 0, 0, 0);
-    const yesterday = new Date(today);
-    yesterday.setDate(yesterday.getDate() - 1);
+    const today = localDateKey();
+    const yesterday = localDateKey(new Date(Date.now() - 86400000));
 
     if (request.user.role !== 'ADMIN') {
-      if (dateObj < yesterday) {
+      if (data.date < yesterday || data.date > today) {
         return reply.code(400).send({ error: 'Supervisors can only mark attendance for today or yesterday' });
       }
     }
@@ -869,8 +869,9 @@ async function attendanceRoutes(fastify, opts) {
   // ── Today's attendance overview (for dashboard) ──
   fastify.get('/attendance/today', async (request) => {
     const orgId = request.user.orgId;
-    const today = new Date();
-    today.setUTCHours(0, 0, 0, 0);
+    // The local calendar date, stored as UTC midnight like every attendance date; the UTC date
+    // showed yesterday's attendance until 05:30 in India. [BUG-0057]
+    const today = new Date(localDateKey() + 'T00:00:00Z');
 
     const records = await prisma.attendance.findMany({
       where: { orgId, date: today },

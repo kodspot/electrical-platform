@@ -72,8 +72,9 @@ Commands: `npm run bug:list` · `npm run bug:run -- <ID>` · `npm run bug:valida
 | BUG-0054 | MEDIUM | FIXED | ele | On a shared phone, an inspection saved offline was sent in as whoever else was signed in | `test/shared-device-sessions.test.js` |
 | BUG-0055 | MEDIUM | FIXED | ele | Date filters started each day at 05:30 in India (UTC midnight), and pages took "today" from UTC | `test/integration/date-filters-local-day.test.js` |
 | BUG-0056 | MEDIUM | FIXED | ele | Analytics charts counted inspections between midnight and 05:30 under the day before | `test/integration/analytics-local-days.test.js` |
+| BUG-0057 | MEDIUM | FIXED | ele | Supervisors could mark attendance for any future date, and for two days back just after midnight | `test/integration/attendance-local-day.test.js` |
 
-Count: 56 bug scenario(s).
+Count: 57 bug scenario(s).
 
 ## BUG-0001 — Admin could set a ticket to RESOLVED_PENDING_VERIFY directly
 
@@ -1078,4 +1079,22 @@ Count: 56 bug scenario(s).
 1. With TZ=Asia/Kolkata, record inspections at 01:00 and 23:30 on one day.
 2. GET /api/analytics/report?from=<day>&to=<day>. Broken: trend keyed by the day before. Fixed: [{ date: <day>, count: 2 }].
 3. Regression: test/integration/analytics-local-days.test.js (runs in Asia/Kolkata).
+
+## BUG-0057 — Supervisors could mark attendance for any future date, and for two days back just after midnight
+
+- **Severity:** MEDIUM · **Status:** FIXED · **Module:** ele · **Category:** supervisor-workflow
+- **Origin:** Found while fixing BUG-0055 (PAR-10/07), 2026-10-26
+- **Introduced:** pre-audit · **Fixed:** 2026-10-26
+- **Description:** POST /attendance/bulk and POST /duty-roster allowed supervisors "today or yesterday" with "today" taken as the UTC date — until 05:30 in India still the day before, so the day before yesterday was accepted — and the attendance check had no upper bound, so any future date passed. The dashboard's GET /attendance/today showed yesterday's attendance until 05:30. Found while fixing BUG-0055 (PAR-10/07).
+- **Root cause:** today.setUTCHours(0, 0, 0, 0) is the UTC date; only a lower bound was checked.
+- **Expected behavior:** Supervisors mark attendance for the local today or yesterday only (admins override); rosters from the local yesterday; the dashboard shows the local today.
+- **Broken behavior:** Attendance for tomorrow accepted; at 01:00 IST the day before yesterday accepted and yesterday shown as today.
+- **Scenario dependencies:** —
+- **Regression test:** `test/integration/attendance-local-day.test.js`
+
+**Reproduction steps:**
+
+1. As a supervisor, POST /api/attendance/bulk for tomorrow.
+2. Broken: 200. Fixed: 400 "Supervisors can only mark attendance for today or yesterday".
+3. Regression: test/integration/attendance-local-day.test.js (Asia/Kolkata, clock at 01:00).
 

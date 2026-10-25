@@ -2,6 +2,7 @@
 
 const { z } = require('zod');
 const { prisma } = require('../lib/prisma');
+const { localDateKey } = require('../lib/dates');
 const { authenticateJWT, requirePolicy } = require('../middleware/auth');
 const { getAssignedWorkerIds } = require('../services/assignment-resolver');
 
@@ -95,14 +96,12 @@ async function dutyRosterRoutes(fastify) {
       return reply.code(400).send({ error: 'Invalid date' });
     }
 
-    // Only allow today or yesterday for supervisors
+    // Only allow today or yesterday for supervisors — yesterday as a local calendar date, not
+    // the UTC one (two days back, until 05:30 in India). [BUG-0057]
     const dateObj = new Date(data.date + 'T00:00:00Z');
-    const today = new Date();
-    today.setUTCHours(0, 0, 0, 0);
-    const yesterday = new Date(today);
-    yesterday.setDate(yesterday.getDate() - 1);
+    const yesterday = localDateKey(new Date(Date.now() - 86400000));
 
-    if (request.user.role !== 'ADMIN' && dateObj < yesterday) {
+    if (request.user.role !== 'ADMIN' && data.date < yesterday) {
       return reply.code(400).send({ error: 'Can only create rosters for today or yesterday' });
     }
 

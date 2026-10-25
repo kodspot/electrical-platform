@@ -36,6 +36,9 @@
   day before. *Today* is also correct just after midnight. The charts in *Analytics* and the
   room heatmap count each inspection on the day it was done; the report's days are no
   longer shifted by one.
+- **Attendance is for today or yesterday, and only in the past.** Supervisors can no longer
+  mark attendance for a future date. Just after midnight, the dashboard's attendance shows
+  the new day.
 - **A purchase cost of 0 is kept.** Assets that cost nothing, such as donations, keep 0 as
   their cost instead of showing it as unknown.
 - **Photos show in the asset, failure and inspection details.** Photos attached to an asset, a

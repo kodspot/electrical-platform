@@ -341,6 +341,17 @@ see `docs/DEPLOYMENT.md` for how a change reaches production.
     `toISOString()`'s date, so between 00:00 and 05:30 IST they missed the inspection they
     had just made and failed, whatever the code. They use `localDateKey()` now. This was
     found at 01:12 IST.
+- **`[BUG-0057]` Supervisors could mark attendance for any future date, and for two days
+  back just after midnight** (found while fixing BUG-0055).
+  - `POST /attendance/bulk` and `POST /duty-roster` allow supervisors "today or yesterday",
+    but took "today" as the UTC date. Until 05:30 IST that is still the day before, so the
+    day before yesterday passed.
+  - The attendance check had no upper bound, so any future date passed.
+  - `GET /attendance/today` showed yesterday's attendance until 05:30.
+  - Both checks now compare local calendar dates (`localDateKey`), and attendance also
+    refuses a future date. Admins keep their override.
+  - Rosters for future dates are still accepted, as before. Planning ahead may be wanted, so
+    that is left to the owner.
 
 ### 2026-10-24 (product and architecture review — documentation only)
 
