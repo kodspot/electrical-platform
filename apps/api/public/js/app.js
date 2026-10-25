@@ -206,6 +206,12 @@ window.App = (function () {
 
   async function _doFetch(path, fetchOpts, loginRedirect, scope) {
     var lastErr;
+    // A request that may have reached the server before the connection dropped is retried
+    // only if repeating it is harmless: GET/HEAD. Retrying a POST/PATCH/DELETE could submit
+    // the same complaint, ticket or inspection twice. (A 503 is still retried: the server's
+    // circuit breaker refused it before doing anything.) [BUG-0047]
+    var method = String(fetchOpts.method || 'GET').toUpperCase();
+    var retryOnNetworkError = method === 'GET' || method === 'HEAD';
     for (var i = 0; i < 3; i++) {
       try {
         var res = await fetch(API + path, fetchOpts);
@@ -233,6 +239,7 @@ window.App = (function () {
         return res;
       } catch (err) {
         lastErr = err;
+        if (!retryOnNetworkError) break;
         if (i < 2) await _wait(1000 * Math.pow(2, i) + Math.random() * 500);
       }
     }

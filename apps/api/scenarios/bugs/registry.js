@@ -54,7 +54,8 @@ const BUGS_LIST = [
   require('./bug-0043-alert-form-drops-location-actions'),
   require('./bug-0044-alert-tickets-unassigned-unaudited'),
   require('./bug-0045-missed-inspection-alert-timing-and-dedup'),
-  require('./bug-0046-jwt-any-hmac-algorithm-accepted')
+  require('./bug-0046-jwt-any-hmac-algorithm-accepted'),
+  require('./bug-0047-client-repeats-lost-submissions')
 ];
 
 const BUGS = Object.fromEntries(BUGS_LIST.map((b) => [b.id, b]));

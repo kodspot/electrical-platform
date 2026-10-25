@@ -230,6 +230,15 @@ see `docs/DEPLOYMENT.md` for how a change reaches production.
     electrician's live stream.
   - A token signed HS384 or HS512 with the same secret answers 401.
   - `auth-and-tenancy.md` updated. Not visible to users: the app signs HS256 only.
+- **`[BUG-0047]` The pages re-sent a submission after a network error** (PAR-10/54).
+  - `public/js/app.js` `_doFetch` retried every request three times on a network error,
+    POST, PATCH and DELETE included. On a weak connection, where the request had reached the
+    server but the reply was lost, one tap could create two complaints, tickets or
+    inspections.
+  - Now only GET and HEAD are retried after a network error. A submission fails once, with
+    the "Network error" message, and the person can try again knowingly.
+  - A 503 (the circuit breaker refused before doing anything) is still retried.
+  - Documented in `docs/architecture/frontend.md`.
 
 ### 2026-10-24 (product and architecture review — documentation only)
 

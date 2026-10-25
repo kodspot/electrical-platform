@@ -34,6 +34,10 @@ All API calls go through `App.apiFetch(path, opts)` (and its JSON variant). This
 owns: attaching the auth header for the active role, injecting `X-Org-Id` when a SuperAdmin
 has an org selected, and handling `401` centrally. New page code calls `apiFetch` rather
 than using `fetch` directly, so auth and tenant-context handling stay in a single place.
+After a network error it retries GET and HEAD only (up to three attempts). A submission
+(POST/PATCH/DELETE) may already have reached the server, so it is not repeated: the call
+fails with "Network error" (BUG-0047). A `503` is retried for every method, because the
+server's circuit breaker refused it before doing any work.
 
 ## Escaping text into markup
 

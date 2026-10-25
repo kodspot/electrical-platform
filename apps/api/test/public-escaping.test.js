@@ -47,6 +47,50 @@ const PAYLOADS = [
   'Hostel A — Block 2'
 ];
 
+// _doFetch retried every request up to three times after a network error — POSTs included.
+// A submission whose response was lost (the request reached the server, the phone lost the
+// connection) was sent again: a second complaint, ticket or inspection. Only GET/HEAD, which
+// change nothing, are retried now. [BUG-0047]
+describe('BUG-0047: the client retries a lost request only when repeating it is harmless', () => {
+  /** app.js with a fake fetch that fails with a network error `failures` times, then answers. */
+  function appWithFlakyFetch(failures) {
+    const noop = () => {};
+    const calls = [];
+    const sandbox = {
+      window: { addEventListener: noop }, navigator: {}, location: { pathname: '/', href: '' },
+      localStorage: { getItem: () => 'tkn', setItem: noop, removeItem: noop },
+      document: {
+        addEventListener: noop, querySelector: () => null, getElementById: () => null, body: { appendChild: noop },
+        createElement: () => ({ style: {}, classList: { add: noop, remove: noop }, appendChild: noop, remove: noop, addEventListener: noop, innerHTML: '', textContent: '' })
+      },
+      setTimeout: (fn) => { fn(); return 0; }, clearTimeout: noop, FormData: class FormData {},
+      fetch: async (url, opts) => {
+        calls.push((opts && opts.method) || 'GET');
+        if (calls.length <= failures) throw new TypeError('Failed to fetch');
+        return { status: 200, ok: true, json: async () => ({}) };
+      }
+    };
+    vm.runInNewContext(fs.readFileSync(path.join(PUBLIC, 'js', 'app.js'), 'utf8'), sandbox);
+    sandbox.window.App.toast = noop;
+    return { App: sandbox.window.App, calls };
+  }
+
+  it('a POST, PATCH or DELETE that fails on the network is sent once, not repeated', async () => {
+    for (const method of ['POST', 'PATCH', 'DELETE']) {
+      const { App, calls } = appWithFlakyFetch(1);
+      await assert.rejects(App.apiFetch('/tickets', { method, body: '{}' }), /Failed to fetch/, method);
+      assert.deepStrictEqual(calls, [method], `${method} was sent ${calls.length} time(s)`);
+    }
+  });
+
+  it('a GET is still retried after a network error', async () => {
+    const { App, calls } = appWithFlakyFetch(2);
+    const res = await App.apiFetch('/tickets');
+    assert.strictEqual(res.status, 200);
+    assert.strictEqual(calls.length, 3);
+  });
+});
+
 describe('BUG-0028: App.esc / App.escJs are safe where pages use them', () => {
   const App = loadApp();
 

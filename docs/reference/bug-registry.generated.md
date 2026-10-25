@@ -62,8 +62,9 @@ Commands: `npm run bug:list` · `npm run bug:run -- <ID>` · `npm run bug:valida
 | BUG-0044 | MEDIUM | FIXED | ele | Tickets raised by an alert rule were unassigned, had no SLA deadline, no audit row, and nobody was told | `test/integration/alert-escalation.test.js` |
 | BUG-0045 | MEDIUM | FIXED | ele | Missed-inspection alerts: the night shift was checked during the night, and a second shift or a second rule never alerted | `test/integration/missed-inspection.test.js` |
 | BUG-0046 | LOW | FIXED | ele | Token verification accepted any HMAC algorithm, not just the HS256 the app signs | `test/integration/jwt-algorithms.test.js` |
+| BUG-0047 | MEDIUM | FIXED | ele | The pages re-sent a submission after a network error, so one tap could create two complaints or tickets | `test/public-escaping.test.js` |
 
-Count: 46 bug scenario(s).
+Count: 47 bug scenario(s).
 
 ## BUG-0001 — Admin could set a ticket to RESOLVED_PENDING_VERIFY directly
 
@@ -889,4 +890,22 @@ Count: 46 bug scenario(s).
 1. Sign { userId, orgId, role } with JWT_SECRET using HS512.
 2. GET /api/auth/me with it.
 3. Broken: 200. Fixed: 401.
+
+## BUG-0047 — The pages re-sent a submission after a network error, so one tap could create two complaints or tickets
+
+- **Severity:** MEDIUM · **Status:** FIXED · **Module:** ele · **Category:** resilience
+- **Origin:** Product and architecture review 2026-10 (PAR-10/54)
+- **Introduced:** pre-audit · **Fixed:** 2026-10-25
+- **Description:** public/js/app.js _doFetch retried every request up to three times when fetch failed with a network error — POST, PATCH and DELETE included. On a weak campus or mobile connection the request can reach the server and only the response be lost; the retry then submitted the same complaint, ticket, inspection or edit again. Found by the 2026-10 product and architecture review (PAR-10/54).
+- **Root cause:** The retry loop did not distinguish idempotent requests from submissions.
+- **Expected behavior:** Only GET/HEAD are retried after a network error; a submission fails once with the "Network error" message. A 503 (the circuit breaker refused before doing any work) is still retried.
+- **Broken behavior:** A POST whose first attempt failed on the network was sent again.
+- **Scenario dependencies:** —
+- **Regression test:** `test/public-escaping.test.js`
+
+**Reproduction steps:**
+
+1. Load app.js with a fetch that fails once with a network error, then answers.
+2. App.apiFetch(path, { method: "POST" }).
+3. Broken: two POSTs reach fetch. Fixed: one, and the call rejects.
 
