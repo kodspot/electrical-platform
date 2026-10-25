@@ -49,18 +49,23 @@ async function getLocationAncestors(locationId, maxDepth = 10) {
  * subtree — this backs getWorkerCoverageLocationIds (worker-auth.js), which
  * runs on essentially every worker-app request (list/detail/pickup/resolve),
  * so this was the hottest N+1 path in the app. [WP11]
+ *
+ * Deactivated locations are walked through and included, like getLocationAncestors does:
+ * a location can be deactivated while its children stay active (and keep taking complaints),
+ * and its own open tickets stay open. Skipping them meant an electrician was rung for a
+ * ticket the app then refused to show. [BUG-0050]
  */
 async function getLocationDescendants(locationId, orgId, maxDepth = 10) {
   const rows = await prisma.$queryRaw`
     WITH RECURSIVE descendants AS (
       SELECT id, "parentId", 0 AS depth
       FROM "Location"
-      WHERE "parentId" = ${locationId} AND "orgId" = ${orgId} AND "isActive" = true
+      WHERE "parentId" = ${locationId} AND "orgId" = ${orgId}
       UNION ALL
       SELECT l.id, l."parentId", d.depth + 1
       FROM "Location" l
       INNER JOIN descendants d ON l."parentId" = d.id
-      WHERE l."orgId" = ${orgId} AND l."isActive" = true AND d.depth < ${maxDepth - 1}
+      WHERE l."orgId" = ${orgId} AND d.depth < ${maxDepth - 1}
     )
     SELECT id FROM descendants
   `;

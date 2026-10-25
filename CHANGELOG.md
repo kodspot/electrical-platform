@@ -249,6 +249,17 @@ see `docs/DEPLOYMENT.md` for how a change reaches production.
 - **`[BUG-0049]` An asset purchase cost of 0 was stored as "unknown"** (PAR-10/52). `|| null`
   became `?? null` on create and edit.
 - **User-visible (Release Notes):** refused actions say why; a cost of 0 is kept.
+- **`[BUG-0050]` An electrician could be rung for a ticket they could not open** (PAR-10/50).
+  - An admin can deactivate a floor and keep the rooms under it active
+    (`DELETE /locations/:id?force=true`), and those rooms still take complaints.
+  - The ring (`getAssignedWorkerIds`) walked up through the inactive floor and reached the
+    electrician covering the building. The electrician app's coverage
+    (`getLocationDescendants`) walked down only through active locations, so it answered
+    404 for that ticket. It did the same for open tickets left at the deactivated floor.
+  - The descendant walk now passes through deactivated locations and includes them, as the
+    ancestor walk does. Coverage still ends at the electrician's own subtree and org.
+  - Documented in `docs/architecture/data-model.md`.
+- **User-visible (Release Notes):** electricians can open tickets under a deactivated floor.
 
 ### 2026-10-24 (product and architecture review — documentation only)
 

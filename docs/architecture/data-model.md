@@ -37,7 +37,10 @@ owned rows.
 down the hierarchy (`coverChildren`), resolved by `services/assignment-resolver.js` with
 recursive CTEs (Charter §7). Matches are returned in a stable order, and callers take the
 first as the auto-assignee: direct assignment, then nearest ancestor, then `isPrimary`
-(workers only), then oldest assignment (WP-H F2). The API requires `Worker.employeeId` on
+(workers only), then oldest assignment (WP-H F2). Who is rung (walking up) and what an
+electrician's app shows (walking down) follow the same tree. Both pass through deactivated
+locations, because a location can be deactivated while its children stay active
+(BUG-0050). The API requires `Worker.employeeId` on
 creation and refuses to clear it, because worker login uses it (WP-H F8). The column stays
 nullable, so existing rows are untouched.
 
