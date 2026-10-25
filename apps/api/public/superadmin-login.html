@@ -32,7 +32,7 @@
 
   <div id="setupHint" style="display:none;margin-top:var(--sp-lg);font-size:.82rem;color:#3730A3;background:#EEF2FF;border:1px solid #C7D2FE;border-radius:8px;padding:.75rem 1rem;text-align:center">
     No Super Admin account found.<br>
-    <a href="/superadmin-setup" style="color:#4338CA;font-weight:600">Run one-time setup &rarr;</a>
+    <button type="button" class="btn btn-sa" id="setupBtn" style="margin-top:.5rem">Run one-time setup</button>
   </div>
 
   <p style="margin-top:var(--sp-lg);font-size:.8rem;color:var(--text-light);text-align:center">
@@ -70,6 +70,28 @@ $('saLoginForm').addEventListener('submit', async function(e) {
     location.href = '/superadmin-dashboard';
   } catch (err) { showErr('Network error. Please try again.'); }
   finally { btn.disabled = false; btn.textContent = 'Sign In'; }
+});
+
+// One-time setup: no super admin exists yet, so create it with the admin key just entered
+// (POST /auth/bootstrap; the same key signs in afterwards). This linked to /superadmin-setup,
+// a page that does not exist. [BUG-0051]
+$('setupBtn').addEventListener('click', async function() {
+  hideErr();
+  var btn = $('setupBtn'); btn.disabled = true; btn.textContent = 'Setting up...';
+  try {
+    var res = await fetch('/api/auth/bootstrap', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ adminKey: $('adminKey').value }) });
+    var data = await res.json();
+    if (!res.ok) {
+      $('setupHint').style.display = 'none';
+      showErr(data.error || 'Setup failed');
+      return;
+    }
+    localStorage.setItem('sa_token', data.token);
+    localStorage.setItem('sa_user', JSON.stringify(data.user));
+    location.href = '/superadmin-dashboard';
+  } catch (err) { showErr('Network error. Please try again.'); }
+  finally { btn.disabled = false; btn.textContent = 'Run one-time setup'; }
 });
 
 // Redirect if already logged in as SA

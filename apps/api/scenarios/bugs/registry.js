@@ -58,7 +58,8 @@ const BUGS_LIST = [
   require('./bug-0047-client-repeats-lost-submissions'),
   require('./bug-0048-row-actions-fail-silently'),
   require('./bug-0049-zero-purchase-cost-lost'),
-  require('./bug-0050-rung-for-ticket-under-inactive-location')
+  require('./bug-0050-rung-for-ticket-under-inactive-location'),
+  require('./bug-0051-no-way-to-request-a-reset')
 ];
 
 const BUGS = Object.fromEntries(BUGS_LIST.map((b) => [b.id, b]));

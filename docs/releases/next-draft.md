@@ -51,6 +51,9 @@
   fixed now shows the photo the electrician took. It showed a broken image before.
 
 ## For everyone who signs in
+- **"Forgot password?" and "Forgot PIN?"** The sign-in pages now let you ask for a reset link
+  by email. Electricians receive it at the email address their administrator has on file. If
+  no email arrives, your administrator can still set a new password or PIN for you.
 - **Password and PIN reset links are better protected.** If you requested a reset link shortly
   before this update and it no longer works, request a new one.
 - **Names show in full.** Names containing quotation marks or apostrophes, such as

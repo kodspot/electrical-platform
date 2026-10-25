@@ -260,6 +260,21 @@ see `docs/DEPLOYMENT.md` for how a change reaches production.
     ancestor walk does. Coverage still ends at the electrician's own subtree and org.
   - Documented in `docs/architecture/data-model.md`.
 - **User-visible (Release Notes):** electricians can open tickets under a deactivated floor.
+- **`[BUG-0051]` No sign-in page let anyone ask for a reset** (PAR-10/26, in part).
+  - `POST /auth/forgot-password` and `/auth/worker-forgot-pin` had no caller in the app.
+  - The reset pages, opened without a link, said to "request a new reset from the sign-in
+    page", and no sign-in page could.
+  - The admin and supervisor sign-in pages now have **Forgot password?**, and the electrician
+    page has **Forgot PIN?**. Each link passes the page's organization.
+  - The reset pages opened without a token now show a request form: email, or Employee ID
+    with the organization code when no organization is passed. The answer is the server's
+    generic message, plus who to ask if no email arrives.
+  - The super-admin sign-in page's **Run one-time setup** linked to `/superadmin-setup`, a
+    page that does not exist. It now runs `POST /auth/bootstrap` with the key just entered.
+  - No server change. The rest of PAR-10/26, a password or PIN change while signed in, is not
+    done yet: `PATCH /auth/password` still has no screen, and electricians have no PIN-change
+    endpoint.
+- **User-visible (Release Notes):** "Forgot password?" and "Forgot PIN?" on the sign-in pages.
 
 ### 2026-10-24 (product and architecture review — documentation only)
 

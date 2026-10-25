@@ -521,4 +521,56 @@ test.describe('Forms — admin, supervisor, electrician', () => {
       await db().location.deleteMany({ where: { orgId: x.org.id, name: locName } });
     }
   });
+
+  // The reset pages said "request a new reset from the sign-in page", but no sign-in page could:
+  // forgot-password and worker-forgot-pin had no caller in the app, and the super-admin page's
+  // "Run one-time setup" linked to a page that does not exist. [BUG-0051]
+  test('BUG-0051: a forgotten password or PIN can be requested from the sign-in pages', async ({ page, request }) => {
+    const { token } = await apiLogin(request, x.admin);
+    const empId = `FORGOT-${s.run}`;
+    const created = await request.post('/api/workers', { headers: { authorization: `Bearer ${token}` }, data: { name: `Forgot Elec ${s.run}`, employeeId: empId, email: `forgot-${s.run}@example.test` } });
+    expect(created.ok(), await created.text()).toBeTruthy();
+    try {
+      // Staff: "Forgot password?" on the admin sign-in page, then the email → the generic answer.
+      await page.goto(orgPage(slug, 'admin-login'));
+      await page.getByRole('link', { name: 'Forgot password?' }).click();
+      await expect(page).toHaveURL(/\/reset-password$/);
+      await page.locator('#email').fill(x.admin.email);
+      await page.getByRole('button', { name: 'Send reset link' }).click();
+      await expect(page.getByTestId('reset-done')).toContainText('If an account exists');
+      await expect.poll(async () => (await db().user.findUnique({ where: { id: x.admin.id }, select: { resetToken: true } })).resetToken).toMatch(/^[0-9a-f]{64}$/);
+
+      await page.goto(orgPage(slug, 'supervisor-login'));
+      await expect(page.getByRole('link', { name: 'Forgot password?' })).toHaveAttribute('href', `/reset-password?org=${slug}`);
+
+      // Electrician: "Forgot PIN?" then the Employee ID; the organization comes from the sign-in page.
+      await page.goto(orgPage(slug, 'electrician-login'));
+      await page.getByRole('link', { name: 'Forgot PIN?' }).click();
+      await expect(page).toHaveURL(/\/worker-reset-pin$/);
+      await expect(page.locator('#orgCode')).toBeHidden();
+      await page.locator('#employeeId').fill(empId);
+      await page.getByRole('button', { name: 'Send reset link' }).click();
+      await expect(page.getByTestId('reset-done')).toContainText('PIN reset link');
+      await expect.poll(async () => (await db().worker.findFirst({ where: { orgId: x.org.id, employeeId: empId }, select: { resetToken: true } })).resetToken).toMatch(/^[0-9a-f]{64}$/);
+    } finally {
+      await db().worker.deleteMany({ where: { orgId: x.org.id, employeeId: empId } });
+    }
+  });
+
+  test('BUG-0051: super admin, none set up yet: "Run one-time setup" runs it with the key just entered', async ({ page }) => {
+    // Stubbed responses — the e2e database already has a super admin, and keeps it.
+    let bootstrapBody = null;
+    await page.route('**/api/auth/login', (r) => r.fulfill({ status: 404, contentType: 'application/json', body: JSON.stringify({ error: 'No SuperAdmin account exists. Use /auth/bootstrap first.' }) }));
+    await page.route('**/api/auth/bootstrap', (r) => {
+      bootstrapBody = r.request().postDataJSON();
+      return r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ token: 'stub', user: { id: 'stub', name: 'Super Admin', role: 'SUPER_ADMIN' } }) });
+    });
+    await page.route('**/superadmin-dashboard', (r) => r.fulfill({ status: 200, contentType: 'text/html', body: '<p>dashboard</p>' }));
+    await page.goto('/superadmin-login');
+    await page.locator('#adminKey').fill('a-key-typed-by-the-operator');
+    await page.getByRole('button', { name: 'Sign In' }).click();
+    await page.getByRole('button', { name: 'Run one-time setup' }).click();
+    await expect(page).toHaveURL(/\/superadmin-dashboard$/);
+    expect(bootstrapBody).toEqual({ adminKey: 'a-key-typed-by-the-operator' });
+  });
 });
