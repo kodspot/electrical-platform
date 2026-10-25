@@ -22,6 +22,17 @@ has been git-tagged yet, so everything below is grouped under **Unreleased**.
 Complete and merged into the working tree as of this writing, pending its next deploy —
 see `docs/DEPLOYMENT.md` for how a change reaches production.
 
+### 2026-10-25 (PAR-10 fixes: security and data exposure)
+
+- **`[BUG-0027]` The electrician API returned the guest's review token and personal data**
+  (PAR-10/14). Every electrician ticket route (list, detail, pool, my work, pickup, resolve)
+  read tickets with a bare `include`, so the JSON carried every column: the guest's secret
+  review token — enough for the electrician who did the work to "confirm as the resident" —
+  and their name, phone, IP hash, user agent and risk score. `worker-auth.js` now returns one
+  explicit field allow-list (`WORKER_TICKET_SELECT`) holding exactly what the electrician app
+  reads. Not visible to users. No data migration: a pending review link expires 30 minutes
+  after it is issued, so any token already exposed is short-lived.
+
 ### 2026-10-24 (product and architecture review — documentation only)
 
 - **Documentation only; no code, schema, dependency, workflow or setting changed.** Not

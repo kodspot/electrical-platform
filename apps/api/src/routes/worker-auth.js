@@ -35,6 +35,34 @@ const {
 
 const VALID_MODULES = ['ele', 'civil', 'asset', 'complaints'];
 
+// The ticket fields an electrician's app may see — an allow-list, not `include`. A bare
+// `include` returns every column, among them the guest's review token (which confirms the
+// work "as the resident"), and their name, phone, IP hash and user agent. [BUG-0027]
+const WORKER_TICKET_SELECT = Object.freeze({
+  id: true,
+  locationId: true,
+  title: true,
+  description: true,
+  imageUrl: true,
+  priority: true,
+  status: true,
+  source: true,
+  module: true,
+  issueType: true,
+  resolvedImageUrl: true,
+  resolvedNote: true,
+  resolvedAt: true,
+  acceptedAt: true,
+  verifiedAt: true,
+  verifyNote: true,
+  createdAt: true,
+  updatedAt: true,
+  location: { select: { id: true, name: true, type: true } },
+  assignedTo: { select: { id: true, name: true } },
+  resolvedWorkers: { select: { id: true, name: true } },
+  verifiedBy: { select: { id: true, name: true } }
+});
+
 // ── Worker JWT Authentication Middleware ──
 
 async function authenticateWorkerJWT(request, reply) {
@@ -452,11 +480,7 @@ async function workerAuthRoutes(fastify) {
     const [tickets, total, grouped] = await Promise.all([
       prisma.ticket.findMany({
         where,
-        include: {
-          location: { select: { id: true, name: true, type: true } },
-          assignedTo: { select: { id: true, name: true } },
-          resolvedWorkers: { select: { id: true, name: true } }
-        },
+        select: WORKER_TICKET_SELECT,
         orderBy: [{ priority: 'desc' }, { createdAt: 'desc' }],
         take: limit,
         skip
@@ -492,11 +516,7 @@ async function workerAuthRoutes(fastify) {
 
     const ticket = await prisma.ticket.findFirst({
       where,
-      include: {
-        location: { select: { id: true, name: true, type: true } },
-        assignedTo: { select: { id: true, name: true } },
-        resolvedWorkers: { select: { id: true, name: true } }
-      }
+      select: WORKER_TICKET_SELECT
     });
     if (!ticket) return reply.code(404).send({ error: 'Ticket not found' });
     return ticket;
@@ -553,10 +573,7 @@ async function workerAuthRoutes(fastify) {
         resolvedNote: note,
         resolvedWorkers: alreadyConnected ? undefined : { connect: [{ id: workerId }] }
       },
-      include: {
-        location: { select: { id: true, name: true, type: true } },
-        resolvedWorkers: { select: { id: true, name: true } }
-      }
+      select: WORKER_TICKET_SELECT
     });
 
     await prisma.auditLog.create({
@@ -646,11 +663,7 @@ async function workerAuthRoutes(fastify) {
 
     const tickets = await prisma.ticket.findMany({
       where,
-      include: {
-        location: { select: { id: true, name: true, type: true } },
-        assignedTo: { select: { id: true, name: true } },
-        resolvedWorkers: { select: { id: true, name: true } }
-      },
+      select: WORKER_TICKET_SELECT,
       orderBy: [{ priority: 'desc' }, { createdAt: 'asc' }],
       take: 100
     });
@@ -683,10 +696,7 @@ async function workerAuthRoutes(fastify) {
         acceptedAt: ticket.acceptedAt || new Date(),
         resolvedWorkers: alreadyConnected ? undefined : { connect: [{ id: workerId }] }
       },
-      include: {
-        location: { select: { id: true, name: true, type: true } },
-        resolvedWorkers: { select: { id: true, name: true } }
-      }
+      select: WORKER_TICKET_SELECT
     });
 
     await prisma.auditLog.create({
@@ -739,11 +749,7 @@ async function workerAuthRoutes(fastify) {
 
     const tickets = await prisma.ticket.findMany({
       where,
-      include: {
-        location: { select: { id: true, name: true, type: true } },
-        assignedTo: { select: { id: true, name: true } },
-        verifiedBy: { select: { id: true, name: true } }
-      },
+      select: WORKER_TICKET_SELECT,
       orderBy: [{ resolvedAt: 'desc' }, { updatedAt: 'desc' }],
       take: 200
     });

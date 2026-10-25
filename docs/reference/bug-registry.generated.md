@@ -42,8 +42,9 @@ Commands: `npm run bug:list` · `npm run bug:run -- <ID>` · `npm run bug:valida
 | BUG-0024 | MEDIUM | FIXED | asset | After logging an asset event or reporting a failure, the supervisor saw a blank page | `e2e/tests/forms.spec.js` |
 | BUG-0025 | MEDIUM | FIXED | ele | A new duty roster suggested no electrician when they covered the floor from its building | `test/integration/admin-forms-api.test.js` |
 | BUG-0026 | MEDIUM | FIXED | complaints | After a guest rejected a fix, the electrician who did it saw the ticket as "Done" and could not pick it up again | `test/integration/ticket-resolve-verify.test.js` |
+| BUG-0027 | CRITICAL | FIXED | ele | The electrician API returned the guest's review token, name, phone, IP hash and user agent | `test/integration/ticket-resolve-verify.test.js` |
 
-Count: 26 bug scenario(s).
+Count: 27 bug scenario(s).
 
 ## BUG-0001 — Admin could set a ticket to RESOLVED_PENDING_VERIFY directly
 
@@ -509,4 +510,22 @@ Count: 26 bug scenario(s).
 1. Create a PUBLIC ticket, RESOLVED by an electrician, with a pending guest review.
 2. As the guest, POST /api/public/review/:token { action: "REJECT", note }.
 3. Broken: the electrician is still in resolvedWorkers and has no notification. Fixed: disconnected, and a ticket_review_rejected notification with the note.
+
+## BUG-0027 — The electrician API returned the guest's review token, name, phone, IP hash and user agent
+
+- **Severity:** CRITICAL · **Status:** FIXED · **Module:** ele · **Category:** data-exposure
+- **Origin:** Product and architecture review 2026-10 (PAR-10/14)
+- **Introduced:** pre-audit · **Fixed:** 2026-10-25
+- **Description:** Every electrician ticket route (list, detail, pool, my work, pickup, resolve) read tickets with a bare Prisma `include`, which returns every column. The response carried the guest's secret review token — with it, the electrician who did the work could "confirm as the resident" and close it — and the guest's name, phone, IP hash, user agent and risk score. The staff routes strip the token; the electrician routes did not. Found by the 2026-10 product and architecture review (PAR-10/14).
+- **Root cause:** worker-auth.js used `include` (all scalar columns + relations) instead of an explicit `select` for every ticket it returns.
+- **Expected behavior:** Electrician ticket responses carry only the fields the electrician app uses; no review token or guest personal data.
+- **Broken behavior:** GET /api/worker/tickets/:id returned reviewToken, guestName, guestPhone, sourceIp, userAgent and riskScore.
+- **Scenario dependencies:** —
+- **Regression test:** `test/integration/ticket-resolve-verify.test.js`
+
+**Reproduction steps:**
+
+1. Create an org, a location, an electrician covering it, and a PUBLIC ticket awaiting guest review there, with guest name and phone.
+2. As the electrician, GET /api/worker/tickets/:id.
+3. Broken: the JSON contains reviewToken and guestPhone. Fixed: neither key is present.
 

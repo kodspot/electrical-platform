@@ -229,6 +229,54 @@ describe('ticket resolve → verify → reopen, every role', () => {
 
   // ── Regressions ──
 
+  it('BUG-0027: no electrician ticket response carries the guest\'s review token, name, phone, IP hash or user agent', async (t) => {
+    if (!dbAvailable) return t.skip('No database available');
+    const guestFields = { source: 'PUBLIC', guestName: 'BUG0027 Resident', guestPhone: '9000027027', sourceIp: 'bug0027ipaddrhash', userAgent: 'BUG0027-agent', riskScore: 40 };
+    const reviewToken = crypto.randomBytes(32).toString('hex');
+    const awaitingReview = await createTestTicket(org.id, location.id, {
+      ...guestFields, status: 'RESOLVED', resolvedAt: new Date(), verifiedAt: new Date(), verifiedById: supA.id,
+      reviewToken, reviewStatus: 'PENDING', reviewExpiresAt: new Date(Date.now() + 30 * 60 * 1000),
+      resolvedWorkers: { connect: [{ id: worker.id }] }
+    });
+    const inPool = await createTestTicket(org.id, location.id, { ...guestFields, status: 'OPEN' });
+
+    const get = (url) => app.inject({ method: 'GET', url, headers: auth(workerToken) });
+    const responses = {
+      list: await get('/api/worker/tickets?status=OPEN,IN_PROGRESS,RESOLVED_PENDING_VERIFY,RESOLVED,CLOSED&limit=100'),
+      detail: await get(`/api/worker/tickets/${awaitingReview.id}`),
+      pool: await get('/api/worker/tickets/pool'),
+      myWork: await get('/api/worker/my-work?days=30'),
+      pickup: await app.inject({ method: 'POST', url: `/api/worker/tickets/${inPool.id}/pickup`, headers: auth(workerToken) })
+    };
+    responses.resolve = await workerResolve(inPool.id);
+
+    const GUEST_ONLY = ['reviewToken', 'reviewExpiresAt', 'reviewStatus', 'reviewNote', 'reviewedAt', 'guestName', 'guestPhone', 'sourceIp', 'userAgent', 'riskScore'];
+    const keysOf = (value, keys = new Set()) => {
+      if (Array.isArray(value)) value.forEach((v) => keysOf(v, keys));
+      else if (value && typeof value === 'object') for (const [k, v] of Object.entries(value)) { keys.add(k); keysOf(v, keys); }
+      return keys;
+    };
+    for (const [name, res] of Object.entries(responses)) {
+      assert.strictEqual(res.statusCode, 200, `${name}: ${res.body.slice(0, 120)}`);
+      for (const secret of [reviewToken, guestFields.guestName, guestFields.guestPhone, guestFields.sourceIp, guestFields.userAgent]) {
+        assert.ok(!res.body.includes(secret), `${name} leaks a guest value`);
+      }
+      const keys = keysOf(res.json());
+      for (const k of GUEST_ONLY) assert.ok(!keys.has(k), `${name} returns ${k}`);
+    }
+
+    // What the electrician app shows is still there.
+    const listed = responses.list.json().tickets.find((x) => x.id === awaitingReview.id);
+    assert.ok(listed, 'the ticket awaiting review is listed');
+    for (const k of ['title', 'status', 'priority', 'createdAt', 'locationId']) assert.ok(listed[k] !== undefined, `list keeps ${k}`);
+    assert.ok(listed.location.name && listed.resolvedWorkers.some((w) => w.id === worker.id));
+    assert.ok(responses.pool.json().tickets.some((x) => x.id === inPool.id), 'the pool lists the open ticket');
+    const done = responses.myWork.json().tickets.find((x) => x.id === awaitingReview.id);
+    assert.ok(done && done.resolvedAt && done.verifiedBy.id === supA.id, 'my work keeps the resolution and who verified it');
+    assert.strictEqual(responses.resolve.json().status, 'RESOLVED_PENDING_VERIFY');
+    assert.match(responses.resolve.json().resolvedImageUrl, /^\/images\/uploads\//);
+  });
+
   it('BUG-0015: an electrician cannot resolve a ticket that is already verified or waiting for verification', async (t) => {
     if (!dbAvailable) return t.skip('No database available');
     for (const status of ['RESOLVED', 'RESOLVED_PENDING_VERIFY', 'CLOSED', 'CANCELLED']) {
