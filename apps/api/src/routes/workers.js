@@ -509,7 +509,7 @@ async function workerRoutes(fastify, opts) {
 
     let data;
     try { data = schema.parse(request.body); } catch (err) {
-      return reply.code(400).send({ error: 'Invalid input', details: err.errors });
+      return reply.code(400).send({ error: 'Invalid input', details: err.issues });
     }
 
     const worker = await prisma.worker.findFirst({

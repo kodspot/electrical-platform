@@ -378,6 +378,14 @@ see `docs/DEPLOYMENT.md` for how a change reaches production.
   - Still open, as owner decisions: the copy of the name in the admin notification email,
     which cannot be recalled once sent, and whether the IP hash, user agent, description and
     review note should go after 180 days too.
+- **zod 3 → 4.6.6 (security).**
+  - GHSA-mrhx-c7xc-m3w5 (high, published 2026-10-01): zod could exhaust memory while
+    validating oversized constrained collections. It affects every zod before 4.6.6.
+  - This failed the CI dependency-audit gate, which blocked every deploy.
+  - Two code changes were needed: `ZodError.errors` is `.issues` in zod 4 (`errors.js`, the
+    worker auth and worker routes), and `z.record` takes its key schema explicitly.
+  - Response shapes are unchanged; validation messages now use zod 4's default wording.
+  - Full gate 664/664 and full e2e 230/230 with zod 4.
 - **`[BUG-0060]` A guest's name and phone were accepted without their consent** (PAR-10/48).
   - The privacy policy says a guest who gives a name or phone must tick a consent box.
   - Only `scan.html` checked the box, and it never sent the answer. `POST /public/complaint`

@@ -42,7 +42,7 @@ const createAssetSchema = z.object({
   nextMaintenanceDue: z.string().optional(),
   maintenanceCycleDays: z.number().int().min(1).max(3650).optional(),
   purchaseCost: z.number().min(0).optional(),
-  metadata: z.record(z.any()).optional()
+  metadata: z.record(z.string(), z.any()).optional()
 });
 
 // On edit, null clears the two numeric fields (the form sends null for a cleared one). [BUG-0021]

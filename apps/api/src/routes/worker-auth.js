@@ -153,7 +153,7 @@ async function workerAuthRoutes(fastify) {
 
     let data;
     try { data = schema.parse(request.body); } catch (err) {
-      return reply.code(400).send({ error: 'Invalid input', details: err.errors });
+      return reply.code(400).send({ error: 'Invalid input', details: err.issues });
     }
 
     // Find org by slug
@@ -237,7 +237,7 @@ async function workerAuthRoutes(fastify) {
 
     let data;
     try { data = schema.parse(request.body); } catch (err) {
-      return reply.code(400).send({ error: 'Invalid input', details: err.errors });
+      return reply.code(400).send({ error: 'Invalid input', details: err.issues });
     }
 
     const worker = await prisma.worker.findUnique({
@@ -285,7 +285,7 @@ async function workerAuthRoutes(fastify) {
 
     let data;
     try { data = schema.parse(request.body); } catch (err) {
-      return reply.code(400).send({ error: 'Invalid input', details: err.errors });
+      return reply.code(400).send({ error: 'Invalid input', details: err.issues });
     }
 
     const genericResponse = { success: true, message: 'If a matching worker account with an email on file exists, a PIN reset link has been sent.' };
@@ -337,7 +337,7 @@ async function workerAuthRoutes(fastify) {
 
     let data;
     try { data = schema.parse(request.body); } catch (err) {
-      return reply.code(400).send({ error: 'Invalid input', details: err.errors });
+      return reply.code(400).send({ error: 'Invalid input', details: err.issues });
     }
 
     const worker = await prisma.worker.findUnique({

@@ -61,7 +61,7 @@ async function alertRoutes(fastify) {
     name: z.string().min(1).max(200).trim(),
     description: z.string().max(1000).optional(),
     trigger: z.enum(VALID_TRIGGERS),
-    conditions: z.record(z.unknown()).default({}),
+    conditions: z.record(z.string(), z.unknown()).default({}),
     actions: z.array(z.object({
       type: z.enum(VALID_ACTIONS),
       priority: z.enum(TICKET_PRIORITIES).optional()
@@ -115,7 +115,7 @@ async function alertRoutes(fastify) {
   const updateRuleSchema = z.object({
     name: z.string().min(1).max(200).trim().optional(),
     description: z.string().max(1000).optional().nullable(),
-    conditions: z.record(z.unknown()).optional(),
+    conditions: z.record(z.string(), z.unknown()).optional(),
     actions: z.array(z.object({
       type: z.enum(VALID_ACTIONS),
       priority: z.enum(TICKET_PRIORITIES).optional()
