@@ -15,6 +15,10 @@
   roster, in attendance records or on tickets they fixed is kept, with that reason shown. This
   is the same rule as for inspection history. Before, the delete failed with an error, or
   removed their attendance history.
+- **Analytics and the dashboard show inspection activity.** The electrician and supervisor
+  bars in *Analytics* show how many inspections each person did; they read "undefined"
+  before. The dashboard's *Today's Inspection Log* now lists today's inspections instead of
+  always saying none were logged.
 - **Proof photos stay for 30 days from when they were taken.** A proof photo for work finished
   on an older ticket is no longer removed the next night.
 - **Supervisors' ID details are better protected.** Aadhaar numbers and blood groups of

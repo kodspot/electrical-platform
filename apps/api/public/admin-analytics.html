@@ -828,16 +828,17 @@ function renderTicketLocations(locs) {
 
 function renderWorkers(workers) {
   if (!workers || !workers.length) { $('workerPerf').innerHTML = '<div class="an-empty">No electrician activity</div>'; return; }
-  var max = workers[0].records || 1;
+  // The API sends `inspections` per electrician; `records` was never sent (BUG-0039).
+  var max = workers[0].inspections || 1;
   var html = '<div class="an-perf">';
   for (var i = 0; i < workers.length; i++) {
     var w = workers[i];
-    var pct = Math.max(Math.round(w.records / max * 100), 5);
+    var pct = Math.max(Math.round(w.inspections / max * 100), 5);
     var meta = '';
     if (w.flagged > 0) meta += '<span style="color:var(--danger)">' + w.flagged + ' flagged (' + w.flaggedRate + '%)</span>';
     if (w.images > 0) meta += (meta ? ' · ' : '') + '<span>' + w.images + ' 📷</span>';
     html += '<div class="an-perf-row"><div class="an-perf-name" title="' + esc(w.name) + '">' + esc(w.name) + '</div>' +
-      '<div class="an-perf-bar"><div class="an-perf-fill worker" style="width:' + pct + '%"><span class="an-perf-lbl">' + w.records + '</span></div></div>' +
+      '<div class="an-perf-bar"><div class="an-perf-fill worker" style="width:' + pct + '%"><span class="an-perf-lbl">' + w.inspections + '</span></div></div>' +
       '<div class="an-perf-meta">' + meta + '</div></div>';
   }
   html += '</div>';
@@ -846,15 +847,15 @@ function renderWorkers(workers) {
 
 function renderSupervisors(sups) {
   if (!sups || !sups.length) { $('supPerf').innerHTML = '<div class="an-empty">No supervisor activity</div>'; return; }
-  var max = sups[0].records || 1;
+  var max = sups[0].inspections || 1;
   var html = '<div class="an-perf">';
   for (var i = 0; i < sups.length; i++) {
     var s = sups[i];
-    var pct = Math.max(Math.round(s.records / max * 100), 5);
+    var pct = Math.max(Math.round(s.inspections / max * 100), 5);
     var meta = '';
     if (s.flagged > 0) meta += '<span style="color:var(--danger)">' + s.flagged + ' flagged (' + s.flaggedRate + '%)</span>';
     html += '<div class="an-perf-row"><div class="an-perf-name" title="' + esc(s.name) + '">' + esc(s.name) + '</div>' +
-      '<div class="an-perf-bar"><div class="an-perf-fill supervisor" style="width:' + pct + '%"><span class="an-perf-lbl">' + s.records + '</span></div></div>' +
+      '<div class="an-perf-bar"><div class="an-perf-fill supervisor" style="width:' + pct + '%"><span class="an-perf-lbl">' + s.inspections + '</span></div></div>' +
       '<div class="an-perf-meta">' + meta + '</div></div>';
   }
   html += '</div>';

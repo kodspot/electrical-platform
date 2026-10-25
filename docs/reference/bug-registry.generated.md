@@ -54,8 +54,9 @@ Commands: `npm run bug:list` · `npm run bug:run -- <ID>` · `npm run bug:valida
 | BUG-0036 | HIGH | FIXED | ele | `npm test` passed when a suite's after() hook threw — e.g. a cleanup that left test data behind | `test/report-tests.test.js` |
 | BUG-0037 | HIGH | FIXED | ele | A deactivated (or moved) supervisor kept their open tickets, where no one else could see them | `test/integration/supervisor-handover.test.js` |
 | BUG-0038 | HIGH | FIXED | ele | Two people acting on one ticket at once both "succeeded" — the last write won | `test/integration/ticket-concurrency.test.js` |
+| BUG-0039 | MEDIUM | FIXED | ele | Analytics labelled every electrician and supervisor bar "undefined"; the dashboard's inspection log was always empty | `e2e/tests/ui-fixes.spec.js` |
 
-Count: 38 bug scenario(s).
+Count: 39 bug scenario(s).
 
 ## BUG-0001 — Admin could set a ticket to RESOLVED_PENDING_VERIFY directly
 
@@ -737,4 +738,22 @@ Count: 38 bug scenario(s).
 1. Create a ticket waiting for verification, assigned to a supervisor.
 2. Send POST /api/tickets/:id/verify as that supervisor and as an admin at the same moment.
 3. Broken: both 200. Fixed: exactly one 200.
+
+## BUG-0039 — Analytics labelled every electrician and supervisor bar "undefined"; the dashboard's inspection log was always empty
+
+- **Severity:** MEDIUM · **Status:** FIXED · **Module:** ele · **Category:** ui
+- **Origin:** Product and architecture review 2026-10 (PAR-10/27) and the full e2e run (explorer rawValue on admin-analytics)
+- **Introduced:** pre-audit · **Fixed:** 2026-10-25
+- **Description:** admin-analytics.html read topWorkers[].records and topSupervisors[].records; GET /api/analytics/report sends `inspections`, so each performance bar showed "undefined" with a NaN width. admin-dashboard.html read `inspections` from GET /api/electrical-inspections, which sends `records`, so "Today's Inspection Log" always said "No inspections logged today" (PAR-10/27). Both show only when inspections exist, which is why the explorer flagged the first only in full runs. Found by the 2026-10 product and architecture review and the full local e2e run.
+- **Root cause:** The pages kept field names the APIs do not send (the BUG-0012 class).
+- **Expected behavior:** Every field the performance bars and the inspection log read exists in the API responses.
+- **Broken behavior:** Bars labelled "undefined"; the log always empty.
+- **Scenario dependencies:** —
+- **Regression test:** `e2e/tests/ui-fixes.spec.js`
+
+**Reproduction steps:**
+
+1. Sign in as an admin of an org with an inspection today that names an electrician.
+2. Open admin-analytics, then admin-dashboard.
+3. Broken: the bars read "undefined"; the log says "No inspections logged today". Browser test: e2e/tests/ui-fixes.spec.js (BUG-0039).
 

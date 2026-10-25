@@ -154,6 +154,14 @@ see `docs/DEPLOYMENT.md` for how a change reaches production.
   - A proof photo uploaded by a losing resolve is deleted.
   - The admin's generic PATCH stays an explicit override.
   - Documented in `data-model.md`.
+- **`[BUG-0039]` Analytics labelled every electrician and supervisor bar "undefined"; the
+  dashboard's "Today's Inspection Log" was always empty** (PAR-10/27).
+  - Both pages read field names the APIs do not send: `records` and `inspections` swapped.
+  - This was the cause of the 17 phone-explorer failures in full local e2e runs (also on
+    `origin/main`). They appear only once other tests have added inspections.
+  - Browser test: `e2e/tests/ui-fixes.spec.js`.
+- **User-visible (Release Notes):** the analytics performance bars show counts, and the
+  dashboard lists today's inspections.
 
 ### 2026-10-24 (product and architecture review — documentation only)
 
