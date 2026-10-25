@@ -23,6 +23,10 @@
   can now notify the supervisors and electricians who cover the location concerned. Editing
   a rule no longer removes those choices. Tickets that an alert rule creates now go to the
   supervisor covering the location, who is notified. Before, nobody held them.
+- **Missed-inspection alerts come at the right time.** An alert for a missed night
+  inspection now arrives after the night shift, not minutes after it starts, and a round
+  done before midnight counts. A room that misses two rounds in a day gets an alert for each.
+  Every alert rule you set up now fires; before, only the first rule on the same event did.
 - **Photos show in the asset, failure and inspection details.** Photos attached to an asset, a
   failure report or an inspection now appear when you press *View*; they showed as broken
   images before.

@@ -60,8 +60,9 @@ Commands: `npm run bug:list` · `npm run bug:run -- <ID>` · `npm run bug:valida
 | BUG-0042 | MEDIUM | FIXED | complaints | A ticket the guest rejected was open again but still carried its resolution and verification times | `test/integration/ticket-resolve-verify.test.js` |
 | BUG-0043 | MEDIUM | FIXED | ele | Editing an alert rule silently dropped its "notify the location's supervisors / electricians" actions | `e2e/tests/forms.spec.js` |
 | BUG-0044 | MEDIUM | FIXED | ele | Tickets raised by an alert rule were unassigned, had no SLA deadline, no audit row, and nobody was told | `test/integration/alert-escalation.test.js` |
+| BUG-0045 | MEDIUM | FIXED | ele | Missed-inspection alerts: the night shift was checked during the night, and a second shift or a second rule never alerted | `test/integration/missed-inspection.test.js` |
 
-Count: 44 bug scenario(s).
+Count: 45 bug scenario(s).
 
 ## BUG-0001 — Admin could set a ticket to RESOLVED_PENDING_VERIFY directly
 
@@ -851,4 +852,22 @@ Count: 44 bug scenario(s).
 1. Create a rule on TICKET_HIGH_PRIORITY whose action is CREATE_TICKET, at a location a supervisor covers.
 2. Raise a HIGH ticket there so the rule fires.
 3. Broken: the [Auto] ticket has no assignee. Fixed: the covering supervisor holds it.
+
+## BUG-0045 — Missed-inspection alerts: the night shift was checked during the night, and a second shift or a second rule never alerted
+
+- **Severity:** MEDIUM · **Status:** FIXED · **Module:** ele · **Category:** notification
+- **Origin:** Product and architecture review 2026-10 (PAR-10/22)
+- **Introduced:** pre-audit · **Fixed:** 2026-10-25
+- **Description:** checkMissedInspections checked the NIGHT shift (22:00–06:00) from 22:00 to 06:00 — while it was running — so a "missed night inspection" fired minutes after the shift began, and after midnight a round done at 23:00 did not count (only today's inspections were read); nothing ran once the shift was over. fireAlert deduplicated on trigger + entity + day only, so a room that missed the morning and the afternoon got one alert, and of two rules on the same trigger only the first ever fired. Found by the 2026-10 product and architecture review (PAR-10/22) — the cross-rule part while fixing it.
+- **Root cause:** The NIGHT skip condition was inverted and its window was the calendar day; the dedup key had neither the rule nor the shift.
+- **Expected behavior:** A shift is checked after it ends (NIGHT: from 06:00, against inspections since 22:00 the evening before); one alert per rule, entity, shift and day.
+- **Broken behavior:** A NIGHT alert at 22:30; no NIGHT alert at 07:00; one alert for two missed shifts; the second rule silent.
+- **Scenario dependencies:** —
+- **Regression test:** `test/integration/missed-inspection.test.js`
+
+**Reproduction steps:**
+
+1. Create two INSPECTION_MISSED rules and a room with no inspections.
+2. Run the scheduled checks at 23:00 and at 07:00 the next day (test/integration/missed-inspection.test.js mocks the clock).
+3. Broken: one alert, for the first rule, at 23:00 — partly the night shift. Fixed: morning and afternoon at 23:00 for each rule; night at 07:00.
 

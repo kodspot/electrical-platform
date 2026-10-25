@@ -90,9 +90,12 @@ function deriveSeverity(trigger, data) {
 
 async function fireAlert(rule, orgId, trigger, data, logger) {
   const today = new Date().toISOString().slice(0, 10);
-  const dedupKey = `${trigger}:${data.entityId || 'scheduled'}:${today}`;
+  // One alert per rule, entity, shift (when there is one) and day: without the rule a second
+  // rule on the same trigger never fired; without the shift a missed afternoon round was
+  // swallowed by that morning's alert. A re-run of a skipped tick still dedupes. [BUG-0045]
+  const dedupKey = `${trigger}:${rule.id}:${data.entityId || 'scheduled'}${data.shift ? ':' + data.shift : ''}:${today}`;
 
-  // Deduplicate — skip if same trigger+entity+day already exists
+  // Deduplicate — skip if the same rule+trigger+entity(+shift)+day already exists
   const existing = await prisma.alert.findUnique({
     where: { orgId_dedupKey: { orgId, dedupKey } }
   });
@@ -334,7 +337,7 @@ async function checkMissedInspections(orgId, logger) {
 
   const now = new Date();
   const todayStart = new Date(now); todayStart.setHours(0, 0, 0, 0);
-  const todayEnd = new Date(now); todayEnd.setHours(23, 59, 59, 999);
+  const yesterdayStart = new Date(todayStart); yesterdayStart.setDate(yesterdayStart.getDate() - 1);
   const currentHour = now.getHours();
 
   // Get all active locations
@@ -343,31 +346,35 @@ async function checkMissedInspections(orgId, logger) {
     select: { id: true, name: true }
   });
 
-  // Get all inspections for today
+  // Inspections since yesterday: a shift that crosses midnight began yesterday.
   const inspections = await prisma.electricalInspection.findMany({
-    where: { orgId, inspectedAt: { gte: todayStart, lte: todayEnd } },
-    select: { locationId: true, shift: true }
+    where: { orgId, inspectedAt: { gte: yesterdayStart, lte: now } },
+    select: { locationId: true, shift: true, inspectedAt: true }
   });
 
-  const inspectedSet = new Set(inspections.map(i => `${i.locationId}:${i.shift}`));
-
-  // Check each shift that should be complete by now — deadlines follow this
-  // org's configured ShiftConfig (falling back to the same defaults used
-  // here previously) instead of a hardcoded table, so orgs with custom
-  // shift windows get correctly-timed missed-inspection alerts. [WP10]
+  // Check each shift that has ended — deadlines follow this org's configured ShiftConfig
+  // (falling back to the defaults) instead of a hardcoded table, so orgs with custom shift
+  // windows get correctly-timed missed-inspection alerts. [WP10]
+  // A day shift (MORNING, AFTERNOON) is checked from its end until midnight, against today's
+  // inspections. A shift that crosses midnight (NIGHT, 22:00–06:00) ended this morning: it is
+  // checked from its end until it starts again, against inspections since it began yesterday
+  // evening. Before, NIGHT was checked during the night itself, against today only. [BUG-0045]
   const shiftConfigs = await getShiftConfigs(orgId);
-  const SHIFT_DEADLINES = {
-    MORNING: shiftConfigs.MORNING.endHour,
-    AFTERNOON: shiftConfigs.AFTERNOON.endHour,
-    NIGHT: shiftConfigs.NIGHT.endHour
-  };
-
-  for (const [shift, deadline] of Object.entries(SHIFT_DEADLINES)) {
-    if (currentHour < deadline && shift !== 'NIGHT') continue;
-    if (shift === 'NIGHT' && currentHour >= shiftConfigs.NIGHT.endHour && currentHour < shiftConfigs.NIGHT.startHour) continue;
+  for (const shift of ['MORNING', 'AFTERNOON', 'NIGHT']) {
+    const cfg = shiftConfigs[shift];
+    const crossesMidnight = cfg.endHour <= cfg.startHour;
+    let since;
+    if (!crossesMidnight) {
+      if (currentHour < cfg.endHour) continue;
+      since = todayStart;
+    } else {
+      if (currentHour < cfg.endHour || currentHour >= cfg.startHour) continue;
+      since = new Date(yesterdayStart); since.setHours(cfg.startHour, cfg.startMin || 0, 0, 0);
+    }
+    const inspected = new Set(inspections.filter((i) => i.shift === shift && i.inspectedAt >= since).map((i) => i.locationId));
 
     for (const loc of locations) {
-      if (inspectedSet.has(`${loc.id}:${shift}`)) continue;
+      if (inspected.has(loc.id)) continue;
 
       const data = {
         entityType: 'location',

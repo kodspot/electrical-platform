@@ -209,6 +209,21 @@ see `docs/DEPLOYMENT.md` for how a change reaches production.
     paths.
 - **User-visible (Release Notes):** tickets created by alert rules go to the location's
   supervisor.
+- **`[BUG-0045]` Missed-inspection alerts were mistimed and deduplicated too broadly**
+  (PAR-10/22).
+  - The NIGHT shift (22:00–06:00) was checked while it was running, so an alert fired minutes
+    after it began. After midnight only today's inspections counted, so a round done at 23:00
+    didn't. Nothing was checked once the shift ended.
+  - `fireAlert` deduplicated on trigger + entity + day. So a room that missed two rounds got
+    one alert, and of two rules on the same trigger only the first ever fired.
+  - Now each shift is checked after it ends. NIGHT is checked from 06:00, against
+    inspections since 22:00 the evening before.
+  - The dedup key now includes the rule and the shift. On the day of the deploy, an alert
+    raised that day under the old key may be raised once more.
+  - Shown by `test/integration/missed-inspection.test.js`, which mocks only `Date`.
+    `docs/architecture/resilience.md` updated.
+- **User-visible (Release Notes):** missed-inspection alerts arrive after each shift; none
+  arrive at the start of the night shift.
 
 ### 2026-10-24 (product and architecture review — documentation only)
 
