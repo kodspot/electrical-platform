@@ -67,7 +67,8 @@ const BUGS_LIST = [
   require('./bug-0056-analytics-group-by-utc-day'),
   require('./bug-0057-attendance-today-is-utc'),
   require('./bug-0058-actions-without-audit-rows'),
-  require('./bug-0059-guest-name-kept-in-audit')
+  require('./bug-0059-guest-name-kept-in-audit'),
+  require('./bug-0060-guest-consent-not-enforced')
 ];
 
 const BUGS = Object.fromEntries(BUGS_LIST.map((b) => [b.id, b]));

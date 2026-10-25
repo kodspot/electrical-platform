@@ -378,6 +378,18 @@ see `docs/DEPLOYMENT.md` for how a change reaches production.
   - Still open, as owner decisions: the copy of the name in the admin notification email,
     which cannot be recalled once sent, and whether the IP hash, user agent, description and
     review note should go after 180 days too.
+- **`[BUG-0060]` A guest's name and phone were accepted without their consent** (PAR-10/48).
+  - The privacy policy says a guest who gives a name or phone must tick a consent box.
+  - Only `scan.html` checked the box, and it never sent the answer. `POST /public/complaint`
+    took contact details from any client without consent, and nothing recorded that consent
+    was given.
+  - The server now answers 400 for a name or phone sent without `consent` (`true` in JSON,
+    `"true"` in the form). The page sends it, and the complaint's audit row records
+    `consent: true`.
+  - A complaint without contact details needs no consent.
+  - **API change:** a client that sends contact details must now send `consent`.
+  - A consent column on the ticket would need a migration. The audit row keeps the record
+    for now.
 - **Documentation drift (PAR-10/36), docs only.**
   - `CLAUDE.md` and the architecture overview said Fastify 4; the app runs Fastify 5
     (ADR 0008).

@@ -208,7 +208,8 @@ async function publicRoutes(fastify, opts) {
         module: fieldValue(request.body.module) || 'ele',
         description: fieldValue(request.body.description)?.trim() || null,
         guestName: fieldValue(request.body.guestName)?.trim() || null,
-        guestPhone: fieldValue(request.body.guestPhone)?.trim() || null
+        guestPhone: fieldValue(request.body.guestPhone)?.trim() || null,
+        consent: fieldValue(request.body.consent) === 'true'
       };
 
       const imageFile = request.body.image;
@@ -237,7 +238,8 @@ async function publicRoutes(fastify, opts) {
         module: z.string().max(20).default('ele'),
         description: z.string().max(500).optional(),
         guestName: z.string().max(100).optional(),
-        guestPhone: z.string().max(20).optional()
+        guestPhone: z.string().max(20).optional(),
+        consent: z.boolean().optional()
       });
       data = schema.parse(request.body);
     }
@@ -251,6 +253,12 @@ async function publicRoutes(fastify, opts) {
     const uuidRe = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
     if (!uuidRe.test(data.locationId)) {
       return reply.code(400).send({ error: 'Invalid locationId format' });
+    }
+
+    // A name or phone only with the guest's consent — checked here, not just by the page, as the
+    // privacy policy promises; the consent is kept in the complaint's audit row. [BUG-0060]
+    if ((data.guestName || data.guestPhone) && data.consent !== true) {
+      return reply.code(400).send({ error: 'Please check the consent box to submit your contact info.' });
     }
 
     // Sanitize phone — only keep digits, +, -, spaces
@@ -444,7 +452,7 @@ async function publicRoutes(fastify, opts) {
         action: 'ticket_public_create',
         entityType: 'Ticket',
         entityId: ticket.id,
-        newValue: { issueType, locationName: location.name, guestName: data.guestName }
+        newValue: { issueType, locationName: location.name, guestName: data.guestName, consent: data.consent === true }
       }
     });
 

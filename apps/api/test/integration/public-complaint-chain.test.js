@@ -113,7 +113,7 @@ describe('W1/W3 — QR complaint with a photo → assignment → who is notified
 
   it('a complaint with a photo is stored, auto-assigned to the covering supervisor, and notifies exactly the right people', async (t) => {
     if (!dbAvailable) return t.skip('No database available');
-    const { payload, headers } = multipart({ locationId: room.id, issueType: 'LIGHT_NOT_WORKING', description: 'Tube light flickers', guestName: 'Asha' }, PNG);
+    const { payload, headers } = multipart({ locationId: room.id, issueType: 'LIGHT_NOT_WORKING', description: 'Tube light flickers', guestName: 'Asha', consent: 'true' }, PNG);
     const res = await app.inject({ method: 'POST', url: '/api/public/complaint', headers: { ...headers, ...guestHeaders() }, payload });
     assert.strictEqual(res.statusCode, 200, res.body);
     const id = res.json().ticket.id;

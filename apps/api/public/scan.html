@@ -472,6 +472,7 @@ body{background:var(--bg);min-height:100dvh}
         if ((name || phone) && !document.getElementById('consentCheck').checked) {
           throw new Error('Please check the consent box to submit your contact info.');
         }
+        if (name || phone) form.append('consent', 'true'); // checked by the server too (BUG-0060)
         if (name) form.append('guestName', name);
         if (phone) form.append('guestPhone', phone);
         if (photoInput.files && photoInput.files[0]) {

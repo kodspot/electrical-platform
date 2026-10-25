@@ -71,7 +71,7 @@ describe('WP-H F4 — failed notification steps are logged, never silent', () =>
     if (!dbAvailable) return t.skip('No database available in this environment');
     const res = await app.inject({
       method: 'POST', url: '/api/public/complaint', headers: { 'x-forwarded-for': '10.88.0.1' },
-      payload: { locationId: location.id, issueType: 'LIGHT_NOT_WORKING', guestName: 'Guest With Email', guestPhone: '9999999999' }
+      payload: { locationId: location.id, issueType: 'LIGHT_NOT_WORKING', guestName: 'Guest With Email', guestPhone: '9999999999', consent: true }
     });
     assert.strictEqual(res.statusCode, 200);
     const ticketId = res.json().ticket.id;

@@ -75,8 +75,9 @@ Commands: `npm run bug:list` · `npm run bug:run -- <ID>` · `npm run bug:valida
 | BUG-0057 | MEDIUM | FIXED | ele | Supervisors could mark attendance for any future date, and for two days back just after midnight | `test/integration/attendance-local-day.test.js` |
 | BUG-0058 | MEDIUM | FIXED | ele | Sign-ins, password and PIN changes, templates, rosters, attendance edits, alert actions and ticket creation left no audit row | `test/integration/audit-coverage.test.js` |
 | BUG-0059 | MEDIUM | FIXED | complaints | After 180 days a guest's name was removed from the complaint but kept in its audit row | `test/integration/guest-anonymisation.test.js` |
+| BUG-0060 | MEDIUM | FIXED | complaints | A guest's name and phone were accepted without their consent; consent was never recorded | `test/integration/public-complaint-consent.test.js` |
 
-Count: 59 bug scenario(s).
+Count: 60 bug scenario(s).
 
 ## BUG-0001 — Admin could set a ticket to RESOLVED_PENDING_VERIFY directly
 
@@ -1135,4 +1136,22 @@ Count: 59 bug scenario(s).
 1. A public complaint with a guest name, older than 180 days.
 2. Run the guest anonymisation job.
 3. Broken: the ticket_public_create audit row still names the guest. Fixed: "anonymous". Test: test/integration/guest-anonymisation.test.js.
+
+## BUG-0060 — A guest's name and phone were accepted without their consent; consent was never recorded
+
+- **Severity:** MEDIUM · **Status:** FIXED · **Module:** complaints · **Category:** public-complaint
+- **Origin:** Product and architecture review 2026-10 (PAR-10/48)
+- **Introduced:** pre-audit · **Fixed:** 2026-10-26
+- **Description:** The privacy policy says a guest giving a name or phone must check a consent box. Only scan.html checked it and it never sent it, so POST /api/public/complaint accepted contact details without consent from any other client, and no record showed that consent was given. Found by the 2026-10 product and architecture review (PAR-10/48).
+- **Root cause:** Consent was a browser-only check.
+- **Expected behavior:** Contact details without consent: 400. With it: accepted, and the complaint's audit row records consent: true.
+- **Broken behavior:** POST with guestName and no consent → 200; nothing recorded.
+- **Scenario dependencies:** —
+- **Regression test:** `test/integration/public-complaint-consent.test.js`
+
+**Reproduction steps:**
+
+1. POST /api/public/complaint with guestName and no consent.
+2. Broken: 200. Fixed: 400 "Please check the consent box…".
+3. Regression: test/integration/public-complaint-consent.test.js.
 
