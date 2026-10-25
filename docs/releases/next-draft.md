@@ -28,6 +28,10 @@
   supervisors are now protected the same way as electricians'. Change history records that
   they changed, not the numbers themselves.
 
+## For residents and guests
+- **You can see the photo of the fix.** The review page that asks whether the problem is
+  fixed now shows the photo the electrician took. It showed a broken image before.
+
 ## For everyone who signs in
 - **Password and PIN reset links are better protected.** If you requested a reset link shortly
   before this update and it no longer works, request a new one.

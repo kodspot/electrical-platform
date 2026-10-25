@@ -197,6 +197,11 @@ test.describe.serial('Journeys J1–J6: QR → guest complaint → electrician �
       expect(api.status()).toBe(200);
       await page.goto(`/review/${t.reviewToken}`);
       await expect(page.getByText('Your Complaint')).toBeVisible();
+      // The resident sees the proof photo they are asked to confirm (BUG-0041): it loads,
+      // through the review link itself — the guest has no sign-in.
+      const proof = page.locator('.rv-proof-img');
+      await expect(proof).toBeVisible();
+      await expect.poll(() => proof.evaluate((el) => el.complete && el.naturalWidth > 0), { message: 'the proof photo loads' }).toBe(true);
     } else {
       test.info().annotations.push({ type: 'note', description: 'no guest review link was produced for this ticket' });
     }

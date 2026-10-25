@@ -277,6 +277,35 @@ describe('ticket resolve → verify → reopen, every role', () => {
     assert.match(responses.resolve.json().resolvedImageUrl, /^\/images\/uploads\//);
   });
 
+  // The review page asked the resident to confirm a fix but could not show its proof photo:
+  // images need a staff or electrician token, and the guest has none. The review link now
+  // carries the photo — only that ticket's, only while its review is open. [BUG-0041]
+  it('BUG-0041: the guest review link serves the ticket\'s proof photo, and nothing else', async (t) => {
+    if (!dbAvailable) return t.skip('No database available');
+    const ticket = await createTestTicket(org.id, location.id, { status: 'IN_PROGRESS', source: 'PUBLIC' });
+    const resolved = await staffResolve(adminToken, ticket.id);
+    assert.strictEqual(resolved.statusCode, 200, resolved.body);
+    const token = tokenOf(resolved.json().reviewUrl);
+
+    const review = (await guest('GET', token)).json();
+    assert.strictEqual(review.status, 'pending');
+    assert.strictEqual(review.ticket.resolvedImageUrl, undefined, 'the storage path is not handed to the guest');
+    assert.strictEqual(review.ticket.photoUrl, `/api/public/review/${token}/photo`);
+
+    const photo = await app.inject({ method: 'GET', url: review.ticket.photoUrl, headers: { 'x-forwarded-for': nextIp() } });
+    assert.strictEqual(photo.statusCode, 200, photo.body.slice(0, 100));
+    assert.match(photo.headers['content-type'], /^image\//);
+    assert.ok(photo.rawPayload.equals(PNG), 'the proof photo itself');
+
+    const wrong = await app.inject({ method: 'GET', url: `/api/public/review/${'0'.repeat(64)}/photo`, headers: { 'x-forwarded-for': nextIp() } });
+    assert.strictEqual(wrong.statusCode, 404);
+
+    // Once the review is answered the link no longer serves it.
+    assert.strictEqual((await guest('POST', token, { action: 'CONFIRM' })).statusCode, 200);
+    const after = await app.inject({ method: 'GET', url: review.ticket.photoUrl, headers: { 'x-forwarded-for': nextIp() } });
+    assert.strictEqual(after.statusCode, 404);
+  });
+
   it('BUG-0015: an electrician cannot resolve a ticket that is already verified or waiting for verification', async (t) => {
     if (!dbAvailable) return t.skip('No database available');
     for (const status of ['RESOLVED', 'RESOLVED_PENDING_VERIFY', 'CLOSED', 'CANCELLED']) {

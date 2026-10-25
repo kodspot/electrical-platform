@@ -148,8 +148,8 @@ body{background:var(--bg);min-height:100dvh}
   function showReviewForm(data) {
     var t = data.ticket;
     var imgHtml = '';
-    if (t.resolvedImageUrl) {
-      imgHtml = '<img class="rv-proof-img" src="' + esc(t.resolvedImageUrl) + '" alt="Resolution proof" onclick="document.getElementById(\'fsImg\').src=this.src;document.getElementById(\'fsOverlay\').classList.add(\'show\')">';
+    if (t.photoUrl) { // served through the review link itself (BUG-0041)
+      imgHtml = '<img class="rv-proof-img" src="' + esc(t.photoUrl) + '" alt="Resolution proof" onclick="document.getElementById(\'fsImg\').src=this.src;document.getElementById(\'fsOverlay\').classList.add(\'show\')">';
     }
 
     var timerHtml = '';

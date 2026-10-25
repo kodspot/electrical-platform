@@ -56,8 +56,9 @@ Commands: `npm run bug:list` · `npm run bug:run -- <ID>` · `npm run bug:valida
 | BUG-0038 | HIGH | FIXED | ele | Two people acting on one ticket at once both "succeeded" — the last write won | `test/integration/ticket-concurrency.test.js` |
 | BUG-0039 | MEDIUM | FIXED | ele | Analytics labelled every electrician and supervisor bar "undefined"; the dashboard's inspection log was always empty | `e2e/tests/ui-fixes.spec.js` |
 | BUG-0040 | MEDIUM | FIXED | asset | Asset, failure and inspection photos were broken images in the admin detail views | `e2e/tests/ui-fixes.spec.js` |
+| BUG-0041 | MEDIUM | FIXED | complaints | The guest review page asked the resident to confirm a fix but could not show its proof photo | `test/integration/ticket-resolve-verify.test.js` |
 
-Count: 40 bug scenario(s).
+Count: 41 bug scenario(s).
 
 ## BUG-0001 — Admin could set a ticket to RESOLVED_PENDING_VERIFY directly
 
@@ -775,4 +776,22 @@ Count: 40 bug scenario(s).
 1. Attach a stored photo to an asset (or a failure, or an inspection).
 2. Open admin-assets (admin-failures, admin-electrical) and press View on that row.
 3. Broken: a broken image. Fixed: the photo shows. Browser test: e2e/tests/ui-fixes.spec.js (BUG-0040).
+
+## BUG-0041 — The guest review page asked the resident to confirm a fix but could not show its proof photo
+
+- **Severity:** MEDIUM · **Status:** FIXED · **Module:** complaints · **Category:** public-complaint
+- **Origin:** Product and architecture review 2026-10 (PAR-10/23)
+- **Introduced:** pre-audit · **Fixed:** 2026-10-25
+- **Description:** GET /api/public/review/:token returned the proof photo's raw /images/... path, and review.html used it as the image source. Photos are served only through /api/images/... with a staff or electrician token; the guest has neither, so the photo they were asked to judge never loaded. Found by the 2026-10 product and architecture review (PAR-10/23).
+- **Root cause:** The review flow had no way to serve the photo to a holder of the review link.
+- **Expected behavior:** The review response gives photoUrl = /api/public/review/:token/photo (not the storage path); that route serves only this ticket's proof photo while its review is open, and 404 otherwise.
+- **Broken behavior:** The review page showed a broken image.
+- **Scenario dependencies:** —
+- **Regression test:** `test/integration/ticket-resolve-verify.test.js`
+
+**Reproduction steps:**
+
+1. Resolve a public ticket with a proof photo so a guest review link is issued.
+2. Open /review/:token as the guest.
+3. Broken: a broken image. Fixed: the photo shows. Browser test: e2e/tests/journeys.spec.js J5; API test: ticket-resolve-verify.test.js (BUG-0041).
 

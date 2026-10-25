@@ -48,7 +48,8 @@ const BUGS_LIST = [
   require('./bug-0037-deactivated-supervisor-keeps-tickets'),
   require('./bug-0038-concurrent-transitions-both-win'),
   require('./bug-0039-analytics-perf-and-dashboard-log-fields'),
-  require('./bug-0040-admin-detail-photos-broken')
+  require('./bug-0040-admin-detail-photos-broken'),
+  require('./bug-0041-guest-cannot-see-proof-photo')
 ];
 
 const BUGS = Object.fromEntries(BUGS_LIST.map((b) => [b.id, b]));

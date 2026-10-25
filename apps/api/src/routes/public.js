@@ -3,7 +3,7 @@
 const crypto = require('crypto');
 const { z } = require('zod');
 const { prisma } = require('../lib/prisma');
-const { uploadToR2 } = require('../lib/r2');
+const { uploadToR2, getFromR2 } = require('../lib/r2');
 const { validateImageBuffer } = require('../errors');
 const { notifyAdmins, notifySupervisors, notifyWorkers, createNotification } = require('./notifications');
 const { notify } = require('../services/notification-service');
@@ -557,7 +557,9 @@ async function publicRoutes(fastify, opts) {
       ticket: {
         title: ticket.title,
         issueType: ticket.issueType,
-        resolvedImageUrl: ticket.resolvedImageUrl,
+        // The guest has no sign-in, so /api/images is closed to them: the review link itself
+        // serves the proof photo (route below). [BUG-0041]
+        photoUrl: ticket.resolvedImageUrl ? `/api/public/review/${token}/photo` : null,
         resolvedNote: ticket.resolvedNote,
         resolvedAt: ticket.resolvedAt,
         createdAt: ticket.createdAt,
@@ -567,6 +569,43 @@ async function publicRoutes(fastify, opts) {
       },
       expiresAt: ticket.reviewExpiresAt
     };
+  });
+
+  // ── Public: the proof photo of the resolution under review ──
+  // For the guest who holds the review link — only that ticket's photo, only while its review
+  // is open and in date. The token in the path never reaches a log line (the request logger
+  // records the route template; Caddy redacts /review/...). [BUG-0041]
+  fastify.get('/public/review/:token/photo', {
+    config: {
+      rateLimit: {
+        max: 30,
+        timeWindow: 900000,
+        keyGenerator: (req) => req.ip
+      }
+    }
+  }, async (request, reply) => {
+    const { token } = request.params;
+    if (!token || token.length !== 64) return reply.code(404).send({ error: 'Not found' });
+
+    const ticket = await prisma.ticket.findUnique({
+      where: { reviewToken: token },
+      select: { orgId: true, resolvedImageUrl: true, reviewStatus: true, reviewExpiresAt: true }
+    });
+    const open = ticket && ticket.reviewStatus === 'PENDING' && !(ticket.reviewExpiresAt && new Date() > ticket.reviewExpiresAt);
+    const key = open && ticket.resolvedImageUrl ? ticket.resolvedImageUrl.replace(/^\/images\//, '') : '';
+    if (!key || key.includes('..') || !key.startsWith(`uploads/${ticket.orgId}/`)) {
+      return reply.code(404).send({ error: 'Not found' });
+    }
+
+    try {
+      const image = await getFromR2(key);
+      reply.header('Content-Type', image.ContentType || 'image/webp');
+      reply.header('Cache-Control', 'private, max-age=300');
+      return reply.send(image.Body);
+    } catch (err) {
+      if (err.name === 'NoSuchKey' || err.$metadata?.httpStatusCode === 404) return reply.code(404).send({ error: 'Not found' });
+      throw err;
+    }
   });
 
   // ── Public: Submit review (confirm/reject resolution) ──

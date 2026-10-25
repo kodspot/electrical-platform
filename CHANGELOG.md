@@ -172,6 +172,18 @@ see `docs/DEPLOYMENT.md` for how a change reaches production.
     admins, which hit the per-IP login limit (429) in a full run.
 - **User-visible (Release Notes):** photos attached to assets, failures and inspections show
   in the admin pages.
+- **`[BUG-0041]` The guest review page could not show the proof photo the resident was asked
+  to confirm** (PAR-10/23).
+  - What happened: the review response gave the raw `/images/...` path, which needs a staff
+    or electrician token.
+  - New route `GET /api/public/review/:token/photo`. It serves only that ticket's proof photo,
+    only while its review is open and in date, and is rate-limited.
+  - The review response now gives `photoUrl` instead of the storage path. `review.html` uses
+    it.
+  - The token in the path stays out of logs: the app logs the route template, and Caddy
+    already redacts `/review/...`.
+  - Route index regenerated. J5 now checks that the photo loads.
+- **User-visible (Release Notes):** residents see the proof photo on the review page.
 
 ### 2026-10-24 (product and architecture review — documentation only)
 
