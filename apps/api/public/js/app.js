@@ -107,6 +107,14 @@ window.App = (function () {
     return new Date(s).toLocaleDateString();
   }
 
+  // The local calendar date as YYYY-MM-DD, for date inputs and filters. d.toISOString().slice(0, 10)
+  // is the UTC date: the day before, between 00:00 and 05:30 in India. [BUG-0055]
+  function localDate(d) {
+    d = d || new Date();
+    var pad = function (n) { return (n < 10 ? '0' : '') + n; };
+    return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
+  }
+
   // ─── Token Management ───
   // Admin uses 'token'/'user', SuperAdmin uses 'sa_token'/'sa_user',
   // Supervisor uses 'sup_token'/'sup_user', Electrician uses 'elec_token'/'elec_user'
@@ -1527,7 +1535,7 @@ window.App = (function () {
 
   // ─── Public API ───
   return {
-    $: $, esc: esc, escJs: escJs, fmtDate: fmtDate, fmtDateShort: fmtDateShort,
+    $: $, esc: esc, escJs: escJs, fmtDate: fmtDate, fmtDateShort: fmtDateShort, localDate: localDate,
     getOrgSlug: getOrgSlug, orgPath: orgPath,
     getModule: getModule, modulePath: modulePath,
     getEnabledModules: getEnabledModules, isModuleEnabled: isModuleEnabled,

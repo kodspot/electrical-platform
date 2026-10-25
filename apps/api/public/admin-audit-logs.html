@@ -202,16 +202,16 @@ function formatAction(a) {
 // ── Quick date range buttons ──
 function setDateRange(range) {
   var from = $('filterFrom'), to = $('filterTo');
-  var today = new Date().toISOString().slice(0, 10);
+  var today = App.localDate(new Date());
   activeQuickDate = range;
   if (range === 'today') {
     from.value = today; to.value = today;
   } else if (range === '7d') {
     var d = new Date(); d.setDate(d.getDate() - 7);
-    from.value = d.toISOString().slice(0, 10); to.value = today;
+    from.value = App.localDate(d); to.value = today;
   } else if (range === '30d') {
     var d = new Date(); d.setDate(d.getDate() - 30);
-    from.value = d.toISOString().slice(0, 10); to.value = today;
+    from.value = App.localDate(d); to.value = today;
   } else {
     from.value = ''; to.value = '';
   }

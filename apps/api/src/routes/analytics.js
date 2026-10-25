@@ -1,6 +1,7 @@
 'use strict';
 
 const { prisma } = require('../lib/prisma');
+const { dayRange } = require('../lib/dates');
 const { authenticateJWT, requirePolicy } = require('../middleware/auth');
 const { ACTIVE_TICKET_STATUSES } = require('../services/ticket-status');
 
@@ -157,9 +158,7 @@ async function analyticsRoutes(fastify, opts) {
     const orgId = request.user.orgId;
     const { from, to } = request.query;
 
-    const dateFilter = {};
-    if (from) dateFilter.gte = new Date(from);
-    if (to) dateFilter.lte = new Date(to);
+    const dateFilter = dayRange(from, to) || {};
     const hasDateFilter = Object.keys(dateFilter).length > 0;
 
     const workers = await prisma.worker.findMany({
@@ -244,9 +243,7 @@ async function analyticsRoutes(fastify, opts) {
     const orgId = request.user.orgId;
     const { from, to } = request.query;
 
-    const dateFilter = {};
-    if (from) dateFilter.gte = new Date(from);
-    if (to) dateFilter.lte = new Date(to);
+    const dateFilter = dayRange(from, to) || {};
 
     const locations = await prisma.location.findMany({
       where: { orgId, isActive: true },
@@ -274,9 +271,7 @@ async function analyticsRoutes(fastify, opts) {
     const orgId = request.user.orgId;
     const { from, to } = request.query;
 
-    const dateFilter = {};
-    if (from) dateFilter.gte = new Date(from);
-    if (to) dateFilter.lte = new Date(to);
+    const dateFilter = dayRange(from, to) || {};
 
     const supervisors = await prisma.user.findMany({
       where: { orgId, role: 'SUPERVISOR', isActive: true },

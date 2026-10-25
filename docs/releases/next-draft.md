@@ -30,6 +30,10 @@
 - **Actions that cannot be done say why.** If deleting an alert rule, acknowledging an alert
   or flagging an inspection is refused (for example because someone just removed it), the
   page now says so instead of doing nothing.
+- **Date filters cover the whole day.** Choosing a day, or a range of days, in tickets,
+  alerts, the audit log, inspections, assets and analytics now includes everything from
+  midnight. Before, anything between midnight and 5:30 in the morning was counted under the
+  day before. *Today* is also correct just after midnight.
 - **A purchase cost of 0 is kept.** Assets that cost nothing, such as donations, keep 0 as
   their cost instead of showing it as unknown.
 - **Photos show in the asset, failure and inspection details.** Photos attached to an asset, a

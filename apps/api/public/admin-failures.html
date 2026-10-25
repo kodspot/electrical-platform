@@ -410,7 +410,7 @@ async function exportCSV(){
   if(!res) return;
   var blob = await res.blob();
   var url = URL.createObjectURL(blob);
-  var a = document.createElement('a'); a.href=url; a.download='asset-failures-'+new Date().toISOString().split('T')[0]+'.csv'; a.click();
+  var a = document.createElement('a'); a.href=url; a.download='asset-failures-'+App.localDate(new Date())+'.csv'; a.click();
   URL.revokeObjectURL(url);
 }
 

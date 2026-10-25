@@ -2,6 +2,7 @@
 
 const { z } = require('zod');
 const { prisma } = require('../lib/prisma');
+const { dayRange } = require('../lib/dates');
 const { authenticateJWT, requirePolicy } = require('../middleware/auth');
 const { generateAiInsights, runScheduledChecks, runEscalationChecks } = require('../services/automation');
 const { runExclusive, LOCK_KEYS } = require('../lib/scheduler-lock');
@@ -200,15 +201,7 @@ async function alertRoutes(fastify) {
     if (acknowledged === 'true') where.acknowledged = true;
     if (acknowledged === 'false') where.acknowledged = false;
 
-    if (from || to) {
-      where.createdAt = {};
-      if (from) where.createdAt.gte = new Date(from);
-      if (to) {
-        const toDate = new Date(to);
-        if (to.length === 10) toDate.setHours(23, 59, 59, 999);
-        where.createdAt.lte = toDate;
-      }
-    }
+    if (from || to) where.createdAt = dayRange(from, to);
 
     const take = Math.min(parseInt(limit) || 50, 100);
     const skip = ((parseInt(page) || 1) - 1) * take;

@@ -3,6 +3,7 @@
 const crypto = require('crypto');
 const { z } = require('zod');
 const { prisma } = require('../lib/prisma');
+const { dayRange } = require('../lib/dates');
 const { uploadToR2, deleteFromR2 } = require('../lib/r2');
 const { validateImageBuffer } = require('../errors');
 const { authenticateJWT, requirePolicy } = require('../middleware/auth');
@@ -249,11 +250,7 @@ async function ticketRoutes(fastify, opts) {
         where.OR = searchOR;
       }
     }
-    if (from || to) {
-      where.createdAt = {};
-      if (from) where.createdAt.gte = new Date(from + 'T00:00:00Z');
-      if (to) where.createdAt.lte = new Date(to + 'T23:59:59Z');
-    }
+    if (from || to) where.createdAt = dayRange(from, to);
 
     const take = Math.min(parseInt(limit) || 50, 100);
     const skip = ((parseInt(page) || 1) - 1) * take;

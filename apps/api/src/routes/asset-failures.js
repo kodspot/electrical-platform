@@ -2,6 +2,7 @@
 
 const { z } = require('zod');
 const { prisma } = require('../lib/prisma');
+const { dayRange, localDateKey } = require('../lib/dates');
 const { uploadToR2 } = require('../lib/r2');
 const { validateImageBuffer } = require('../errors');
 const { authenticateJWT, requirePolicy, requireModule } = require('../middleware/auth');
@@ -64,15 +65,7 @@ async function assetFailureRoutes(fastify, opts) {
       ];
     }
 
-    if (from || to) {
-      where.failedAt = {};
-      if (from) where.failedAt.gte = new Date(from);
-      if (to) {
-        const toDate = new Date(to);
-        if (to.length === 10) toDate.setHours(23, 59, 59, 999);
-        where.failedAt.lte = toDate;
-      }
-    }
+    if (from || to) where.failedAt = dayRange(from, to);
 
     const take = Math.min(parseInt(limit) || 50, 100);
     const skip = ((parseInt(page) || 1) - 1) * take;
@@ -380,15 +373,7 @@ async function assetFailureRoutes(fastify, opts) {
     const where = { orgId };
     if (status) where.status = status;
     if (severity) where.severity = severity;
-    if (from || to) {
-      where.failedAt = {};
-      if (from) where.failedAt.gte = new Date(from);
-      if (to) {
-        const toDate = new Date(to);
-        if (to.length === 10) toDate.setHours(23, 59, 59, 999);
-        where.failedAt.lte = toDate;
-      }
-    }
+    if (from || to) where.failedAt = dayRange(from, to);
 
     const failures = await prisma.assetFailure.findMany({
       where,
@@ -424,7 +409,7 @@ async function assetFailureRoutes(fastify, opts) {
 
     const csv = header + '\n' + rows.join('\n');
     reply.header('Content-Type', 'text/csv');
-    reply.header('Content-Disposition', 'attachment; filename="asset-failures-' + new Date().toISOString().split('T')[0] + '.csv"');
+    reply.header('Content-Disposition', 'attachment; filename="asset-failures-' + localDateKey() + '.csv"');
     return csv;
   });
 }

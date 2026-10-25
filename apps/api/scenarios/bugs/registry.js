@@ -62,7 +62,8 @@ const BUGS_LIST = [
   require('./bug-0051-no-way-to-request-a-reset'),
   require('./bug-0052-no-signed-in-password-change'),
   require('./bug-0053-electrician-profile-says-admin'),
-  require('./bug-0054-shared-device-wrong-session')
+  require('./bug-0054-shared-device-wrong-session'),
+  require('./bug-0055-date-filters-start-at-0530')
 ];
 
 const BUGS = Object.fromEntries(BUGS_LIST.map((b) => [b.id, b]));

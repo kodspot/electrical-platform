@@ -397,7 +397,7 @@ async function exportCSV() {
   var url = URL.createObjectURL(blob);
   var a = document.createElement('a');
   a.href = url;
-  a.download = 'electrical-inspections-' + new Date().toISOString().split('T')[0] + '.csv';
+  a.download = 'electrical-inspections-' + App.localDate(new Date()) + '.csv';
   a.click();
   URL.revokeObjectURL(url);
 }

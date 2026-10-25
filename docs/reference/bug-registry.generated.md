@@ -70,8 +70,9 @@ Commands: `npm run bug:list` · `npm run bug:run -- <ID>` · `npm run bug:valida
 | BUG-0052 | MEDIUM | FIXED | ele | Nobody could change their own password or PIN while signed in | `e2e/tests/forms.spec.js` |
 | BUG-0053 | LOW | FIXED | ele | The profile of an electrician said "Admin" | `e2e/tests/forms.spec.js` |
 | BUG-0054 | MEDIUM | FIXED | ele | On a shared phone, an inspection saved offline was sent in as whoever else was signed in | `test/shared-device-sessions.test.js` |
+| BUG-0055 | MEDIUM | FIXED | ele | Date filters started each day at 05:30 in India (UTC midnight), and pages took "today" from UTC | `test/integration/date-filters-local-day.test.js` |
 
-Count: 54 bug scenario(s).
+Count: 55 bug scenario(s).
 
 ## BUG-0001 — Admin could set a ticket to RESOLVED_PENDING_VERIFY directly
 
@@ -1040,4 +1041,22 @@ Count: 54 bug scenario(s).
 1. On one browser, sign in as an admin and as a supervisor.
 2. Go offline on supervisor-electrical, submit an inspection (it is saved), then come back online on an admin page.
 3. Broken: the inspection is submitted with the admin's token. Fixed: with the supervisor's. Test: test/shared-device-sessions.test.js.
+
+## BUG-0055 — Date filters started each day at 05:30 in India (UTC midnight), and pages took "today" from UTC
+
+- **Severity:** MEDIUM · **Status:** FIXED · **Module:** ele · **Category:** admin-workflow
+- **Origin:** Product and architecture review 2026-10 (PAR-10/07)
+- **Introduced:** pre-audit · **Fixed:** 2026-10-25
+- **Description:** The ticket, audit-log, alert, asset-event, asset-failure, inspection and analytics filters parsed a date-only `from` as UTC midnight — 05:30 IST — so the first 5.5 hours of a range were left out; the ticket and audit-log filters ended `to` at 05:29 the next morning, and three analytics endpoints at 05:30 on the last day. Admin pages built "today" and their preset ranges with toISOString(), the UTC date, which is yesterday between 00:00 and 05:30 IST. Found by the 2026-10 product and architecture review (PAR-10/07).
+- **Root cause:** new Date("YYYY-MM-DD") is UTC midnight; the server and its users are in IST. Each route parsed its own way.
+- **Expected behavior:** One rule (lib/dates.js dayRange): a date-only value is the local day, 00:00 to 23:59:59.999 in the server's TZ. Pages use App.localDate().
+- **Broken behavior:** A ticket raised at 01:00 IST was missing from that day's list, and showed in the previous day's.
+- **Scenario dependencies:** —
+- **Regression test:** `test/integration/date-filters-local-day.test.js`
+
+**Reproduction steps:**
+
+1. With TZ=Asia/Kolkata, raise a ticket at 01:00 IST.
+2. GET /api/tickets?from=<that day>&to=<that day>. Broken: missing (and listed under the day before). Fixed: listed.
+3. Regression: test/integration/date-filters-local-day.test.js (runs in Asia/Kolkata).
 

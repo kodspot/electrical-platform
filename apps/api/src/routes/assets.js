@@ -2,6 +2,7 @@
 
 const { z } = require('zod');
 const { prisma } = require('../lib/prisma');
+const { localDateKey } = require('../lib/dates');
 const { uploadToR2, deleteFromR2 } = require('../lib/r2');
 const { validateImageBuffer } = require('../errors');
 const { authenticateJWT, requirePolicy, requireModule } = require('../middleware/auth');
@@ -551,7 +552,7 @@ async function assetRoutes(fastify, opts) {
 
     const csv = header + '\n' + rows.join('\n');
     reply.header('Content-Type', 'text/csv');
-    reply.header('Content-Disposition', 'attachment; filename="assets-' + new Date().toISOString().split('T')[0] + '.csv"');
+    reply.header('Content-Disposition', 'attachment; filename="assets-' + localDateKey() + '.csv"');
     return csv;
   });
 }

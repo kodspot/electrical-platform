@@ -300,10 +300,10 @@ App.initNotifications(App.apiFetch);
 var esc = App.esc, $ = App.$;
 
 // ── Period helpers ──
-function getToday() { var d = new Date(); return d.toISOString().split('T')[0]; }
-function getYesterday() { var d = new Date(); d.setDate(d.getDate()-1); return d.toISOString().split('T')[0]; }
-function getWeekStart() { var d = new Date(); d.setDate(d.getDate()-d.getDay()+1); return d.toISOString().split('T')[0]; }
-function getDaysAgo(n) { var d = new Date(); d.setDate(d.getDate()-(n-1)); return d.toISOString().split('T')[0]; }
+function getToday() { return App.localDate(new Date()); }
+function getYesterday() { var d = new Date(); d.setDate(d.getDate()-1); return App.localDate(d); }
+function getWeekStart() { var d = new Date(); d.setDate(d.getDate()-d.getDay()+1); return App.localDate(d); }
+function getDaysAgo(n) { var d = new Date(); d.setDate(d.getDate()-(n-1)); return App.localDate(d); }
 function getMonthStart() { var d = new Date(); return d.getFullYear()+'-'+(d.getMonth()+1+'').padStart(2,'0')+'-01'; }
 function getYearStart() { return new Date().getFullYear()+'-01-01'; }
 

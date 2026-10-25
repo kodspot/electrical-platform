@@ -2,6 +2,7 @@
 
 const { z } = require('zod');
 const { prisma } = require('../lib/prisma');
+const { dayRange } = require('../lib/dates');
 const { uploadToR2 } = require('../lib/r2');
 const { validateImageBuffer } = require('../errors');
 const { authenticateJWT, requirePolicy, requireModule } = require('../middleware/auth');
@@ -37,15 +38,7 @@ async function assetEventRoutes(fastify, opts) {
     if (assetId) where.assetId = assetId;
     if (type) where.type = type;
 
-    if (from || to) {
-      where.eventDate = {};
-      if (from) where.eventDate.gte = new Date(from);
-      if (to) {
-        const toDate = new Date(to);
-        if (to.length === 10) toDate.setHours(23, 59, 59, 999);
-        where.eventDate.lte = toDate;
-      }
-    }
+    if (from || to) where.eventDate = dayRange(from, to);
 
     const take = Math.min(parseInt(limit) || 50, 100);
     const skip = ((parseInt(page) || 1) - 1) * take;

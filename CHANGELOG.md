@@ -305,6 +305,25 @@ see `docs/DEPLOYMENT.md` for how a change reaches production.
   - The rest of PAR-10/49, a server-side sign-out, is not done. Changing a password or PIN
     now ends every other session (BUG-0052). A sign-out that ends one session needs a
     session table, which is a decision for the owner.
+- **`[BUG-0055]` Date filters started each day at 05:30, and pages took "today" from UTC**
+  (PAR-10/07, in part).
+  - These filters parsed a date-only `from` as UTC midnight, which is 05:30 in India: tickets,
+    the audit log, alerts, asset events, asset failures (list and CSV), inspections (list and
+    export) and three analytics endpoints. A ticket raised at 01:00 was missing from that
+    day's list.
+  - The ticket and audit-log filters also ended `to` at 05:29 the next morning, and
+    `/analytics/workers`, `/locations` and `/supervisors` ended it at 05:30 on the last day.
+  - One rule now, `lib/dates.js` `dayRange`: a date-only value is the local day, 00:00 to
+    23:59:59.999 in the server's `TZ` (Asia/Kolkata). A full timestamp is used as given.
+  - The admin pages built "today" and their preset ranges with `toISOString()`, the UTC date,
+    which is yesterday between 00:00 and 05:30. Affected: Analytics, the audit log, the
+    dashboard's inspection log, and the CSV file names. They now use `App.localDate()`; the
+    server's CSV names use `localDateKey()`.
+  - Attendance and duty-roster dates are unchanged: they are calendar-date columns, keyed at
+    UTC midnight on purpose.
+  - Documented in `docs/reference/environment.md` (`TZ`).
+  - Not in this change: analytics charts still group by UTC day (BUG-0056), and there is
+    still one zone for every organization.
 
 ### 2026-10-24 (product and architecture review — documentation only)
 
