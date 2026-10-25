@@ -30,9 +30,18 @@ function hashAdminKey(key) {
   return crypto.createHmac('sha256', process.env.COOKIE_SECRET).update(key).digest('hex');
 }
 
+// The Worker fields an org admin or super-admin may see: the profile, never credential
+// material — the PIN hash, a pending reset token and its expiry, the session cut-off. [BUG-0031]
+const WORKER_PROFILE_SELECT = Object.freeze({
+  id: true, orgId: true, employeeId: true, name: true, phone: true, email: true, address: true,
+  department: true, designation: true, dateOfBirth: true, dateOfJoin: true, gender: true,
+  bloodGroup: true, aadharNo: true, notes: true, isActive: true, createdAt: true, updatedAt: true
+});
+
 module.exports = {
   BCRYPT_COST,
   COOKIE_CONFIG,
   hashAdminKey,
-  passwordSchema
+  passwordSchema,
+  WORKER_PROFILE_SELECT
 };

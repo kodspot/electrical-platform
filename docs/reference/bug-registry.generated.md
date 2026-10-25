@@ -46,8 +46,9 @@ Commands: `npm run bug:list` · `npm run bug:run -- <ID>` · `npm run bug:valida
 | BUG-0028 | CRITICAL | FIXED | ele | Stored XSS: an org admin could plant script in names that ran for anyone opening the page, including a super-admin | `test/public-escaping.test.js` |
 | BUG-0029 | HIGH | FIXED | ele | `npm test` passed when a test file's describe() threw while collecting its tests | `test/report-tests.test.js` |
 | BUG-0030 | CRITICAL | FIXED | ele | Supervisors' Aadhaar numbers and blood groups were stored in plain text and copied into audit logs | `test/integration/supervisor-pii.test.js` |
+| BUG-0031 | HIGH | FIXED | ele | Worker detail, create and update responses carried the PIN hash and a pending PIN-reset token | `test/integration/worker-credentials.test.js` |
 
-Count: 30 bug scenario(s).
+Count: 31 bug scenario(s).
 
 ## BUG-0001 — Admin could set a ticket to RESOLVED_PENDING_VERIFY directly
 
@@ -585,4 +586,22 @@ Count: 30 bug scenario(s).
 1. As an org admin, POST /api/supervisors with an aadharNo, then PATCH it to another number.
 2. Read User.aadharNo and the supervisor_updated AuditLog row directly from the database.
 3. Broken: both hold the numbers in plain text. Fixed: the row holds "v1:…" and the audit row { changed: true }.
+
+## BUG-0031 — Worker detail, create and update responses carried the PIN hash and a pending PIN-reset token
+
+- **Severity:** HIGH · **Status:** FIXED · **Module:** ele · **Category:** data-exposure
+- **Origin:** Product and architecture review 2026-10 (PAR-10/16)
+- **Introduced:** pre-audit · **Fixed:** 2026-10-25
+- **Description:** GET /api/workers/:id, POST /api/workers, PATCH /api/workers/:id and the super-admin worker create/update routes returned the whole Worker row: pinHash, resetToken (a pending token sets the electrician's PIN), resetTokenExpiresAt and tokenInvalidBefore. The list routes already used an explicit select. Found by the 2026-10 product and architecture review (PAR-10/16).
+- **Root cause:** Those routes read and wrote Worker without a select, so Prisma returned every column.
+- **Expected behavior:** They return WORKER_PROFILE_SELECT (lib/security.js): the profile, no credential material.
+- **Broken behavior:** The JSON contained pinHash (a bcrypt hash) and resetToken.
+- **Scenario dependencies:** —
+- **Regression test:** `test/integration/worker-credentials.test.js`
+
+**Reproduction steps:**
+
+1. Create an electrician with a PIN and a pending PIN-reset token.
+2. As the org admin, GET /api/workers/:id.
+3. Broken: pinHash and resetToken are in the response. Fixed: neither key is present.
 

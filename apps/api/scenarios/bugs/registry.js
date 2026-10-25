@@ -38,7 +38,8 @@ const BUGS_LIST = [
   require('./bug-0027-electrician-sees-guest-review-token'),
   require('./bug-0028-attribute-xss-via-names'),
   require('./bug-0029-test-run-green-when-suite-throws'),
-  require('./bug-0030-supervisor-aadhaar-plaintext')
+  require('./bug-0030-supervisor-aadhaar-plaintext'),
+  require('./bug-0031-worker-responses-carry-credentials')
 ];
 
 const BUGS = Object.fromEntries(BUGS_LIST.map((b) => [b.id, b]));

@@ -4,7 +4,7 @@ const bcrypt = require('bcrypt');
 const QRCode = require('qrcode');
 const { z } = require('zod');
 const { prisma } = require('../lib/prisma');
-const { BCRYPT_COST, passwordSchema } = require('../lib/security');
+const { BCRYPT_COST, passwordSchema, WORKER_PROFILE_SELECT } = require('../lib/security');
 const { authenticateJWT, requirePolicy } = require('../middleware/auth');
 const { encryptWorkerPII, decryptWorkerPII, encryptField, decryptField } = require('../lib/crypto');
 const { APP_URL } = require('../config/env');
@@ -836,7 +836,7 @@ async function superadminRoutes(fastify, opts) {
     };
     encryptWorkerPII(workerData);
 
-    const worker = await prisma.worker.create({ data: workerData });
+    const worker = await prisma.worker.create({ data: workerData, select: WORKER_PROFILE_SELECT });
 
     await prisma.auditLog.create({
       data: {
@@ -897,7 +897,7 @@ async function superadminRoutes(fastify, opts) {
 
     encryptWorkerPII(data);
 
-    const updated = await prisma.worker.update({ where: { id }, data });
+    const updated = await prisma.worker.update({ where: { id }, data, select: WORKER_PROFILE_SELECT });
     return decryptWorkerPII(updated);
   });
 

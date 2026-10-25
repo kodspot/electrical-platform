@@ -69,6 +69,10 @@ see `docs/DEPLOYMENT.md` for how a change reaches production.
 - **Deployment step (owner):** `scripts/migrate-user-pii.js` encrypts the older rows and strips
   the values from old supervisor audit rows. It runs as a dry run by default; `--apply` writes.
   Run it after a backup (`docs/DEPLOYMENT.md`). Not visible to users.
+- **`[BUG-0031]` Worker detail, create and update responses carried the PIN hash and a pending
+  PIN-reset token** (PAR-10/16). This affected the org-admin and super-admin routes. They now
+  return `WORKER_PROFILE_SELECT` (`lib/security.js`): the profile, and no credential
+  material. Not visible to users.
 
 ### 2026-10-24 (product and architecture review — documentation only)
 
