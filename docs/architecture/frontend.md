@@ -97,7 +97,16 @@ example a supervisor's and an admin's.
 Static files are served by `@fastify/static` from `public/` (`plugins/content.js`). Caddy
 sets the caching policy (`infrastructure/Caddyfile`): long cache for `/css` and `/js`,
 `no-store` for org-scoped admin/supervisor/superadmin pages and for every service worker and
-manifest, so a client never runs a stale SW. CSP is set by Helmet in the backend
+manifest, so a client never runs a stale SW.
+
+**When a file in `public/js/` or `public/css/` changes, bump its `?v=`.**
+- Browsers keep `/js` and `/css` for a day (`max-age=86400`).
+- Both service workers serve them from cache first, then refresh in the background.
+- So a changed file reaches people only through a new URL.
+- Bump the version on every page that loads the file, and in both precache lists:
+  `public/sw.js` and the module worker in `src/routes/pages.js`. Bump both `CACHE_NAME`s too,
+  so the old entries are dropped.
+- `test/asset-versions.test.js` fails when the pages and the workers disagree. CSP is set by Helmet in the backend
 (`plugins/security.js`), not duplicated in Caddy.
 
 ## Related

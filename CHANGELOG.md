@@ -352,6 +352,16 @@ see `docs/DEPLOYMENT.md` for how a change reaches production.
     refuses a future date. Admins keep their override.
   - Rosters for future dates are still accepted, as before. Planning ahead may be wanted, so
     that is left to the owner.
+- **The fixes in `app.js` reach people on their first load after the deploy.**
+  - Every page still loaded `app.js?v=14`, or `v=15` on the Quality page. Browsers keep
+    `/js` for a day, and both service workers serve it from cache first.
+  - So this release's `app.js` changes would have reached people up to a day late. Those
+    changes include the escaping fix (BUG-0028), the retry rule (BUG-0047) and the sessions
+    on a shared phone (BUG-0054).
+  - Every page now loads `app.js?v=16`, matching both precache lists. The service-worker
+    caches are renamed (`kodspot-v18`, `kodspot-<module>-v8`), so the old entries are dropped.
+  - `docs/architecture/frontend.md` states the rule, and `test/asset-versions.test.js` checks
+    that every page and both workers name one version.
 
 ### 2026-10-24 (product and architecture review — documentation only)
 
