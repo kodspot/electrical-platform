@@ -3,6 +3,7 @@
 const { prisma } = require('../lib/prisma');
 const { authenticateJWT, requirePolicy } = require('../middleware/auth');
 const { addConnection, removeConnection } = require('../services/sse');
+const { JWT_VERIFY_OPTIONS } = require('../lib/security');
 const {
   createNotification,
   notifyAdmins,
@@ -54,7 +55,7 @@ async function notificationRoutes(fastify) {
     if (!token) return reply.code(401).send({ error: 'Unauthorized' });
 
     let decoded;
-    try { decoded = jwt.verify(token, process.env.JWT_SECRET); } catch {
+    try { decoded = jwt.verify(token, process.env.JWT_SECRET, JWT_VERIFY_OPTIONS); } catch {
       return reply.code(401).send({ error: 'Unauthorized' });
     }
     if (!decoded.workerId) return reply.code(401).send({ error: 'Unauthorized' });

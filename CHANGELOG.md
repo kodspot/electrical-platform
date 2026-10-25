@@ -224,6 +224,12 @@ see `docs/DEPLOYMENT.md` for how a change reaches production.
     `docs/architecture/resilience.md` updated.
 - **User-visible (Release Notes):** missed-inspection alerts arrive after each shift; none
   arrive at the start of the night shift.
+- **`[BUG-0046]` Token verification accepted any HMAC algorithm** (PRA-07 L3, PAR-10/35).
+  - All four `jwt.verify` sites now pass `JWT_VERIFY_OPTIONS` (`{ algorithms: ['HS256'] }`,
+    `lib/security.js`): the staff API, the electrician API, the image proxy and the
+    electrician's live stream.
+  - A token signed HS384 or HS512 with the same secret answers 401.
+  - `auth-and-tenancy.md` updated. Not visible to users: the app signs HS256 only.
 
 ### 2026-10-24 (product and architecture review — documentation only)
 

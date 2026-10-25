@@ -5,7 +5,7 @@ const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const { z } = require('zod');
 const { prisma } = require('../lib/prisma');
-const { BCRYPT_COST, hashResetToken } = require('../lib/security');
+const { BCRYPT_COST, hashResetToken, JWT_VERIFY_OPTIONS } = require('../lib/security');
 const { loginRateLimit, strictRateLimit } = require('../middleware/rateLimits');
 const { uploadToR2, deleteFromR2 } = require('../lib/r2');
 const { validateImageBuffer } = require('../errors');
@@ -72,7 +72,7 @@ async function authenticateWorkerJWT(request, reply) {
     const token = request.headers.authorization?.replace('Bearer ', '');
     if (!token) return reply.code(401).send({ error: 'Unauthorized' });
 
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const decoded = jwt.verify(token, process.env.JWT_SECRET, JWT_VERIFY_OPTIONS);
     if (!decoded.workerId) return reply.code(401).send({ error: 'Unauthorized' });
 
     const worker = await prisma.worker.findUnique({

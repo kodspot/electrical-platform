@@ -61,8 +61,9 @@ Commands: `npm run bug:list` · `npm run bug:run -- <ID>` · `npm run bug:valida
 | BUG-0043 | MEDIUM | FIXED | ele | Editing an alert rule silently dropped its "notify the location's supervisors / electricians" actions | `e2e/tests/forms.spec.js` |
 | BUG-0044 | MEDIUM | FIXED | ele | Tickets raised by an alert rule were unassigned, had no SLA deadline, no audit row, and nobody was told | `test/integration/alert-escalation.test.js` |
 | BUG-0045 | MEDIUM | FIXED | ele | Missed-inspection alerts: the night shift was checked during the night, and a second shift or a second rule never alerted | `test/integration/missed-inspection.test.js` |
+| BUG-0046 | LOW | FIXED | ele | Token verification accepted any HMAC algorithm, not just the HS256 the app signs | `test/integration/jwt-algorithms.test.js` |
 
-Count: 45 bug scenario(s).
+Count: 46 bug scenario(s).
 
 ## BUG-0001 — Admin could set a ticket to RESOLVED_PENDING_VERIFY directly
 
@@ -870,4 +871,22 @@ Count: 45 bug scenario(s).
 1. Create two INSPECTION_MISSED rules and a room with no inspections.
 2. Run the scheduled checks at 23:00 and at 07:00 the next day (test/integration/missed-inspection.test.js mocks the clock).
 3. Broken: one alert, for the first rule, at 23:00 — partly the night shift. Fixed: morning and afternoon at 23:00 for each rule; night at 07:00.
+
+## BUG-0046 — Token verification accepted any HMAC algorithm, not just the HS256 the app signs
+
+- **Severity:** LOW · **Status:** FIXED · **Module:** ele · **Category:** data-exposure
+- **Origin:** Production readiness audit 2026-07 (L3); product and architecture review 2026-10 (PAR-10/35)
+- **Introduced:** pre-audit · **Fixed:** 2026-10-25
+- **Description:** All four jwt.verify sites (middleware/auth.js, worker-auth.js, images.js, the worker notification stream) passed no algorithms option, so jsonwebtoken accepted HS256, HS384 and HS512 for the shared secret. Not exploitable with one symmetric secret, but the allow-list is standard defence in depth (OWASP ASVS V9) and was open as PRA-07 L3. Found by the 2026-10 product and architecture review (PAR-10/35).
+- **Root cause:** jwt.verify(token, secret) without { algorithms }.
+- **Expected behavior:** Every verify pins { algorithms: ['HS256'] } (JWT_VERIFY_OPTIONS); a token signed otherwise answers 401.
+- **Broken behavior:** An HS512-signed token for a real user answered 200 on /api/auth/me.
+- **Scenario dependencies:** —
+- **Regression test:** `test/integration/jwt-algorithms.test.js`
+
+**Reproduction steps:**
+
+1. Sign { userId, orgId, role } with JWT_SECRET using HS512.
+2. GET /api/auth/me with it.
+3. Broken: 200. Fixed: 401.
 

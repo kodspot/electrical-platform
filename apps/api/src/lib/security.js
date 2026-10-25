@@ -30,6 +30,10 @@ function hashAdminKey(key) {
   return crypto.createHmac('sha256', process.env.COOKIE_SECRET).update(key).digest('hex');
 }
 
+// Options for every jwt.verify: the app signs HS256 only, so nothing else is accepted —
+// jsonwebtoken would otherwise take any HMAC algorithm for the secret (PRA-07 L3). [BUG-0046]
+const JWT_VERIFY_OPTIONS = Object.freeze({ algorithms: ['HS256'] });
+
 // Password/PIN reset tokens are stored as their SHA-256 digest: the e-mailed token is the
 // credential, and a database read (or a backup) must not hand it over. A 256-bit random
 // token needs no slow hash. [BUG-0034]
@@ -50,6 +54,7 @@ module.exports = {
   COOKIE_CONFIG,
   hashAdminKey,
   hashResetToken,
+  JWT_VERIFY_OPTIONS,
   passwordSchema,
   WORKER_PROFILE_SELECT
 };
