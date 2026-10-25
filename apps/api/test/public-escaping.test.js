@@ -24,7 +24,7 @@ function loadApp() {
       let text = '';
       return {
         set textContent(v) { text = String(v); },
-        get innerHTML() { return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/ /g, '&nbsp;'); }
+        get innerHTML() { return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\u00a0/g, '&nbsp;'); }
       };
     }
   };
