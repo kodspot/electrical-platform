@@ -85,6 +85,8 @@ test.describe('Forms — admin, supervisor, electrician', () => {
     await page.locator('#saveBtn').click();
     const row = page.locator('#supBody tr', { hasText: email });
     await expect(row).toBeVisible();
+    // Adding a supervisor goes straight on to their locations (BUG-0065).
+    await page.locator('#locModal').getByRole('button', { name: 'Cancel' }).click();
     await page.reload();
     await expect(row).toBeVisible();
 
@@ -208,6 +210,7 @@ test.describe('Forms — admin, supervisor, electrician', () => {
     await expect(ruleCard).toBeVisible();
     await db().alertRule.delete({ where: { id: rule.id } });
     await ruleCard.getByRole('button', { name: 'Delete' }).click();
+    await confirmYes(page);
     await expect(page.locator('.toast-error', { hasText: 'Rule not found' })).toBeVisible();
 
     await page.goto(orgPage(slug, 'admin-electrical'));
@@ -215,6 +218,7 @@ test.describe('Forms — admin, supervisor, electrician', () => {
     await expect(page.locator('#flagBtn')).toBeVisible();
     await db().electricalInspection.delete({ where: { id: inspection.id } });
     await page.locator('#flagBtn').click();
+    await page.getByRole('button', { name: 'Flag inspection' }).click();
     await expect(page.locator('.toast-error', { hasText: 'Inspection not found' })).toBeVisible();
     await db().location.delete({ where: { id: room.id } });
   });
@@ -450,9 +454,15 @@ test.describe('Forms — admin, supervisor, electrician', () => {
     const admin = await ctx.newPage();
     await signIn(admin, 'admin', x.admin, slug);
     await admin.goto(orgPage(slug, 'admin-electrical'));
-    admin.once('dialog', (d) => d.accept('Readings look copied'));
     await admin.locator('tbody tr').first().getByRole('button', { name: 'View' }).click();
+    // Cancel leaves it as it was (BUG-0070).
     await admin.locator('#flagBtn').click();
+    await admin.getByRole('dialog', { name: 'Flag this inspection' }).getByRole('button', { name: 'Cancel' }).click();
+    await admin.waitForTimeout(300);
+    expect((await db().electricalInspection.findUnique({ where: { id: record.id } })).status).not.toBe('FLAGGED');
+    await admin.locator('#flagBtn').click();
+    await admin.getByRole('dialog', { name: 'Flag this inspection' }).getByRole('textbox').fill('Readings look copied');
+    await admin.getByRole('button', { name: 'Flag inspection' }).click();
     await expect.poll(async () => (await db().electricalInspection.findUnique({ where: { id: record.id } })).status).toBe('FLAGGED');
     await ctx.close();
   });
@@ -586,6 +596,84 @@ test.describe('Forms — admin, supervisor, electrician', () => {
     await page.locator('#userMenuTrigger').click();
     await page.locator('#userMenuProfile').click();
     await expect(page.locator('.profile-role-badge')).toHaveText('Electrician');
+  });
+
+  // A global rule hides file inputs, and the required proof photo had no label tied to it, so
+  // an electrician saw "Proof Photo *" with nothing to tap and could not resolve a ticket. The
+  // journeys set the file directly, so they never noticed. A real file chooser must open. [BUG-0062]
+  test('BUG-0062: an electrician can reach the proof photo: tapping the visible control opens the file chooser', async ({ page }) => {
+    await signInElectrician(page, x.worker, slug);
+    await page.goto(orgPage(slug, 'electrician-tickets'));
+    await page.evaluate(() => window.openResolve('00000000-0000-4000-8000-000000000000'));
+    const control = page.locator('label[for="rPhoto"]');
+    await expect(control).toBeVisible();
+    const [chooser] = await Promise.all([page.waitForEvent('filechooser', { timeout: 5000 }), control.click()]);
+    expect(chooser.isMultiple()).toBe(false);
+  });
+
+  test('BUG-0063: a wrong organization code, or none, says so', async ({ page }) => {
+    await page.goto('/');
+    await page.evaluate(() => localStorage.clear());
+    await page.reload();
+    await page.getByRole('button', { name: 'Go', exact: true }).click();
+    await expect(page.locator('#orgError')).toBeVisible();
+    await expect(page.locator('#orgError')).toContainText('Enter your organization code');
+    await page.locator('#orgSlugField').fill('no-such-organization');
+    await page.getByRole('button', { name: 'Go', exact: true }).click();
+    await expect(page.locator('#orgError')).toContainText("can't find that code");
+  });
+
+  test('BUG-0065: a supervisor can be given locations from the admin screen', async ({ page }) => {
+    await signIn(page, 'admin', x.admin, slug);
+    await page.goto(orgPage(slug, 'admin-supervisors'));
+    await page.locator('#supBody tr', { hasText: x.supervisor.email }).getByRole('button', { name: 'Locations' }).click();
+    const box = page.locator('#locList input[type=checkbox]').first();
+    await expect(box).toBeVisible();
+    await box.check();
+    const id = await box.inputValue();
+    await page.locator('#locSaveBtn').click();
+    await expect.poll(() => db().supervisorAssignment.count({ where: { supervisorId: x.supervisor.id, locationId: id } })).toBe(1);
+  });
+
+  test('BUG-0066: a resident can choose the problem with the keyboard', async ({ page }) => {
+    const location = await db().location.findUnique({ where: { id: x.locationId } });
+    await page.goto(`/s/${location.qrCode}`);
+    const service = page.locator('.role-card').first();
+    if (await service.isVisible().catch(() => false)) { await service.focus(); await page.keyboard.press('Enter'); }
+    const first = page.locator('#issueGrid input[type=radio]').first();
+    await first.focus();
+    await page.keyboard.press('Space');
+    await expect(first).toBeChecked();
+    await expect(page.locator('#submitBtn')).toBeEnabled();
+    await expect(page.locator('#submitBtn')).toHaveText('Send report');
+  });
+
+  test('BUG-0068: Print All waits for every sticker', async ({ page }) => {
+    await signIn(page, 'admin', x.admin, slug);
+    let release;
+    const gate = new Promise((resolve) => { release = resolve; });
+    await page.route('**/qr-image', async (route) => { await gate; await route.continue(); });
+    await page.goto(orgPage(slug, 'admin-qr-print'));
+    await expect(page.locator('#countLabel')).toContainText('Preparing');
+    await expect(page.locator('#printBtn')).toBeDisabled();
+    release();
+    await expect(page.locator('#countLabel')).toContainText('Ready');
+    await expect(page.locator('#printBtn')).toBeEnabled();
+  });
+
+  test('BUG-0069 and BUG-0073: a count tile filters to its group, and a failed load is not "no tickets"', async ({ page }) => {
+    await signIn(page, 'admin', x.admin, slug);
+    await page.goto(orgPage(slug, 'admin-tickets'));
+    await expect(page.locator('#statOpen')).not.toHaveText('-');
+    const asked = page.waitForRequest((r) => r.url().includes('/api/tickets?') && r.url().includes('status='));
+    await page.locator('.tk-stat.open').click();
+    expect(decodeURIComponent((await asked).url())).toContain('status=OPEN,ACKNOWLEDGED,ASSIGNED');
+    await expect(page.locator('.tk-stat.open')).toHaveAttribute('aria-pressed', 'true');
+
+    await page.route('**/api/tickets?*', (route) => route.fulfill({ status: 500, body: '{}' }));
+    await page.locator('.tk-stat.open').click();
+    await expect(page.locator('#ticketBody')).toContainText('Could not load the tickets');
+    await expect(page.locator('#ticketBody').getByRole('button', { name: 'Try again' })).toBeVisible();
   });
 
   // PATCH /auth/password and /auth/worker-pin had no screen: nobody could change their own

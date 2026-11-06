@@ -15,6 +15,7 @@ const { normalizeEnabledModules } = require('../services/module-policy');
 const { notifyAdmins, createNotification } = require('./notifications');
 const { attachTenantContextFromWorker } = require('../middleware/tenant-context');
 const { sendEmail, escHtml } = require('../lib/email');
+const { decryptWorkerPII } = require('../lib/crypto');
 const { APP_URL } = require('../config/env');
 
 const RESET_TOKEN_TTL_MS = 60 * 60 * 1000; // 1 hour
@@ -202,6 +203,52 @@ async function workerAuthRoutes(fastify) {
         name: org.name,
         enabledModules: normalizeEnabledModules(org.enabledModules)
       }
+    };
+  });
+
+  // DPDP Act s.11 (right to access): what /auth/export gives staff. An electrician signs in to a
+  // separate account type, so that route could not serve them. [BUG-0076]
+  fastify.get('/auth/worker-export', {
+    preHandler: [authenticateWorkerJWT],
+    config: { rateLimit: strictRateLimit }
+  }, async (request, reply) => {
+    const { id, orgId } = request.worker;
+    const worker = await prisma.worker.findFirst({
+      where: { id, orgId },
+      select: {
+        id: true, name: true, employeeId: true, phone: true, email: true, address: true,
+        department: true, designation: true, gender: true, bloodGroup: true, aadharNo: true,
+        dateOfBirth: true, dateOfJoin: true, notes: true, isActive: true, createdAt: true, updatedAt: true,
+        org: { select: { name: true, type: true } }
+      }
+    });
+    const attendance = await prisma.attendance.findMany({
+      where: { workerId: id, orgId },
+      select: { date: true, shift: true, status: true, note: true },
+      orderBy: { date: 'desc' },
+      take: 500
+    });
+    const inspections = await prisma.electricalInspection.findMany({
+      where: { orgId, workers: { some: { id } } },
+      select: { id: true, shift: true, status: true, inspectedAt: true, location: { select: { name: true } } },
+      orderBy: { inspectedAt: 'desc' },
+      take: 500
+    });
+    const tickets = await prisma.ticket.findMany({
+      where: { orgId, resolvedWorkers: { some: { id } } },
+      select: { id: true, title: true, status: true, resolvedNote: true, resolvedAt: true, location: { select: { name: true } } },
+      orderBy: { createdAt: 'desc' },
+      take: 500
+    });
+
+    reply.header('content-disposition', 'attachment; filename="kodspot-data-export.json"');
+    return {
+      exportedAt: new Date().toISOString(),
+      platform: 'Kodspot Electrical',
+      personalData: decryptWorkerPII(worker),
+      attendance,
+      inspections,
+      tickets
     };
   });
 

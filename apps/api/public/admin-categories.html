@@ -10,15 +10,15 @@
 <meta name="theme-color" content="#1E40AF">
 <title>Complaint Categories - Kodspot</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/css/design-system.css?v=10">
+<link rel="stylesheet" href="/css/design-system.css?v=11">
 <style>
 .cg-toolbar { display:flex; justify-content:space-between; gap:.75rem; flex-wrap:wrap; margin-bottom:.75rem; }
 .cg-toolbar-left { display:flex; gap:.5rem; flex-wrap:wrap; align-items:center; }
 .cg-summary { display:flex; gap:.9rem; flex-wrap:wrap; font-size:.78rem; color:var(--text-muted); margin:.2rem 0 .8rem; }
 .cg-summary b { color:var(--text); }
 .cg-table td, .cg-table th { vertical-align:top; }
-.cg-key { font-family:var(--font-mono); font-size:.74rem; background:var(--bg); border:1px solid var(--border); border-radius:var(--radius-sm); padding:.1rem .35rem; color:var(--text-muted); }
-.cg-scope { font-size:.72rem; color:var(--text-muted); }
+.cg-key { font-family:var(--font-mono); font-size:var(--fs-xs); background:var(--bg); border:1px solid var(--border); border-radius:var(--radius-sm); padding:.1rem .35rem; color:var(--text-muted); }
+.cg-scope { font-size:var(--fs-xs); color:var(--text-muted); }
 .cg-actions { display:flex; gap:.35rem; flex-wrap:wrap; }
 .cg-empty { text-align:center; padding:2rem 1rem; color:var(--text-muted); }
 @media (max-width:700px) {
@@ -142,7 +142,7 @@
 </div>
 
 <script src="/js/offline-sync.js?v=1"></script>
-<script src="/js/app.js?v=16"></script>
+<script src="/js/app.js?v=17"></script>
 <script>
 if (!App.initAdmin('categories')) throw '';
 App.initNotifications(App.apiFetch);

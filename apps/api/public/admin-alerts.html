@@ -10,7 +10,7 @@
 <meta name="theme-color" content="#1E40AF">
 <title>Alerts & Automation — Admin</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/css/design-system.css?v=10">
+<link rel="stylesheet" href="/css/design-system.css?v=11">
 <style>
 .tabs{display:flex;border-bottom:2px solid var(--border);margin-bottom:1rem;gap:0}
 .tab{padding:.55rem 1.1rem;font-size:.82rem;font-weight:600;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-2px;color:var(--text-muted);transition:all .15s}
@@ -20,14 +20,14 @@
 
 .alert-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:.85rem;margin-bottom:.5rem;position:relative}
 .alert-card.unack{border-left:3px solid var(--warning-text)}
-.alert-sev{display:inline-block;font-size:.65rem;font-weight:700;padding:.1rem .4rem;border-radius:3px;text-transform:uppercase}
+.alert-sev{display:inline-block;font-size:var(--fs-xs);font-weight:700;padding:.1rem .4rem;border-radius:3px;text-transform:uppercase}
 .sev-INFO{background:rgba(99,102,241,.12);color:#818cf8}
 .sev-WARNING{background:rgba(245,158,11,.12);color:var(--warning-text)}
 .sev-HIGH{background:rgba(249,115,22,.12);color:#f97316}
 .sev-CRITICAL{background:rgba(239,68,68,.12);color:var(--danger)}
 .alert-title{font-weight:600;font-size:.85rem;margin:.25rem 0 .15rem}
 .alert-body{font-size:.75rem;color:var(--text-muted);margin-bottom:.35rem}
-.alert-meta{font-size:.68rem;color:var(--text-muted);display:flex;gap:.75rem;flex-wrap:wrap}
+.alert-meta{font-size:var(--fs-xs);color:var(--text-muted);display:flex;gap:.75rem;flex-wrap:wrap}
 .alert-ack-btn{position:absolute;top:.75rem;right:.75rem}
 
 .rule-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:.85rem;margin-bottom:.5rem;display:flex;align-items:flex-start;gap:.75rem}
@@ -35,17 +35,17 @@
 .rule-icon{width:36px;height:36px;border-radius:var(--radius);display:flex;align-items:center;justify-content:center;font-size:1.1rem;flex-shrink:0}
 .rule-content{flex:1;min-width:0}
 .rule-name{font-weight:600;font-size:.85rem}
-.rule-trigger{font-size:.7rem;padding:.1rem .35rem;border-radius:3px;background:var(--bg);font-weight:600;margin-left:.35rem}
+.rule-trigger{font-size:var(--fs-xs);padding:.1rem .35rem;border-radius:3px;background:var(--bg);font-weight:600;margin-left:.35rem}
 .rule-desc{font-size:.75rem;color:var(--text-muted);margin:.2rem 0}
 .rule-actions-list{display:flex;gap:.35rem;flex-wrap:wrap;margin-top:.3rem}
-.rule-action-tag{font-size:.62rem;padding:.1rem .3rem;border-radius:3px;background:rgba(8,145,178,.1);color:#0891b2;font-weight:600}
+.rule-action-tag{font-size:var(--fs-xs);padding:.1rem .3rem;border-radius:3px;background:rgba(8,145,178,.1);color:#0891b2;font-weight:600}
 
 .insight-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:1rem;margin-bottom:.65rem;cursor:pointer;transition:border-color .15s}
 .insight-card:hover{border-color:var(--primary)}
 .insight-card.unread{border-left:3px solid var(--primary)}
 .insight-title{font-weight:600;font-size:.88rem}
-.insight-type{font-size:.65rem;padding:.1rem .35rem;border-radius:3px;background:rgba(139,92,246,.1);color:#8b5cf6;font-weight:600;margin-left:.35rem}
-.insight-date{font-size:.7rem;color:var(--text-muted);margin-top:.2rem}
+.insight-type{font-size:var(--fs-xs);padding:.1rem .35rem;border-radius:3px;background:rgba(139,92,246,.1);color:#8b5cf6;font-weight:600;margin-left:.35rem}
+.insight-date{font-size:var(--fs-xs);color:var(--text-muted);margin-top:.2rem}
 .insight-content{font-size:.82rem;line-height:1.6;margin-top:.65rem}
 .insight-content strong{color:var(--text)}
 .insight-content ul{padding-left:1.2rem;margin:.3rem 0}
@@ -219,7 +219,7 @@
   <div class="modal" style="max-width:600px">
     <h2 class="modal-title" id="insightDetailTitle">AI Insight</h2>
     <div class="insight-content" id="insightDetailContent"></div>
-    <div style="margin-top:.75rem;font-size:.7rem;color:var(--text-muted)" id="insightDetailMeta"></div>
+    <div style="margin-top:.75rem;font-size:var(--fs-xs);color:var(--text-muted)" id="insightDetailMeta"></div>
     <div class="modal-actions">
       <button type="button" class="btn btn-outline" onclick="App.closeModal('insightModal')">Close</button>
     </div>
@@ -227,7 +227,7 @@
 </div>
 
 <script src="/js/offline-sync.js?v=1"></script>
-<script src="/js/app.js?v=16"></script>
+<script src="/js/app.js?v=17"></script>
 <script>
 if (!App.initAdmin('admin-alerts')) throw '';
 var esc = App.esc, $ = App.$, apiFetch = App.apiFetch;
@@ -292,7 +292,7 @@ async function loadRules(){
       '<div class="rule-content"><div><span class="rule-name">'+esc(r.name)+'</span><span class="rule-trigger">'+t.label+'</span></div>'+
       (r.description?'<div class="rule-desc">'+esc(r.description)+'</div>':'')+
       '<div class="rule-actions-list">'+actions+'</div>'+
-      '<div style="font-size:.68rem;color:var(--text-muted);margin-top:.25rem">'+
+      '<div style="font-size:var(--fs-xs);color:var(--text-muted);margin-top:.25rem">'+
       (r._count?r._count.alerts+' alerts fired':'')+(r.isActive?'':' · <span style="color:var(--danger)">Disabled</span>')+
       (r.escalateAfterMinutes?' · <span style="color:var(--warning-text)">⏱ Escalates after '+r.escalateAfterMinutes+'min</span>':'')+
       '</div></div>'+
@@ -406,7 +406,7 @@ async function editRule(id){
 }
 
 async function deleteRule(id, name){
-  if(!confirm('Delete rule "'+name+'"? This cannot be undone.')) return;
+  if(!(await App.confirmDialog('Delete rule "'+name+'"? This cannot be undone.',{yes:'Delete rule',danger:true}))) return;
   var res = await apiFetch('/alert-rules/'+id,{method:'DELETE'});
   if(res&&res.ok) loadRules(); else if(res) App.toastFailure(res, 'Could not delete the rule');
 }
@@ -513,11 +513,11 @@ async function loadAlerts(){
 
   $('alertsList').innerHTML = alerts.map(function(a){
     var t = TRIGGER_MAP[a.trigger]||{icon:'🔔',label:a.trigger};
-    var ackBtn = a.acknowledged?'<span style="font-size:.68rem;color:var(--success)">✓ Acked</span>':
+    var ackBtn = a.acknowledged?'<span style="font-size:var(--fs-xs);color:var(--success)">✓ Acked</span>':
       '<button class="btn btn-sm btn-outline alert-ack-btn" onclick="ackAlert(\''+a.id+'\')">Acknowledge</button>';
     return '<div class="alert-card'+(a.acknowledged?'':' unack')+'">'+
       '<div style="display:flex;align-items:center;gap:.5rem"><span class="alert-sev sev-'+a.severity+'">'+a.severity+'</span>'+
-      '<span style="font-size:.72rem;color:var(--text-muted)">'+t.icon+' '+t.label+'</span></div>'+
+      '<span style="font-size:var(--fs-xs);color:var(--text-muted)">'+t.icon+' '+t.label+'</span></div>'+
       '<div class="alert-title">'+esc(a.title)+'</div>'+
       (a.body?'<div class="alert-body">'+esc(a.body).substring(0,200)+'</div>':'')+
       '<div class="alert-meta"><span>'+App.fmtDateShort(a.createdAt)+'</span>'+
@@ -544,7 +544,7 @@ async function ackAlert(id){
 }
 
 async function acknowledgeAll(){
-  if(!confirm('Acknowledge all unacknowledged alerts?')) return;
+  if(!(await App.confirmDialog('Acknowledge all unacknowledged alerts?',{yes:'Acknowledge all',danger:false}))) return;
   var res = await apiFetch('/alerts/acknowledge-all',{method:'PATCH'});
   if(res&&res.ok){ loadAlerts(); loadSummary(); } else if(res) App.toastFailure(res, 'Could not acknowledge the alerts');
 }

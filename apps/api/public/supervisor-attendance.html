@@ -10,7 +10,7 @@
 <meta name="theme-color" content="#1E40AF">
 <title>Attendance — Kodspot</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/css/design-system.css?v=10">
+<link rel="stylesheet" href="/css/design-system.css?v=11">
 <style>
 .sv-shell{max-width:640px;margin:0 auto;padding:1rem .75rem;min-height:calc(100dvh - 56px)}
 
@@ -24,7 +24,7 @@
 .setup-card p{font-size:.8rem;color:var(--text-muted);margin:0 0 1rem}
 .setup-loc-list{text-align:left;max-height:320px;overflow-y:auto;margin-bottom:1rem}
 .setup-loc-group{margin-bottom:.3rem}
-.setup-loc-hdr{font-size:.68rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.04em;padding:.35rem .4rem .2rem;display:flex;align-items:center;gap:.35rem}
+.setup-loc-hdr{font-size:var(--fs-xs);font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.04em;padding:.35rem .4rem .2rem;display:flex;align-items:center;gap:.35rem}
 .setup-loc-item{display:flex;align-items:center;gap:.5rem;padding:.55rem .7rem;border-radius:var(--radius);cursor:pointer;transition:all .12s;border:1.5px solid transparent;margin:.15rem 0}
 .setup-loc-item:hover{background:rgba(30,64,175,.06);border-color:var(--border)}
 .setup-loc-item.selected{background:rgba(30,64,175,.1);border-color:var(--primary)}
@@ -32,7 +32,7 @@
 .setup-loc-item.selected .loc-radio{border-color:var(--primary);background:var(--primary)}
 .setup-loc-item.selected .loc-radio::after{content:'';width:8px;height:8px;border-radius:50%;background:#fff}
 .setup-loc-name{font-size:.85rem;font-weight:500;color:var(--text)}
-.setup-loc-type{font-size:.6rem;color:var(--text-muted);background:var(--bg);padding:.1rem .3rem;border-radius:var(--radius-sm);text-transform:uppercase}
+.setup-loc-type{font-size:var(--fs-xs);color:var(--text-muted);background:var(--bg);padding:.1rem .3rem;border-radius:var(--radius-sm);text-transform:uppercase}
 .setup-loc-indent{padding-left:1.2rem}
 
 /* Roster header */
@@ -41,14 +41,14 @@
 .roster-hdr-icon svg{color:var(--primary)}
 .roster-hdr-info{flex:1;min-width:0}
 .roster-hdr-loc{font-size:.9rem;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.roster-hdr-meta{font-size:.68rem;color:var(--text-muted)}
+.roster-hdr-meta{font-size:var(--fs-xs);color:var(--text-muted)}
 .roster-hdr-actions{display:flex;gap:.3rem;flex-shrink:0}
 
 /* Summary stats */
 .att-stats{display:flex;gap:.35rem;margin-bottom:.85rem;flex-wrap:wrap}
 .att-stat{flex:1;text-align:center;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:.5rem .25rem;min-width:55px}
 .att-stat-val{font-size:1.15rem;font-weight:700;line-height:1}
-.att-stat-lbl{font-size:.58rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.04em;margin-top:.1rem}
+.att-stat-lbl{font-size:var(--fs-xs);color:var(--text-muted);text-transform:uppercase;letter-spacing:.04em;margin-top:.1rem}
 .att-stat.present .att-stat-val{color:var(--success)}
 .att-stat.absent .att-stat-val{color:#ef4444}
 .att-stat.leave .att-stat-val{color:#f59e0b}
@@ -57,35 +57,37 @@
 
 /* Quick action buttons */
 .att-quick{display:flex;gap:.35rem;margin-bottom:.75rem}
-.att-quick-btn{flex:1;font-size:.72rem;font-weight:600;padding:.45rem .3rem;border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--surface);color:var(--text-muted);cursor:pointer;text-align:center;transition:all .15s;min-height:var(--touch-min)}
+.att-quick-btn{flex:1;font-size:var(--fs-xs);font-weight:600;padding:.45rem .3rem;border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--surface);color:var(--text-muted);cursor:pointer;text-align:center;transition:all .15s;min-height:var(--touch-min)}
 .att-quick-btn:hover{border-color:var(--primary);color:var(--text)}
 
 /* Worker attendance list */
 .att-worker{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:.7rem .8rem;transition:border-color .15s;margin-bottom:.4rem}
 .att-worker.marked{border-color:rgba(16,185,129,.3)}
 .att-worker-top{display:flex;align-items:center;gap:.55rem;margin-bottom:.5rem}
-.att-worker-avatar{width:34px;height:34px;border-radius:50%;background:var(--primary);color:#fff;display:flex;align-items:center;justify-content:center;font-size:.72rem;font-weight:700;flex-shrink:0}
+.att-worker-avatar{width:34px;height:34px;border-radius:50%;background:var(--primary);color:#fff;display:flex;align-items:center;justify-content:center;font-size:var(--fs-xs);font-weight:700;flex-shrink:0}
 .att-worker-info{flex:1;min-width:0}
 .att-worker-name{font-size:.88rem;font-weight:600;color:var(--text);line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.att-worker-id{font-size:.68rem;color:var(--text-muted)}
-.att-worker-saved{font-size:.62rem;color:var(--success);display:none}
+.att-worker-id{font-size:var(--fs-xs);color:var(--text-muted)}
+.att-worker-saved{font-size:var(--fs-xs);color:var(--success);display:none}
 .att-worker.marked .att-worker-saved{display:inline}
 
 /* Radio row */
 .att-options{display:flex;gap:.3rem}
 .att-opt{flex:1}
-.att-opt input{display:none}
-.att-opt label{display:block;text-align:center;font-size:.68rem;font-weight:600;padding:.4rem .15rem;border-radius:var(--radius-sm);border:1.5px solid var(--border);cursor:pointer;transition:all .15s;color:var(--text-muted);min-height:var(--touch-min);display:flex;align-items:center;justify-content:center}
+.att-opt input{position:absolute;opacity:0;width:1px;height:1px}
+.att-opt input:focus-visible + label{outline:3px solid var(--focus);outline-offset:2px}
+.att-opt input:checked + label::before{content:'✓ ';content:'✓ ' / ''}
+.att-opt label{display:flex;align-items:center;justify-content:center;min-height:44px;text-align:center;font-size:.8rem;font-weight:600;padding:.25rem .15rem;border-radius:var(--radius-sm);border:1.5px solid var(--border);cursor:pointer;transition:all .15s;color:var(--text-muted);min-height:var(--touch-min);display:flex;align-items:center;justify-content:center}
 .att-opt input:checked + label{color:#fff}
-.att-opt.present input:checked + label{background:#10b981;border-color:#10b981}
-.att-opt.absent input:checked + label{background:#ef4444;border-color:#ef4444}
-.att-opt.leave input:checked + label{background:#f59e0b;border-color:#f59e0b}
-.att-opt.half input:checked + label{background:#3b82f6;border-color:#3b82f6}
+.att-opt.present input:checked + label{background:#047857;border-color:#047857}
+.att-opt.absent input:checked + label{background:#B91C1C;border-color:#B91C1C}
+.att-opt.leave input:checked + label{background:#B45309;border-color:#B45309}
+.att-opt.half input:checked + label{background:#1D4ED8;border-color:#1D4ED8}
 
 /* Submit bar */
 .att-submit-bar{position:sticky;bottom:0;background:var(--bg);padding:.75rem 0 .35rem;z-index:5;display:flex;gap:.5rem;align-items:center}
 .att-submit-bar .btn{flex:1}
-.att-changed-count{font-size:.72rem;color:var(--text-muted);white-space:nowrap}
+.att-changed-count{font-size:var(--fs-xs);color:var(--text-muted);white-space:nowrap}
 
 /* Worker selection modal */
 .ws-search{width:100%;font-size:.82rem;padding:.5rem .65rem;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);margin-bottom:.65rem}
@@ -94,9 +96,9 @@
 .ws-item:hover{background:rgba(30,64,175,.06)}
 .ws-item input{width:16px;height:16px;accent-color:var(--primary);flex-shrink:0}
 .ws-item-name{font-size:.84rem;font-weight:500;color:var(--text)}
-.ws-item-id{font-size:.68rem;color:var(--text-muted)}
-.ws-item-badge{font-size:.58rem;background:rgba(30,64,175,.12);color:var(--primary);padding:.1rem .3rem;border-radius:var(--radius-sm);font-weight:600}
-.ws-count{font-size:.72rem;color:var(--text-muted);margin-bottom:.5rem}
+.ws-item-id{font-size:var(--fs-xs);color:var(--text-muted)}
+.ws-item-badge{font-size:var(--fs-xs);background:rgba(30,64,175,.12);color:var(--primary);padding:.1rem .3rem;border-radius:var(--radius-sm);font-weight:600}
+.ws-count{font-size:var(--fs-xs);color:var(--text-muted);margin-bottom:.5rem}
 
 /* Success */
 .att-success{display:none;text-align:center;padding:2rem 1rem}
@@ -114,18 +116,20 @@
   .att-stat{padding:.4rem .15rem}
   .att-stat-val{font-size:.95rem}
   .att-worker{padding:.6rem .65rem}
-  .att-opt label{font-size:.62rem;padding:.35rem .1rem}
 }
 </style>
+<script>try{if(localStorage.getItem('kodspot_theme')==='light')document.documentElement.removeAttribute('data-theme')}catch(e){}</script>
 </head>
 <body>
 <nav class="topbar">
   <div class="topbar-left">
     <span class="topbar-brand">Kodspot</span>
     <div class="sv-nav" id="sv-nav">
-      <a href="/supervisor-scan" class="sv-nav-link"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7V5a2 2 0 012-2h2"/><path d="M17 3h2a2 2 0 012 2v2"/><path d="M21 17v2a2 2 0 01-2 2h-2"/><path d="M7 21H5a2 2 0 01-2-2v-2"/><rect x="7" y="7" width="10" height="10" rx="1"/></svg>Scan</a>
-      <a href="/supervisor-tickets" class="sv-nav-link"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 5H9a2 2 0 00-2 2v10a2 2 0 002 2h6a2 2 0 002-2V7a2 2 0 00-2-2z"/><path d="M12 11h.01"/><path d="M12 15h.01"/></svg>Tickets</a>
-      <a href="/supervisor-attendance" class="sv-nav-link active"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 00-4-4H5a4 4 0 00-4-4v2"/><circle cx="8.5" cy="7" r="4"/><polyline points="17 11 19 13 23 9"/></svg>Attendance</a>
+      <a href="/supervisor-scan" class="sv-nav-link"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 7V5a2 2 0 012-2h2"/><path d="M17 3h2a2 2 0 012 2v2"/><path d="M21 17v2a2 2 0 01-2 2h-2"/><path d="M7 21H5a2 2 0 01-2-2v-2"/><rect x="7" y="7" width="10" height="10" rx="1"/></svg>Scan</a>
+      <a href="/supervisor-electrical" class="sv-nav-link" data-mod="ele"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>Electrical</a>
+      <a href="/supervisor-assets" class="sv-nav-link" data-mod="asset"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/><polyline points="3.3 7 12 12 20.7 7"/><line x1="12" y1="22" x2="12" y2="12"/></svg>Assets</a>
+      <a href="/supervisor-tickets" class="sv-nav-link"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M15 5H9a2 2 0 00-2 2v10a2 2 0 002 2h6a2 2 0 002-2V7a2 2 0 00-2-2z"/><path d="M12 11h.01"/><path d="M12 15h.01"/></svg>Tickets</a>
+      <a href="/supervisor-attendance" class="sv-nav-link active" aria-current="page"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M16 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="8.5" cy="7" r="4"/><polyline points="17 11 19 13 23 9"/></svg>Attendance</a>
     </div>
   </div>
   <div class="topbar-right">
@@ -137,8 +141,8 @@
 <div class="sv-shell">
   <!-- Date/Shift selector — always visible -->
   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.6rem">
-    <h2 style="font-size:1.05rem;font-weight:700;margin:0">Attendance</h2>
-    <div style="display:inline-flex;align-items:center;gap:.2rem;font-size:.72rem;color:var(--text-light);cursor:pointer;padding:.25rem .5rem;border-radius:var(--radius-sm)" onclick="refreshAll()" title="Refresh"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 11-2.12-9.36L23 10"/></svg> Refresh</div>
+    <h1 style="font-size:1.125rem;font-weight:700;margin:0">Attendance</h1>
+    <button class="btn btn-sm btn-refresh" onclick="refreshAll()">Refresh</button>
   </div>
 
   <div class="att-filters">
@@ -153,7 +157,7 @@
       <h3>Select Your Location</h3>
       <p>Choose the location or area you're supervising today</p>
       <div class="setup-loc-list" id="locationList">Loading locations…</div>
-      <button class="btn btn-primary" id="startRosterBtn" onclick="createRoster()" disabled style="width:100%">Start Roster</button>
+      <button class="btn btn-primary" id="startRosterBtn" onclick="createRoster()" disabled style="width:100%">Choose a location first</button>
     </div>
   </div>
 
@@ -167,7 +171,7 @@
         <div class="roster-hdr-meta" id="rosterMeta">—</div>
       </div>
       <div class="roster-hdr-actions">
-        <button class="btn btn-sm btn-outline" onclick="openWorkerModal()" title="Manage electricians">
+        <button class="btn btn-sm btn-outline" onclick="openWorkerModal()" title="Manage electricians" aria-label="Manage electricians">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4-4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="22" y1="11" x2="16" y2="11"/></svg>
         </button>
         <button class="btn btn-sm btn-ghost" onclick="changeFloor()" title="Change location">
@@ -218,7 +222,7 @@
       <h2 class="modal-title" style="margin:0">Manage Electricians</h2>
     </div>
     <div style="padding:0 1rem .75rem">
-      <input type="text" class="ws-search" id="wsSearch" placeholder="Search electricians…" oninput="filterWorkerList()">
+      <input type="text" class="ws-search" id="wsSearch" placeholder="Search electricians…" aria-label="Search electricians" oninput="filterWorkerList()">
       <div class="ws-count" id="wsCount">0 selected</div>
       <div class="ws-list" id="wsList">Loading…</div>
     </div>
@@ -230,7 +234,7 @@
 </div>
 
 <script src="/js/offline-sync.js?v=1"></script>
-<script src="/js/app.js?v=16"></script>
+<script src="/js/app.js?v=17"></script>
 <script>
 if (!App.initSupervisor()) throw '';
 App.initNotifications(App.supFetch, 'supervisor');
@@ -255,7 +259,24 @@ function setDefaultDate() {
   $('dateSelect').value = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
 }
 
-function onDateShiftChange() {
+function hasUnsaved() { return Object.keys(changes).length > 0; }
+
+window.addEventListener('beforeunload', function(e) {
+  if (hasUnsaved()) { e.preventDefault(); e.returnValue = ''; }
+});
+
+// Moving off the page's date, shift or location throws away what is marked but not saved.
+function okToLeave() {
+  if (!hasUnsaved()) return Promise.resolve(true);
+  return App.confirmDialog('You have unsaved attendance. Leave without saving?', { yes: 'Leave without saving', danger: true });
+}
+
+var picked = {};
+async function onDateShiftChange() {
+  if (!(await okToLeave())) {
+    $('dateSelect').value = picked.date; $('shiftSelect').value = picked.shift;
+    return;
+  }
   currentRoster = null;
   changes = {};
   checkRoster();
@@ -281,6 +302,7 @@ async function loadShifts() {
 function formatShiftLabel(s) {
   if (!s || !s.shift) return '—';
   var fmtT = function(h,m){ var ap=h<12?'AM':'PM'; return (h%12||12)+':'+String(m).padStart(2,'0')+' '+ap; };
+  if (s.startHour === s.endHour && s.startMin === s.endMin) return 'General (all day)';
   return s.shift.charAt(0)+s.shift.slice(1).toLowerCase()+' ('+fmtT(s.startHour,s.startMin)+' – '+fmtT(s.endHour,s.endMin)+')';
 }
 
@@ -298,6 +320,7 @@ function showView(v) {
 
 // ── Check for existing roster ──
 async function checkRoster() {
+  picked = { date: $('dateSelect').value, shift: $('shiftSelect').value };
   var date = $('dateSelect').value, shift = $('shiftSelect').value;
   if (!date || !shift) return;
   showView('none');
@@ -325,10 +348,11 @@ async function showSetup() {
   showView('setup');
   selectedLocId = '';
   $('startRosterBtn').disabled = true;
+  $('startRosterBtn').textContent = 'Choose a location first';
   $('locationList').innerHTML = '<div style="text-align:center;padding:1rem;color:var(--text-muted)">Loading…</div>';
 
   var res = await App.supFetch('/locations?tree=true');
-  if (!res) return;
+  if (!res || !res.ok) { App.loadFailed($('locationList'), { what: 'the locations', onRetry: showSetup }); return; }
   var tree = await res.json();
   renderLocationTree(tree);
 }
@@ -347,14 +371,14 @@ function renderLocationTree(tree) {
     if (bldg.children && bldg.children.length) {
       for (var j = 0; j < bldg.children.length; j++) {
         var floor = bldg.children[j];
-        html += '<div class="setup-loc-item" onclick="selectLocation(this,\'' + App.escJs(floor.id) + '\')">'
+        html += '<button type="button" class="setup-loc-item" aria-pressed="false" onclick="selectLocation(this,\'' + App.escJs(floor.id) + '\')">'
           + '<span>' + esc(floor.name) + '</span>'
-          + (floor.children && floor.children.length ? '<span style="font-size:.7rem;color:var(--text-muted)">' + floor.children.length + ' rooms</span>' : '')
-          + '</div>';
+          + (floor.children && floor.children.length ? '<span style="font-size:var(--fs-xs);color:var(--text-muted)">' + floor.children.length + ' rooms</span>' : '')
+          + '</button>';
       }
     } else {
-      html += '<div class="setup-loc-item" onclick="selectLocation(this,\'' + App.escJs(bldg.id) + '\')">'
-        + '<span>' + esc(bldg.name) + '</span></div>';
+      html += '<button type="button" class="setup-loc-item" aria-pressed="false" onclick="selectLocation(this,\'' + App.escJs(bldg.id) + '\')">'
+        + '<span>' + esc(bldg.name) + '</span></button>';
     }
     html += '</div>';
   }
@@ -363,10 +387,12 @@ function renderLocationTree(tree) {
 
 function selectLocation(el, locId) {
   var items = document.querySelectorAll('.setup-loc-item');
-  for (var i = 0; i < items.length; i++) items[i].classList.remove('selected');
+  for (var i = 0; i < items.length; i++) { items[i].classList.remove('selected'); items[i].setAttribute('aria-pressed', 'false'); }
   el.classList.add('selected');
+  el.setAttribute('aria-pressed', 'true');
   selectedLocId = locId;
   $('startRosterBtn').disabled = false;
+  $('startRosterBtn').textContent = 'Start attendance';
 }
 
 // ── Create / update roster ──
@@ -457,7 +483,7 @@ function renderWorkers() {
     html += '<div class="att-worker-name">' + esc(wk.name) + '</div>';
     html += '<div class="att-worker-id">' + esc(wk.employeeId || '—') + ' <span class="att-worker-saved">· ✓ Saved</span></div>';
     html += '</div></div>';
-    html += '<div class="att-options">';
+    html += '<div class="att-options" role="radiogroup" aria-label="' + esc(wk.name) + '">';
     html += radioOpt(wId, 'PRESENT', 'Present', 'present', w.status);
     html += radioOpt(wId, 'ABSENT', 'Absent', 'absent', w.status);
     html += radioOpt(wId, 'LEAVE', 'Leave', 'leave', w.status);
@@ -512,7 +538,7 @@ function clearAll() {
 function updateSubmitBar() {
   var c = Object.keys(changes).length;
   $('submitBar').style.display = c > 0 ? 'flex' : 'none';
-  $('changedCount').textContent = c + ' change' + (c !== 1 ? 's' : '');
+  $('changedCount').textContent = c + ' not saved yet';
 }
 
 // ── Submit attendance ──
@@ -546,8 +572,13 @@ async function submitAttendance() {
 }
 
 function resetAfterSave() { changes = {}; checkRoster(); }
-function refreshAll() { currentRoster ? loadAttendance() : checkRoster(); }
-function changeFloor() { showSetup(); }
+async function refreshAll() {
+  if (!(await okToLeave())) return;
+  currentRoster ? loadAttendance() : checkRoster();
+}
+async function changeFloor() {
+  if (await okToLeave()) showSetup();
+}
 
 // ── Worker Modal ──
 async function openWorkerModal() {
@@ -589,11 +620,11 @@ function renderWorkerModal(rosterIds, sugIds) {
     if (search && w.name.toLowerCase().indexOf(search) === -1 && (w.employeeId || '').toLowerCase().indexOf(search) === -1) continue;
     var chk = rosterIds[w.id] || sugIds[w.id] || false;
     html += '<label class="ws-item"><input type="checkbox" value="' + esc(w.id) + '"' + (chk ? ' checked' : '') + ' onchange="updateWsCount()">'
-      + '<div class="att-worker-avatar" style="width:32px;height:32px;font-size:.7rem">' + esc(getInitials(w.name)) + '</div>'
+      + '<div class="att-worker-avatar" style="width:32px;height:32px;font-size:var(--fs-xs)">' + esc(getInitials(w.name)) + '</div>'
       + '<div><div style="font-weight:600;font-size:.82rem">' + esc(w.name) + '</div>'
-      + '<div style="font-size:.72rem;color:var(--text-muted)">' + esc(w.employeeId || '—') + '</div></div></label>';
+      + '<div style="font-size:var(--fs-xs);color:var(--text-muted)">' + esc(w.employeeId || '—') + '</div></div></label>';
   }
-  $('wsList').innerHTML = html || '<div style="text-align:center;padding:1rem;color:var(--text-muted)">No workers found</div>';
+  $('wsList').innerHTML = html || '<div style="text-align:center;padding:1rem;color:var(--text-muted)">No electricians found</div>';
 }
 
 function filterWorkerList() {
@@ -621,14 +652,14 @@ async function saveWorkers() {
   var res = await App.supFetch('/duty-roster/' + encodeURIComponent(currentRoster.id) + '/workers', {
     method: 'PUT', body: JSON.stringify({ workerIds: ids })
   });
-  btn.disabled = false; btn.textContent = 'Save Workers';
+  btn.disabled = false; btn.textContent = 'Save Electricians';
   if (!res) return;
   var data = await res.json();
   if (data.error) { App.toast(data.error, 'error'); return; }
 
   currentRoster = data;
   closeWorkerModal();
-  App.toast('Workers updated', 'success');
+  App.toast('Electricians updated', 'success');
   await loadAttendance();
 }
 </script>

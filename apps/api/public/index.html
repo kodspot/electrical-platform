@@ -10,15 +10,17 @@
 <meta name="theme-color" content="#1E40AF">
 <title>Kodspot</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/css/design-system.css?v=10">
+<link rel="stylesheet" href="/css/design-system.css?v=11">
 <style>
-  .landing-org-input { display:flex; gap:.5rem; margin-bottom:1.2rem; }
-  .landing-org-input input { flex:1; font-family:monospace; text-transform:lowercase; }
+  .landing-org-input { display:flex; gap:.5rem; margin-bottom:.35rem; }
+  .landing-org-input input { flex:1; }
+  .landing-label { display:block; color:#fff; font-size:.875rem; font-weight:600; margin-bottom:.3rem; text-align:left; }
+  .landing-hint { color:#fff; opacity:.9; font-size:.8125rem; margin-bottom:1rem; text-align:left; }
   .landing-org-input button { white-space:nowrap; }
   .landing-saved { display:flex; align-items:center; justify-content:space-between; background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-md); padding:.6rem .8rem; margin-bottom:1rem; font-size:.85rem; }
   .landing-saved-name { font-weight:600; color:var(--text-primary); }
   .landing-saved-slug { font-family:monospace; color:var(--text-muted); font-size:.8rem; }
-  .landing-saved-change { color:var(--primary); cursor:pointer; font-size:.8rem; border:none; background:none; text-decoration:underline; }
+  .landing-saved-change { color:var(--primary-text); cursor:pointer; font-size:.875rem; min-height:44px; padding:0 .5rem; border:none; background:none; text-decoration:underline; }
   .landing-cards { display:flex; flex-direction:column; gap:.75rem; }
   .landing-card { text-decoration:none; color:inherit; }
   .landing-card-inner { border:1px solid var(--border); border-radius:var(--radius-md); padding:1rem 1.2rem; transition:box-shadow .15s, border-color .15s; cursor:pointer; }
@@ -31,33 +33,38 @@
 <body class="auth-layout">
   <div class="landing-container">
     <h1 class="landing-title">Kodspot</h1>
-    <p class="landing-subtitle">Facility management platform</p>
+    <p class="landing-subtitle">Staff sign-in</p>
 
     <!-- Org context section -->
     <div id="orgSection">
       <div id="savedOrg" style="display:none" class="landing-saved">
-        <div><span class="landing-saved-name" id="savedOrgName"></span><br><span class="landing-saved-slug" id="savedOrgSlug"></span></div>
+        <div><span class="landing-saved-name" id="savedOrgName"></span></div>
         <button class="landing-saved-change" onclick="changeOrg()">Change</button>
       </div>
-      <div id="orgInput" class="landing-org-input">
-        <input class="form-input" type="text" id="orgSlugField" placeholder="Organization code (e.g. kle)" maxlength="50" pattern="[a-z0-9-]+">
-        <button class="btn btn-primary" onclick="setOrg()" type="button">Go</button>
+      <div id="orgEntry">
+        <label class="landing-label" for="orgSlugField">Organization code</label>
+        <div id="orgInput" class="landing-org-input">
+          <input class="form-input" type="text" id="orgSlugField" placeholder="e.g. kle" maxlength="50" pattern="[a-z0-9-]+" autocapitalize="none" autocorrect="off" spellcheck="false" aria-describedby="orgHint">
+          <button class="btn btn-primary" id="orgGo" onclick="setOrg()" type="button">Go</button>
+        </div>
+        <p class="landing-hint" id="orgHint">Your admin can give you this code. It is usually a short name, like kle.</p>
       </div>
-      <div id="orgError" class="error-msg" style="display:none;margin-bottom:.75rem"></div>
+      <div id="orgError" class="error-msg" role="alert" style="margin-bottom:.75rem"></div>
     </div>
+
+    <p class="landing-hint" style="text-align:center;margin-top:1rem">Reporting a problem? Scan the QR sticker in your room.</p>
 
     <!-- Role cards (shown after org is set) -->
     <div id="roleCards" class="landing-cards" style="display:none">
       <a id="orgHomeLink" class="landing-card">
         <div class="landing-card-inner" style="border-left:3px solid var(--primary)">
-          <div class="landing-card-title" style="color:var(--primary)">Open Dashboard</div>
-          <div class="landing-card-desc">Go to your organisation&rsquo;s module selection</div>
+          <div class="landing-card-title" style="color:var(--primary-text)" id="orgContinue">Continue</div>
         </div>
       </a>
     </div>
   </div>
-  <footer style="position:fixed;bottom:0;left:0;right:0;text-align:center;padding:.8rem;font-size:.75rem;color:var(--text-muted)">
-    <a href="/privacy" style="color:var(--text-muted);text-decoration:underline">Privacy Policy</a> · <a href="/terms" style="color:var(--text-muted);text-decoration:underline">Terms of Service</a> · &copy; 2026 Kodspot
+  <footer class="auth-footer">
+    <a href="/privacy">Privacy Policy</a> · <a href="/terms">Terms of Service</a> · &copy; 2026 Kodspot
   </footer>
   <script>
     var savedSlug = localStorage.getItem('kodspot_org_slug');
@@ -70,9 +77,9 @@
 
     function showSavedOrg() {
       document.getElementById('savedOrgName').textContent = savedName || savedSlug;
-      document.getElementById('savedOrgSlug').textContent = '/' + savedSlug;
       document.getElementById('savedOrg').style.display = '';
-      document.getElementById('orgInput').style.display = 'none';
+      document.getElementById('orgContinue').textContent = 'Continue to ' + (savedName || savedSlug);
+      document.getElementById('orgEntry').style.display = 'none';
       showOrgCards(savedSlug);
     }
 
@@ -81,27 +88,41 @@
       localStorage.removeItem('kodspot_org_name');
       savedSlug = null; savedName = null;
       document.getElementById('savedOrg').style.display = 'none';
-      document.getElementById('orgInput').style.display = '';
+      document.getElementById('orgEntry').style.display = '';
       document.getElementById('roleCards').style.display = 'none';
       document.getElementById('orgSlugField').value = '';
       document.getElementById('orgSlugField').focus();
     }
 
-    async function setOrg() {
-      var slug = document.getElementById('orgSlugField').value.trim().toLowerCase();
-      if (!slug) return;
+    // .error-msg shows only with .show, so setting style.display left every error invisible. [BUG-0063]
+    function orgError(message) {
       var errEl = document.getElementById('orgError');
-      errEl.style.display = 'none';
+      errEl.textContent = message;
+      errEl.classList.add('show');
+      document.getElementById('orgSlugField').focus();
+    }
+
+    async function setOrg() {
+      var field = document.getElementById('orgSlugField');
+      var go = document.getElementById('orgGo');
+      var slug = field.value.trim().toLowerCase();
+      document.getElementById('orgError').classList.remove('show');
+      if (!slug) { orgError('Enter your organization code.'); return; }
+      go.disabled = true; go.textContent = 'Checking…';
       try {
         var res = await fetch('/api/org/' + encodeURIComponent(slug));
-        if (!res.ok) { errEl.textContent = 'Organization not found. Check the code and try again.'; errEl.style.display = ''; return; }
+        if (!res.ok) { orgError('We can\'t find that code. Check it and try again.'); return; }
         var org = await res.json();
         savedSlug = org.slug; savedName = org.name;
         localStorage.setItem('kodspot_org_slug', org.slug);
         localStorage.setItem('kodspot_org_name', org.name);
         // Redirect to org home which shows module tiles
         location.href = '/' + org.slug + '/';
-      } catch(e) { errEl.textContent = 'Network error. Please try again.'; errEl.style.display = ''; }
+      } catch(e) {
+        orgError('No connection. Check your signal and try again.');
+      } finally {
+        go.disabled = false; go.textContent = 'Go';
+      }
     }
 
     document.getElementById('orgSlugField').addEventListener('keydown', function(e) { if (e.key === 'Enter') { e.preventDefault(); setOrg(); } });

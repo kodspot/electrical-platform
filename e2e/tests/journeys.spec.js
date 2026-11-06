@@ -31,7 +31,7 @@ test.describe.serial('Journeys J1–J6: QR → guest complaint → electrician �
     await page.locator('#locName').fill(name);
     await pickOption(page, 'locType', 'Room');
     // The parent list shows each location's full path.
-    await pickOption(page, 'locParent', `${s.names.building} → ${s.names.floor} (FLOOR)`);
+    await pickOption(page, 'locParent', `${s.names.building} → ${s.names.floor}`);
     await page.locator('#locForm button[type=submit]').click();
 
     await expect.poll(async () => {
@@ -71,7 +71,7 @@ test.describe.serial('Journeys J1–J6: QR → guest complaint → electrician �
     await page.locator('#phoneField').fill('9000000000');
     await page.locator('#consentCheck').check();
     await page.locator('#submitBtn').click();
-    await expect(page.getByText('Complaint Submitted!')).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Report sent' })).toBeVisible();
     await ctx.close();
 
     const t = await db().ticket.findFirst({ where: { description: marker } });
@@ -112,7 +112,8 @@ test.describe.serial('Journeys J1–J6: QR → guest complaint → electrician �
     await page.locator('#saveBtn').click();
     const row = page.locator('tr', { hasText: name });
     await expect(row).toBeVisible();
-    await row.locator('button[title="Set login PIN"]').click();
+    // Adding an electrician goes straight on to the PIN they need to sign in (BUG-0064).
+    await expect(page.locator('#pinModalTitle')).toContainText(`set a PIN so ${name} can sign in`);
     await page.locator('#pinInput').fill('123456');
     await page.locator('#pinConfirm').fill('123456');
     await page.locator('#pinSaveBtn').click();
@@ -153,11 +154,10 @@ test.describe.serial('Journeys J1–J6: QR → guest complaint → electrician �
 
   test('J4 — the electrician picks it up and resolves it with a proof photo → RESOLVED_PENDING_VERIFY', async () => {
     const m = state.elecPage;
-    // Pick Up asks for confirmation with a native confirm(); accept it as the user would.
-    const confirmed = new Promise((resolve) => m.once('dialog', async (d) => { const msg = d.message(); await d.accept(); resolve(msg); }));
     const pickupResponse = m.waitForResponse((r) => r.url().includes('/pickup') && r.request().method() === 'POST');
     await m.locator('.el-card', { hasText: state.ticket.description }).getByRole('button', { name: /Pick Up/ }).click();
-    expect(await confirmed).toMatch(/Pick up this ticket/);
+    await expect(m.getByRole('dialog').or(m.locator('#_cfmYes'))).toContainText(/Pick up/);
+    await m.locator('#_cfmYes').click();
     const picked = await pickupResponse;
     expect(picked.status(), `pickup answered ${picked.status()}: ${await picked.text()}`).toBe(200);
     await expect.poll(async () => (await db().ticket.findUnique({ where: { id: state.ticket.id } })).status).toBe('IN_PROGRESS');
@@ -377,9 +377,8 @@ test.describe('BUG-0010 — role nav links after module sync', () => {
     await clearEnabledModules(page);
 
     const ME = '/api/auth/me';
-    // The scan and electrical pages also link Electrical; tickets and attendance do not.
+    // Every page carries the same links, and those of modules the org has off stay hidden.
     const NAV = ['supervisor-scan', 'supervisor-electrical', 'supervisor-tickets', 'supervisor-attendance'];
-    const NAV_SHORT = ['supervisor-scan', 'supervisor-tickets', 'supervisor-attendance'];
     const sync = meResponse(page, ME);
     await page.goto(orgPage(slug, 'supervisor-scan'));
     await syncDone(page, sync);
@@ -388,9 +387,9 @@ test.describe('BUG-0010 — role nav links after module sync', () => {
     await clickNav(page, slug, 'Electrical', 'supervisor-electrical', ME, 'Scan Location QR', 'supervisor-scan');
     await expectNavHrefs(page, slug, NAV);
     await clickNav(page, slug, 'Tickets', 'supervisor-tickets', ME, 'My Tickets');
-    await expectNavHrefs(page, slug, NAV_SHORT);
+    await expectNavHrefs(page, slug, NAV);
     await clickNav(page, slug, 'Attendance', 'supervisor-attendance', ME, 'Attendance');
-    await expectNavHrefs(page, slug, NAV_SHORT);
+    await expectNavHrefs(page, slug, NAV);
     await clickNav(page, slug, 'Scan', 'supervisor-scan', ME, 'Scan Location QR');
     await expectNavHrefs(page, slug, NAV);
 
@@ -399,7 +398,7 @@ test.describe('BUG-0010 — role nav links after module sync', () => {
     await page.goto(orgPage(slug, 'supervisor-assets'));
     await syncDone(page, assetsSync);
     await expect(page.locator('#sv-nav a[data-mod="asset"]')).toBeHidden();
-    await expectNavHrefs(page, slug, NAV_SHORT);
+    await expectNavHrefs(page, slug, NAV);
   });
 });
 
@@ -443,8 +442,8 @@ test.describe('J9 — a fix sent back, redone and verified: the electrician is t
     await signIn(page, 'supervisor', s.supNear, s.orgA.slug);
     await openPendingTicket();
     await page.locator('#verifyNote').fill('Still flickering at the far end');
-    page.once('dialog', (d) => d.accept());
     await page.getByRole('button', { name: /Reject & Reopen/ }).click();
+    await page.locator('#_cfmYes').click();
     await expect.poll(status).toBe('IN_PROGRESS');
 
     const sentBack = await bellItem('Your fix was sent back');

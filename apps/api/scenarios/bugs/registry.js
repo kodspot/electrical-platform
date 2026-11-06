@@ -68,7 +68,23 @@ const BUGS_LIST = [
   require('./bug-0057-attendance-today-is-utc'),
   require('./bug-0058-actions-without-audit-rows'),
   require('./bug-0059-guest-name-kept-in-audit'),
-  require('./bug-0060-guest-consent-not-enforced')
+  require('./bug-0060-guest-consent-not-enforced'),
+  require('./bug-0061-lost-connection-hangs-the-page'),
+  require('./bug-0062-no-way-to-attach-the-proof-photo'),
+  require('./bug-0063-organization-code-errors-invisible'),
+  require('./bug-0064-new-electrician-left-without-a-pin'),
+  require('./bug-0065-no-screen-to-assign-supervisor-locations'),
+  require('./bug-0066-complaint-form-keyboard-unreachable'),
+  require('./bug-0067-location-parent-ambiguous'),
+  require('./bug-0068-qr-print-during-load'),
+  require('./bug-0069-ticket-tiles-clear-the-filter'),
+  require('./bug-0070-flag-cancel-still-flags'),
+  require('./bug-0071-category-label-unescaped-on-public-page'),
+  require('./bug-0072-inspection-answers-unreadable'),
+  require('./bug-0073-failed-load-shown-as-empty'),
+  require('./bug-0074-ai-prompt-names-staff'),
+  require('./bug-0075-privacy-notice-wrong-photo-retention'),
+  require('./bug-0076-electrician-cannot-export-own-data')
 ];
 
 const BUGS = Object.fromEntries(BUGS_LIST.map((b) => [b.id, b]));

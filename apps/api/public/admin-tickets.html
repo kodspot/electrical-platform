@@ -10,7 +10,7 @@
 <meta name="theme-color" content="#1E40AF">
 <title>Tickets — Kodspot</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/css/design-system.css?v=10">
+<link rel="stylesheet" href="/css/design-system.css?v=11">
 <style>
 /* ── Summary bar ── */
 .tk-summary{display:flex;gap:1rem;flex-wrap:wrap;padding:.6rem 0 .5rem;border-bottom:1px solid var(--border-light);margin-bottom:.75rem}
@@ -21,10 +21,11 @@
 .tk-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:.5rem;margin-bottom:1rem}
 .tk-stat{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:.65rem .75rem;text-align:center;transition:box-shadow .15s;cursor:pointer}
 .tk-stat:hover{box-shadow:var(--shadow)}
+button.tk-stat{width:100%;font:inherit;color:inherit}
 .tk-stat-num{font-size:1.3rem;font-weight:700;line-height:1}
-.tk-stat-label{font-size:.68rem;color:var(--text-muted);margin-top:.2rem;text-transform:uppercase}
+.tk-stat-label{font-size:var(--fs-xs);color:var(--text-muted);margin-top:.2rem;text-transform:uppercase}
 .tk-stat.open .tk-stat-num{color:var(--danger)}
-.tk-stat.progress .tk-stat-num{color:#f59e0b}
+.tk-stat.progress .tk-stat-num{color:var(--warning-text)}
 .tk-stat.resolved .tk-stat-num{color:var(--success)}
 .tk-stat.closed .tk-stat-num{color:var(--text-muted)}
 .tk-stat.active-filter{border-color:var(--primary);box-shadow:0 0 0 2px rgba(30,64,175,.15)}
@@ -40,14 +41,14 @@
 
 /* ── Table ── */
 .tk-tbl{width:100%;border-collapse:collapse;font-size:.84rem}
-.tk-tbl thead th{text-align:left;padding:.55rem .65rem;color:var(--text-muted);border-bottom:2px solid var(--border);font-weight:600;font-size:.72rem;text-transform:uppercase;letter-spacing:.04em;white-space:nowrap;position:sticky;top:0;background:var(--surface);z-index:1}
+.tk-tbl thead th{text-align:left;padding:.55rem .65rem;color:var(--text-muted);border-bottom:2px solid var(--border);font-weight:600;font-size:var(--fs-xs);text-transform:uppercase;letter-spacing:.04em;white-space:nowrap;position:sticky;top:0;background:var(--surface);z-index:1}
 .tk-tbl tbody td{padding:.55rem .65rem;border-bottom:1px solid var(--border-light);vertical-align:middle}
 .tk-tbl tbody tr:nth-child(even) td{background:rgba(248,250,252,.5)}
 .tk-tbl tbody tr:hover td{background:rgba(30,64,175,.04)}
 .tk-tbl td:last-child{white-space:nowrap}
 .tk-urgent-row td{background:rgba(225,29,72,.03)!important}
 .tk-title-cell{font-weight:600}
-.tk-desc-sub{font-size:.7rem;color:var(--text-muted);font-weight:400;display:block;margin-top:1px;max-width:260px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tk-desc-sub{font-size:var(--fs-xs);color:var(--text-muted);font-weight:400;display:block;margin-top:1px;max-width:260px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .tk-location{font-size:.8rem;color:var(--text-muted)}
 .tk-date{font-size:.75rem;color:var(--text-muted)}
 .tk-actions{display:flex;gap:4px;flex-wrap:wrap}
@@ -55,7 +56,7 @@
 /* ── Detail modal ── */
 .tk-detail-grid{display:grid;grid-template-columns:1fr 1fr;gap:.5rem .75rem}
 .tk-detail-item{padding:.35rem 0}
-.tk-detail-label{font-size:.7rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.03em;margin-bottom:1px}
+.tk-detail-label{font-size:var(--fs-xs);color:var(--text-muted);text-transform:uppercase;letter-spacing:.03em;margin-bottom:1px}
 .tk-detail-val{font-size:.88rem;font-weight:500;word-break:break-word}
 .tk-detail-full{grid-column:1/-1}
 .tk-detail-img{width:100%;max-height:280px;object-fit:contain;border-radius:var(--radius);cursor:pointer;background:var(--bg);margin-top:.3rem}
@@ -64,7 +65,7 @@
 .tk-resolution-box p{font-size:.82rem;color:#166534;margin:.2rem 0}
 .tk-resolution-box img{width:100%;max-height:200px;object-fit:contain;border-radius:var(--radius-sm);margin-top:.35rem;cursor:pointer}
 .tk-guest-box{background:rgba(59,130,246,.06);border:1px solid rgba(59,130,246,.15);border-radius:var(--radius);padding:.65rem;margin:.6rem 0}
-.tk-guest-box .tk-guest-title{font-size:.65rem;color:#3b82f6;text-transform:uppercase;font-weight:700;letter-spacing:.04em;margin-bottom:.3rem}
+.tk-guest-box .tk-guest-title{font-size:var(--fs-xs);color:#3b82f6;text-transform:uppercase;font-weight:700;letter-spacing:.04em;margin-bottom:.3rem}
 .tk-guest-box p{font-size:.82rem;margin:.15rem 0}
 .tk-desc-section{background:var(--bg);border-radius:var(--radius);padding:.65rem;margin:.6rem 0;font-size:.82rem;line-height:1.5;border:1px solid var(--border-light)}
 
@@ -91,7 +92,7 @@
   .tk-tbl tbody tr{display:block;padding:.75rem;margin-bottom:.5rem;border:1px solid var(--border-light);border-radius:var(--radius);background:var(--surface)}
   .tk-tbl tbody tr:nth-child(even){background:var(--surface)}
   .tk-tbl tbody td{display:flex;justify-content:space-between;align-items:center;padding:.25rem 0;border:none;font-size:.82rem}
-  .tk-tbl tbody td::before{content:attr(data-label);font-weight:600;font-size:.7rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.03em;flex-shrink:0;margin-right:.5rem}
+  .tk-tbl tbody td::before{content:attr(data-label);font-weight:600;font-size:var(--fs-xs);color:var(--text-muted);text-transform:uppercase;letter-spacing:.03em;flex-shrink:0;margin-right:.5rem}
   .tk-tbl tbody td:first-child{padding-top:0}
   .tk-tbl tbody td:last-child{padding-top:.35rem;justify-content:flex-start}
   .tk-tbl tbody td:last-child::before{display:none}
@@ -106,7 +107,7 @@
 @media(min-width:769px) and (max-width:960px){
   .tk-tbl{font-size:.78rem}
   .tk-tbl thead th,.tk-tbl tbody td{padding:.4rem .45rem}
-  .tk-actions .btn-sm{font-size:.7rem;padding:.15rem .3rem}
+  .tk-actions .btn-sm{font-size:var(--fs-xs);padding:.15rem .3rem}
   .tk-search{max-width:170px}
 }
 @media(min-width:1280px){
@@ -114,7 +115,7 @@
 }
 @media(max-width:380px){
   .tk-summary{flex-direction:column;gap:.3rem}
-  .tk-pager button{padding:.2rem .4rem;font-size:.72rem;min-height:28px}
+  .tk-pager button{padding:.2rem .4rem;font-size:var(--fs-xs);min-height:28px}
   .tk-stat{padding:.5rem}
   .tk-stat-num{font-size:1.1rem}
 }
@@ -142,10 +143,10 @@
 
   <!-- Stats cards (clickable to filter) -->
   <div class="tk-stats" id="statsBar">
-    <div class="tk-stat open" onclick="filterByStatus('OPEN,ACKNOWLEDGED,ASSIGNED')"><div class="tk-stat-num" id="statOpen">-</div><div class="tk-stat-label">Open</div></div>
-    <div class="tk-stat progress" onclick="filterByStatus('IN_PROGRESS,ON_HOLD')"><div class="tk-stat-num" id="statProgress">-</div><div class="tk-stat-label">Active</div></div>
-    <div class="tk-stat resolved" onclick="filterByStatus('RESOLVED_PENDING_VERIFY')"><div class="tk-stat-num" id="statResolved">-</div><div class="tk-stat-label">Verify</div></div>
-    <div class="tk-stat closed" onclick="filterByStatus('RESOLVED,CANCELLED,CLOSED')"><div class="tk-stat-num" id="statClosed">-</div><div class="tk-stat-label">Done</div></div>
+    <button type="button" class="tk-stat open" aria-pressed="false" onclick="filterByStatus('OPEN,ACKNOWLEDGED,ASSIGNED')"><div class="tk-stat-num" id="statOpen">-</div><div class="tk-stat-label">Open</div></button>
+    <button type="button" class="tk-stat progress" aria-pressed="false" onclick="filterByStatus('IN_PROGRESS,ON_HOLD')"><div class="tk-stat-num" id="statProgress">-</div><div class="tk-stat-label">In progress</div></button>
+    <button type="button" class="tk-stat resolved" aria-pressed="false" onclick="filterByStatus('RESOLVED_PENDING_VERIFY')"><div class="tk-stat-num" id="statResolved">-</div><div class="tk-stat-label">To check</div></button>
+    <button type="button" class="tk-stat closed" aria-pressed="false" onclick="filterByStatus('RESOLVED,CANCELLED,CLOSED')"><div class="tk-stat-num" id="statClosed">-</div><div class="tk-stat-label">Done</div></button>
   </div>
 
   <!-- Filter bar -->
@@ -231,12 +232,12 @@
         </div>
       </div>
       <div class="form-group">
-        <label class="form-label">Photo <span style="font-weight:400;color:var(--text-light);font-size:.72rem">(optional)</span></label>
+        <label class="form-label">Photo <span style="font-weight:400;color:var(--text-light);font-size:var(--fs-xs)">(optional)</span></label>
         <div class="tk-photo-area">
           <label class="tk-photo-label" for="cPhoto">📷 Attach photo</label>
           <input type="file" id="cPhoto" accept="image/jpeg,image/png,image/webp" style="display:none">
           <img id="cPhotoPreview" class="tk-photo-preview">
-          <span id="cPhotoName" style="font-size:.72rem;color:var(--text-muted)"></span>
+          <span id="cPhotoName" style="font-size:var(--fs-xs);color:var(--text-muted)"></span>
         </div>
       </div>
       <div class="modal-actions">
@@ -302,7 +303,7 @@
 </div>
 
 <script src="/js/offline-sync.js?v=1"></script>
-<script src="/js/app.js?v=16"></script>
+<script src="/js/app.js?v=17"></script>
 <script src="/js/custom-select.js"></script>
 <script>
 if (!App.initAdmin('tickets')) throw '';
@@ -326,7 +327,7 @@ function updateStats(stats) {
   $('statResolved').textContent = pendingVerify;
   $('statClosed').textContent = done;
   // Highlight active stat card
-  var activeStatus = $('filterStatus').value;
+  var activeStatus = statusGroup || $('filterStatus').value;
   var cards = document.querySelectorAll('.tk-stat');
   var statusMap = [
     ['OPEN', 'ACKNOWLEDGED', 'ASSIGNED'],
@@ -338,6 +339,7 @@ function updateStats(stats) {
     var joined = statusMap[i].join(',');
     var inGroup = statusMap[i].indexOf(activeStatus) >= 0 || activeStatus === joined;
     cards[i].classList.toggle('active-filter', inGroup);
+    cards[i].setAttribute('aria-pressed', String(activeStatus === joined));
   }
 }
 
@@ -350,11 +352,15 @@ function statusBadgeClass(status) {
   return 'badge-muted';
 }
 
+// A tile covers several statuses, which no single option of the select can hold: setting it to
+// the list left it empty, so tapping a tile cleared the filter and showed every ticket. [BUG-0069]
+var statusGroup = '';
 function filterByStatus(status) {
-  var sel = $('filterStatus');
-  sel.value = sel.value === status ? '' : status;
+  statusGroup = statusGroup === status ? '' : status;
+  $('filterStatus').value = '';
   loadTickets(1);
 }
+$('filterStatus').addEventListener('change', function() { statusGroup = ''; });
 
 // ── List ──
 async function loadTickets(page) {
@@ -362,7 +368,7 @@ async function loadTickets(page) {
   var params = ['page=' + currentPage, 'limit=' + PAGE_SIZE];
   var search = $('tkSearch').value.trim();
   if (search) params.push('search=' + encodeURIComponent(search));
-  var status = $('filterStatus').value; if (status) params.push('status=' + status);
+  var status = statusGroup || $('filterStatus').value; if (status) params.push('status=' + status);
   var priority = $('filterPriority').value; if (priority) params.push('priority=' + priority);
   var source = $('filterSource').value; if (source) params.push('source=' + source);
   var mod = $('filterModule').value; if (mod) params.push('module=' + mod);
@@ -372,7 +378,13 @@ async function loadTickets(page) {
   var to = $('filterTo').value; if (to) params.push('to=' + to);
 
   var res = await App.apiFetch('/tickets?' + params.join('&'));
-  if (!res) return;
+  if (!res || !res.ok) {
+    // A failed request must not read as "no tickets"
+    $('ticketBody').innerHTML = '<tr><td colspan="9" class="empty" id="ticketEmpty"></td></tr>';
+    App.loadFailed($('ticketEmpty'), { what: 'the tickets', onRetry: function() { loadTickets(currentPage); } });
+    $('pager').innerHTML = '';
+    return;
+  }
   var data = await res.json();
   var tickets = data.tickets || [];
   totalPages = data.pages || 1;
@@ -381,7 +393,11 @@ async function loadTickets(page) {
   renderSummary(data.total, tickets);
 
   if (!tickets.length) {
-    $('ticketBody').innerHTML = '<tr><td colspan="9" class="empty">No tickets found</td></tr>';
+    var filtered = params.length > 2 || statusGroup;
+    $('ticketBody').innerHTML = '<tr><td colspan="9" class="empty" id="ticketEmpty"></td></tr>';
+    App.emptyState($('ticketEmpty'), filtered
+      ? { title: 'No tickets match these filters', actionLabel: 'Clear filters', onAction: clearFilters }
+      : { title: 'No tickets yet', body: 'Problems reported from QR stickers appear here.' });
     $('pager').innerHTML = '';
     return;
   }
@@ -391,14 +407,14 @@ async function loadTickets(page) {
     var num = (currentPage - 1) * PAGE_SIZE + i + 1;
     var priClass = t.priority === 'URGENT' ? 'badge-danger' : t.priority === 'HIGH' ? 'badge-warning' : t.priority === 'NORMAL' ? 'badge-info' : 'badge-muted';
     var statClass = statusBadgeClass(t.status);
-    var srcBadge = t.source === 'PUBLIC' ? ' <span class="badge badge-info" style="font-size:.58rem;vertical-align:middle;">QR</span>' : '';
+    var srcBadge = t.source === 'PUBLIC' ? ' <span class="badge badge-info" style="font-size:var(--fs-xs);vertical-align:middle;">QR</span>' : '';
     var rowCls = t.priority === 'URGENT' ? ' class="tk-urgent-row"' : '';
     var descSub = t.description ? '<span class="tk-desc-sub">' + esc(t.description) + '</span>' : '';
     var modLabel = MOD_LABELS[t.module] || t.module || 'ele';
     return '<tr' + rowCls + '>' +
       '<td data-label="#">' + num + '</td>' +
       '<td data-label="Title"><span class="tk-title-cell">' + esc(t.title) + '</span>' + srcBadge + descSub + '</td>' +
-      '<td data-label="Module" class="hide-mobile"><span class="badge badge-muted" style="font-size:.68rem">' + modLabel + '</span></td>' +
+      '<td data-label="Module" class="hide-mobile"><span class="badge badge-muted" style="font-size:var(--fs-xs)">' + modLabel + '</span></td>' +
       '<td data-label="Priority"><span class="badge ' + priClass + '">' + t.priority + '</span></td>' +
       '<td data-label="Status"><span class="badge ' + statClass + '">' + t.status.replace('_',' ') + '</span></td>' +
       '<td data-label="Location" class="hide-mobile tk-location">' + esc(t.location ? t.location.name : '—') + '</td>' +
@@ -443,6 +459,7 @@ function renderPager() {
 }
 
 function clearFilters() {
+  statusGroup = '';
   $('tkSearch').value = '';
   $('filterStatus').value = '';
   $('filterPriority').value = '';
@@ -527,7 +544,7 @@ $('createForm').addEventListener('submit', async function(e) {
 
   var res = await App.apiFetch('/tickets', { method: 'POST', body: fd });
   if (!res) return;
-  if (!res.ok) { var d = await res.json(); App.showError('createError', d.error || 'Failed'); return; }
+  if (!res.ok) { var d = await res.json(); App.showError('createError', d.error || 'Could not save. Please try again.'); return; }
   $('createForm').reset();
   $('cPhotoPreview').style.display = 'none';
   $('cPhotoName').textContent = '';
@@ -558,7 +575,7 @@ $('editForm').addEventListener('submit', async function(e) {
   };
   var res = await App.apiFetch('/tickets/' + id, { method: 'PATCH', body: JSON.stringify(body) });
   if (!res) return;
-  if (!res.ok) { var d = await res.json(); App.showError('editError', d.error || 'Failed'); return; }
+  if (!res.ok) { var d = await res.json(); App.showError('editError', d.error || 'Could not save. Please try again.'); return; }
   App.closeModal('editModal'); App.toast('Ticket updated', 'success');
   loadTickets(currentPage);
 });
@@ -611,13 +628,13 @@ async function viewDetail(id) {
       html += '<p style=\"font-size:.75rem\"><b>Electricians:</b> ' + t.resolvedWorkers.map(function(w) { return esc(w.name); }).join(', ') + '</p>';
     }
     if (t.resolvedImageUrl) html += '<img src="' + esc(App.imgUrl(t.resolvedImageUrl)) + '" onclick="openLightbox(this.src)" alt="Resolution proof">';
-    if (t.resolvedAt) html += '<p style="font-size:.72rem;margin-top:.4rem;opacity:.7">Resolved on ' + App.fmtDate(t.resolvedAt) + '</p>';
+    if (t.resolvedAt) html += '<p style="font-size:var(--fs-xs);margin-top:.4rem;opacity:.7">Resolved on ' + App.fmtDate(t.resolvedAt) + '</p>';
     // Review status for PUBLIC tickets
     if (t.source === 'PUBLIC' && t.reviewStatus) {
       var rvCls = t.reviewStatus === 'CONFIRMED' ? 'badge-success' : t.reviewStatus === 'REJECTED' ? 'badge-danger' : 'badge-warning';
       var rvLabel = t.reviewStatus === 'CONFIRMED' ? '✅ Guest Confirmed' : t.reviewStatus === 'REJECTED' ? '❌ Guest Rejected' : '⏳ Awaiting Guest Review';
-      html += '<div style="margin-top:.5rem"><span class="badge ' + rvCls + '" style="font-size:.72rem">' + rvLabel + '</span></div>';
-      if (t.reviewNote) html += '<p style="font-size:.72rem;margin-top:.25rem;color:#166534"><b>Guest note:</b> ' + esc(t.reviewNote) + '</p>';
+      html += '<div style="margin-top:.5rem"><span class="badge ' + rvCls + '" style="font-size:var(--fs-xs)">' + rvLabel + '</span></div>';
+      if (t.reviewNote) html += '<p style="font-size:var(--fs-xs);margin-top:.25rem;color:#166534"><b>Guest note:</b> ' + esc(t.reviewNote) + '</p>';
     }
     html += '</div>';
   }

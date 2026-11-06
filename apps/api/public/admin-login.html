@@ -10,40 +10,41 @@
 <meta name="theme-color" content="#1E40AF">
 <title>Admin Login — Kodspot</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/css/design-system.css?v=10">
+<link rel="stylesheet" href="/css/design-system.css?v=11">
 </head>
 <body class="auth-layout">
 <div class="auth-card">
   <h1 class="auth-title" id="brandTitle">Kodspot</h1>
   <p class="auth-subtitle" id="brandSub">Admin — Sign in to manage your facility</p>
-  <div id="error" class="error-msg"></div>
+  <div id="error" class="error-msg" role="alert"></div>
 
   <form id="loginForm">
     <div class="form-group">
       <label class="form-label" for="email">Email</label>
-      <input class="form-input" type="email" id="email" required autocomplete="email" placeholder="admin@facility.com">
+      <input class="form-input" type="email" id="email" required autocomplete="email">
     </div>
     <div class="form-group">
       <label class="form-label" for="password">Password</label>
-      <input class="form-input" type="password" id="password" required autocomplete="current-password" placeholder="••••••••">
+      <input class="form-input" type="password" id="password" required autocomplete="current-password">
     </div>
     <div id="orgSelect" style="display:none" class="form-group">
       <label class="form-label" for="orgId">Select Organization</label>
       <select class="form-select" id="orgId"></select>
     </div>
-    <button type="submit" class="btn btn-primary btn-block" id="btn">Sign In</button>
+    <button type="submit" class="btn btn-primary btn-block btn-lg" id="btn">Sign in as Admin</button>
   </form>
   <p style="margin-top:var(--sp-md);font-size:.85rem;text-align:center">
-    <a id="forgotLink" href="/reset-password" style="color:var(--primary)">Forgot password?</a>
+    <a id="forgotLink" href="/reset-password" style="color:var(--primary-text);text-decoration:underline;display:inline-flex;align-items:center;min-height:44px;font-size:.875rem">Forgot password?</a>
   </p>
 
   <p style="margin-top:var(--sp-lg);font-size:.8rem;color:var(--text-light);text-align:center">
-    <a href="/" style="color:var(--primary)">&larr; Back to Home</a>
+    <a id="backLink" href="/" style="color:var(--primary-text);display:inline-flex;align-items:center;min-height:44px">&larr; Back to Home</a>
   </p>
 </div>
 
 <script src="/js/offline-sync.js?v=1"></script>
-<script src="/js/app.js?v=16"></script>
+<script src="/js/kit.js?v=1"></script>
+<script src="/js/app.js?v=17"></script>
 <script src="/js/custom-select.js"></script>
 <script>
 var $ = App.$;
@@ -51,6 +52,8 @@ var orgSlug = App.getOrgSlug();
 var mod = App.getModule();
 // "Forgot password?" asks for a reset link for this organization's account. [BUG-0051]
 if (orgSlug) $('forgotLink').href = '/reset-password?org=' + encodeURIComponent(orgSlug);
+if (orgSlug) { $('backLink').href = '/' + orgSlug + '/' + mod + '/'; $('backLink').textContent = '← Choose a different role'; }
+Kit.revealToggle($('password'));
 
 // Set dynamic manifest for this module
 App.initModulePWA();
@@ -60,26 +63,32 @@ if (orgSlug) {
   fetch('/api/org/' + encodeURIComponent(orgSlug)).then(function(r) { return r.ok ? r.json() : null; }).then(function(org) {
     if (org && org.name) {
       $('brandTitle').textContent = org.name;
-      $('brandSub').innerHTML = 'Admin Login <span style="display:block;margin-top:.3rem;font-size:.72rem;color:var(--text-light)">Powered by Kodspot</span>';
+      $('brandSub').innerHTML = 'Admin Login <span style="display:block;margin-top:.3rem;font-size:var(--fs-xs);color:var(--text-light)">Powered by Kodspot</span>';
       document.title = 'Admin Login — ' + org.name;
       localStorage.setItem('orgName', org.name);
     }
   }).catch(function() {});
 }
 
-function showErr(msg) { $('error').textContent = msg; $('error').style.display = 'block'; }
-function hideErr() { $('error').style.display = 'none'; }
+function showErr(msg, fields) {
+  $('error').textContent = msg; $('error').style.display = 'block';
+  (fields || []).forEach(function(id) { $(id).setAttribute('aria-invalid', 'true'); });
+}
+function hideErr() {
+  $('error').style.display = 'none';
+  document.querySelectorAll('[aria-invalid]').forEach(function(el) { el.removeAttribute('aria-invalid'); });
+}
 
 $('loginForm').addEventListener('submit', async function(e) {
   e.preventDefault(); hideErr();
-  var btn = $('btn'); btn.disabled = true; btn.textContent = 'Signing in...';
+  var btn = $('btn'); btn.disabled = true; btn.textContent = 'Signing in…';
   try {
     var body = { email: $('email').value, password: $('password').value };
     var orgId = $('orgId').value;
     if (orgId) body.orgId = orgId;
     if (orgSlug) body.orgSlug = orgSlug;
     var res = await fetch('/api/auth/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
-    var data = await res.json();
+    var data = await res.json().catch(function() { return {}; });
     if (res.status === 400 && data.organizations) {
       $('orgSelect').style.display = 'block';
       var sel = $('orgId');
@@ -87,7 +96,7 @@ $('loginForm').addEventListener('submit', async function(e) {
       showErr('Multiple accounts found. Select an organization.');
       return;
     }
-    if (!res.ok) { showErr(data.error || 'Login failed'); return; }
+    if (!res.ok) { showErr(Kit.signInError(res.status, 'password', data.error), ['email', 'password']); return; }
     if (!data.token || !data.user) { showErr('Invalid server response'); return; }
     if (data.user.role !== 'ADMIN') {
       showErr('This login is for organization admins only.'); return;
@@ -100,8 +109,8 @@ $('loginForm').addEventListener('submit', async function(e) {
     if (slug) localStorage.setItem('orgSlug', slug);
     if (data.user.orgName) localStorage.setItem('orgName', data.user.orgName);
     location.href = App.orgPath('admin-dashboard');
-  } catch (err) { showErr('Network error. Please try again.'); }
-  finally { btn.disabled = false; btn.textContent = 'Sign In'; }
+  } catch (err) { showErr(Kit.friendlyError(err)); }
+  finally { btn.disabled = false; btn.textContent = 'Sign in as Admin'; }
 });
 
 // Redirect if already logged in as ADMIN
@@ -110,8 +119,8 @@ if (localStorage.getItem('token')) {
   if (u.role === 'ADMIN') location.href = App.orgPath('admin-dashboard');
 }
 </script>
-<footer style="position:fixed;bottom:0;left:0;right:0;text-align:center;padding:.8rem;font-size:.75rem;color:var(--text-muted)">
-  <a href="/privacy" style="color:var(--text-muted);text-decoration:underline">Privacy Policy</a> · <a href="/terms" style="color:var(--text-muted);text-decoration:underline">Terms of Service</a>
+<footer class="auth-footer">
+  <a href="/privacy">Privacy Policy</a> · <a href="/terms">Terms of Service</a>
 </footer>
 </body>
 </html>

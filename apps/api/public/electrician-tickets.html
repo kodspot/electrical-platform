@@ -10,50 +10,47 @@
 <meta name="theme-color" content="#1E40AF">
 <title>Electrician Tickets — Kodspot</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/css/design-system.css?v=10">
+<link rel="stylesheet" href="/css/design-system.css?v=11">
 <style>
 .el-shell{max-width:760px;margin:0 auto;padding:1rem .8rem 2rem}
-.el-toolbar{display:flex;justify-content:space-between;align-items:center;margin-bottom:.8rem}
+.el-toolbar{display:flex;justify-content:space-between;align-items:center;gap:.5rem;margin-bottom:.8rem}
+.el-toolbar h1{font-size:1.125rem;font-weight:700;margin:0}
 .el-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:.5rem;margin-bottom:.9rem}
 .el-stat{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:.55rem .45rem;text-align:center}
 .el-stat b{display:block;font-size:1.2rem;line-height:1.1}
-.el-stat span{font-size:.65rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.04em}
+.el-stat span{font-size:var(--fs-xs);color:var(--text-muted)}
 .el-list{display:flex;flex-direction:column;gap:.55rem}
 .el-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:.8rem .9rem}
 .el-top{display:flex;justify-content:space-between;gap:.7rem;align-items:flex-start}
-.el-title{font-size:.9rem;font-weight:700;line-height:1.35}
-.el-meta{display:flex;flex-wrap:wrap;gap:.35rem .8rem;color:var(--text-muted);font-size:.74rem;margin-top:.35rem}
-.el-desc{margin-top:.45rem;font-size:.8rem;color:var(--text)}
-.el-actions{margin-top:.65rem;display:flex;gap:.4rem;flex-wrap:wrap}
+.el-title{font-size:1rem;font-weight:700;line-height:1.35}
+.el-badges{display:flex;gap:.3rem;flex-wrap:wrap;justify-content:flex-end;align-items:center}
+.el-meta{display:flex;flex-wrap:wrap;gap:.35rem .8rem;color:var(--text-muted);font-size:.8rem;margin-top:.35rem}
+.el-desc{margin-top:.45rem;font-size:.875rem;color:var(--text)}
+.el-actions{margin-top:.65rem;display:flex;gap:.5rem;flex-wrap:wrap}
+.el-actions .btn{flex:1;min-height:48px;font-size:.95rem}
+.el-note{font-size:.875rem;font-weight:600;color:var(--text-muted)}
 .el-empty{text-align:center;color:var(--text-muted);padding:2rem 1rem}
-.el-pri{font-size:.62rem;font-weight:700;padding:.14rem .4rem;border-radius:6px;text-transform:uppercase;letter-spacing:.03em}
-.el-pri.URGENT{background:rgba(239,68,68,.15);color:#ef4444}
-.el-pri.HIGH{background:rgba(249,115,22,.16);color:#fb923c}
-.el-pri.NORMAL{background:rgba(59,130,246,.16);color:#60a5fa}
-.el-pri.LOW{background:rgba(148,163,184,.16);color:#94a3b8}
-.el-status{font-size:.62rem;font-weight:700;padding:.14rem .4rem;border-radius:6px;letter-spacing:.03em}
-.el-status.OPEN{background:rgba(220,38,38,.13);color:#ef4444}
-.el-status.ACKNOWLEDGED,.el-status.ASSIGNED{background:rgba(249,115,22,.14);color:#fb923c}
-.el-status.IN_PROGRESS{background:rgba(245,158,11,.14);color:#f59e0b}
-.el-status.ON_HOLD{background:rgba(168,85,247,.14);color:#c084fc}
-.el-status.RESOLVED_PENDING_VERIFY{background:rgba(168,85,247,.14);color:#c084fc}
-.el-status.RESOLVED,.el-status.CLOSED{background:rgba(16,185,129,.15);color:#34d399}
-.el-status.CANCELLED{background:rgba(107,114,128,.18);color:#9ca3af}
-.el-timer{font-size:.68rem;font-weight:700;padding:.12rem .4rem;border-radius:6px;background:rgba(239,68,68,.1);color:#ef4444;font-variant-numeric:tabular-nums}
-.el-timer.warn{background:rgba(249,115,22,.1);color:#fb923c}
-.el-timer.ok{background:rgba(59,130,246,.1);color:#60a5fa}
+.el-timer{font-size:var(--fs-xs);font-weight:700;padding:.12rem .4rem;border-radius:6px;background:var(--danger-bg);color:var(--danger-text);font-variant-numeric:tabular-nums}
+.el-timer.warn{background:var(--warning-bg);color:var(--warning-text)}
+.el-timer.ok{background:var(--info-bg);color:var(--info-text)}
 .el-img{margin-top:.55rem;width:100%;max-height:180px;object-fit:contain;border-radius:8px;border:1px solid var(--border)}
-@media(max-width:640px){.el-stats{grid-template-columns:repeat(2,1fr)}}
+.el-locbar{display:none;align-items:center;justify-content:space-between;gap:.5rem;background:var(--info-bg);color:var(--info-text);border-radius:var(--radius);padding:.5rem .75rem;margin-bottom:.7rem;font-size:.875rem;font-weight:600}
+.el-locbar.show{display:flex}
+.filter-tabs{display:flex;gap:.3rem;margin-bottom:.7rem;overflow-x:auto;-webkit-overflow-scrolling:touch}
+.filter-tab{flex:0 0 auto;min-height:44px;padding:.4rem .75rem;font-size:.85rem;font-weight:600;border-radius:var(--radius);border:1px solid var(--border-control);background:var(--surface);color:var(--text-muted);cursor:pointer}
+.filter-tab.active{background:var(--primary);color:#fff;border-color:var(--primary)}
+@media(max-width:640px){.el-stats{display:none}}
 </style>
+<script>try{if(localStorage.getItem('kodspot_theme')==='light')document.documentElement.removeAttribute('data-theme')}catch(e){}</script>
 </head>
 <body>
 <nav class="topbar">
   <div class="topbar-left">
     <span class="topbar-brand">Kodspot</span>
     <div class="sv-nav" id="sv-nav">
-      <a href="/electrician-scan" class="sv-nav-link"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7V5a2 2 0 012-2h2"/><path d="M17 3h2a2 2 0 012 2v2"/><path d="M21 17v2a2 2 0 01-2 2h-2"/><path d="M7 21H5a2 2 0 01-2-2v-2"/><rect x="7" y="7" width="10" height="10" rx="1"/></svg>Scan</a>
-      <a href="/electrician-tickets" class="sv-nav-link active"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 5H9a2 2 0 00-2 2v10a2 2 0 002 2h6a2 2 0 002-2V7a2 2 0 00-2-2z"/><path d="M12 11h.01"/><path d="M12 15h.01"/></svg>Tickets</a>
-      <a href="/electrician-my-work" class="sv-nav-link"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>My Work</a>
+      <a href="/electrician-scan" class="sv-nav-link"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 7V5a2 2 0 012-2h2"/><path d="M17 3h2a2 2 0 012 2v2"/><path d="M21 17v2a2 2 0 01-2 2h-2"/><path d="M7 21H5a2 2 0 01-2-2v-2"/><rect x="7" y="7" width="10" height="10" rx="1"/></svg>Scan</a>
+      <a href="/electrician-tickets" class="sv-nav-link active" aria-current="page"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M15 5H9a2 2 0 00-2 2v10a2 2 0 002 2h6a2 2 0 002-2V7a2 2 0 00-2-2z"/><path d="M12 11h.01"/><path d="M12 15h.01"/></svg>Tickets</a>
+      <a href="/electrician-my-work" class="sv-nav-link"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>My Work</a>
     </div>
   </div>
   <div class="topbar-right">
@@ -64,24 +61,25 @@
 
 <main class="el-shell">
   <div class="el-toolbar">
-    <h2 style="font-size:1.05rem;font-weight:700;margin:0">Electrician Work Queue</h2>
-    <button class="btn btn-sm btn-outline" onclick="loadTickets()">Refresh</button>
+    <h1>Electrician Work Queue</h1>
+    <button class="btn btn-sm btn-refresh" onclick="loadTickets()">Refresh</button>
   </div>
 
   <div class="el-stats">
-    <div class="el-stat"><b id="sPool" style="color:#fb923c">0</b><span>Pool</span></div>
-    <div class="el-stat"><b id="sActive">0</b><span>My Active</span></div>
-    <div class="el-stat"><b id="sVerify" style="color:#c084fc">0</b><span>To Verify</span></div>
-    <div class="el-stat"><b id="sDone" style="color:#34d399">0</b><span>Resolved</span></div>
+    <div class="el-stat"><b id="sPool" style="color:var(--warning-text)">–</b><span>New jobs</span></div>
+    <div class="el-stat"><b id="sActive">–</b><span>My jobs</span></div>
+    <div class="el-stat"><b id="sVerify" style="color:var(--primary-text)">–</b><span>Waiting for check</span></div>
+    <div class="el-stat"><b id="sDone" style="color:var(--success-text)">–</b><span>Done</span></div>
   </div>
 
-  <div class="filter-tabs" id="filterTabs" style="display:flex;gap:.3rem;margin-bottom:.7rem;overflow-x:auto;-webkit-overflow-scrolling:touch">
-    <button class="filter-tab" data-tab="pool" onclick="setTab('pool')" style="flex:0 0 auto;padding:.4rem .75rem;font-size:.78rem;border-radius:var(--radius);border:1px solid var(--border);background:var(--surface);color:var(--text-muted);cursor:pointer;font-weight:600">🔥 Pool <span id="tabPoolCount" style="opacity:.7">0</span></button>
-    <button class="filter-tab" data-tab="active" onclick="setTab('active')" style="flex:0 0 auto;padding:.4rem .75rem;font-size:.78rem;border-radius:var(--radius);border:1px solid var(--border);background:var(--surface);color:var(--text-muted);cursor:pointer;font-weight:600">🛠 Active</button>
-    <button class="filter-tab" data-tab="verify" onclick="setTab('verify')" style="flex:0 0 auto;padding:.4rem .75rem;font-size:.78rem;border-radius:var(--radius);border:1px solid var(--border);background:var(--surface);color:var(--text-muted);cursor:pointer;font-weight:600">⏳ To Verify</button>
-    <button class="filter-tab" data-tab="done" onclick="setTab('done')" style="flex:0 0 auto;padding:.4rem .75rem;font-size:.78rem;border-radius:var(--radius);border:1px solid var(--border);background:var(--surface);color:var(--text-muted);cursor:pointer;font-weight:600">✓ Done</button>
+  <div class="el-locbar" id="locBar"><span id="locBarText"></span><a id="locBarAll" href="">Show all</a></div>
+
+  <div class="filter-tabs" id="filterTabs">
+    <button class="filter-tab" data-tab="pool" onclick="setTab('pool')">New jobs <span id="tabPoolCount">–</span></button>
+    <button class="filter-tab" data-tab="active" onclick="setTab('active')">My jobs <span id="tabActiveCount">–</span></button>
+    <button class="filter-tab" data-tab="verify" onclick="setTab('verify')">Waiting for check <span id="tabVerifyCount">–</span></button>
+    <button class="filter-tab" data-tab="done" onclick="setTab('done')">Done <span id="tabDoneCount">–</span></button>
   </div>
-  <style>.filter-tab.active{background:var(--primary)!important;color:#fff!important;border-color:var(--primary)!important}</style>
 
   <div id="ticketList" class="el-list"></div>
 </main>
@@ -93,23 +91,30 @@
     <form id="resolveForm" enctype="multipart/form-data">
       <input type="hidden" id="rTicketId">
       <div class="form-group">
-        <label class="form-label">Resolution Note</label>
-        <textarea class="form-textarea" id="rNote" rows="3" maxlength="1000" placeholder="What was fixed?"></textarea>
+        <label class="form-label" for="rNote">What did you fix? (optional)</label>
+        <textarea class="form-textarea" id="rNote" rows="3" maxlength="1000" placeholder="For example: replaced the switch"></textarea>
       </div>
       <div class="form-group">
-        <label class="form-label">Proof Photo *</label>
-        <input class="form-input" type="file" id="rPhoto" accept="image/jpeg,image/png,image/webp" required>
+        <div class="form-label">Proof photo (required)</div>
+        <!-- The global rule hides file inputs, so the label is the control. Without it there was
+             no way to attach the photo that resolving requires. [BUG-0062] -->
+        <div class="resolve-photo-area" id="rPhotoArea">
+          <input class="sr-only" type="file" id="rPhoto" accept="image/jpeg,image/png,image/webp" capture="environment" required>
+          <label class="resolve-photo-label" for="rPhoto"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/><circle cx="12" cy="13" r="4"/></svg><span id="rPhotoText">Take proof photo</span></label>
+          <img class="resolve-preview" id="rPhotoPreview" alt="Your proof photo" hidden>
+        </div>
       </div>
       <div class="modal-actions">
         <button type="button" class="btn btn-outline" onclick="App.closeModal('resolveModal')">Cancel</button>
-        <button type="submit" class="btn btn-success" id="resolveBtn">Mark Resolved</button>
+        <button type="submit" class="btn btn-success" id="resolveBtn" disabled>Add proof photo first</button>
       </div>
     </form>
   </div>
 </div>
 
 <script src="/js/offline-sync.js?v=1"></script>
-<script src="/js/app.js?v=16"></script>
+<script src="/js/kit.js?v=1"></script>
+<script src="/js/app.js?v=17"></script>
 <script>
 if (!App.initElectrician()) throw '';
 App.initNotifications(App.elecFetch, 'electrician');
@@ -117,7 +122,17 @@ var $ = App.$, esc = App.esc;
 var tickets = [];
 var poolTickets = [];
 var currentTab = 'pool';
-var locationFilter = new URLSearchParams(location.search).get('locationId') || null;
+var pageQuery = new URLSearchParams(location.search);
+var locationFilter = pageQuery.get('locationId') || null;
+var viewOnly = pageQuery.get('view') === '1'; // from a scan outside this electrician's area
+var poolFailed = false;
+var firstLoad = true;
+
+if (locationFilter) {
+  $('locBarText').textContent = 'Showing tickets for ' + (pageQuery.get('name') || 'this location');
+  $('locBarAll').href = location.pathname;
+  $('locBar').classList.add('show');
+}
 
 async function loadTickets() {
   var list = $('ticketList');
@@ -131,29 +146,48 @@ async function loadTickets() {
     App.elecFetch('/worker/tickets/pool?module=' + encodeURIComponent(mod))
   ]);
   if (!resTk || !resTk.ok) {
-    list.innerHTML = '<div class="el-empty">Failed to load tickets</div>';
+    App.loadFailed(list, { what: 'your tickets', onRetry: loadTickets });
     return;
   }
   var data = await resTk.json();
   tickets = (data.tickets || []).filter(function(t) {
     return !locationFilter || t.locationId === locationFilter;
   });
-  if (resPool && resPool.ok) {
+  poolFailed = !(resPool && resPool.ok);
+  if (!poolFailed) {
     var p = await resPool.json();
     poolTickets = (p.tickets || []).filter(function(t) {
       return !locationFilter || t.locationId === locationFilter;
     });
   }
-  renderStats(data.stats || {});
+  renderStats();
+  // Open on the work in hand, not on the shared list
+  if (firstLoad) {
+    firstLoad = false;
+    if (rowsFor('active').length) return setTab('active');
+    if (locationFilter && !poolTickets.length) {
+      var tab = ['verify', 'done'].filter(function(x) { return rowsFor(x).length; })[0];
+      if (tab) return setTab(tab);
+    }
+  }
   renderList();
 }
 
-function renderStats(stats) {
-  $('sPool').textContent = poolTickets.length;
-  $('tabPoolCount').textContent = poolTickets.length;
-  $('sActive').textContent = (stats.IN_PROGRESS || 0) + (stats.ON_HOLD || 0);
-  $('sVerify').textContent = stats.RESOLVED_PENDING_VERIFY || 0;
-  $('sDone').textContent = (stats.RESOLVED || 0) + (stats.CANCELLED || 0) + (stats.CLOSED || 0);
+// The tab counts and the lists come from the same rows, so they cannot disagree.
+function rowsFor(tab) {
+  if (tab === 'pool') return poolTickets.slice();
+  if (tab === 'active') return tickets.filter(function(t) { return isOpenLikeStatus(t.status) || isActiveLikeStatus(t.status); });
+  if (tab === 'verify') return tickets.filter(function(t) { return t.status === 'RESOLVED_PENDING_VERIFY'; });
+  return tickets.filter(function(t) { return t.status === 'RESOLVED' || t.status === 'CANCELLED' || t.status === 'CLOSED'; });
+}
+
+function renderStats() {
+  var set = function(id, n) { $(id).textContent = n; };
+  var pool = poolFailed ? '–' : poolTickets.length;
+  set('sPool', pool); set('tabPoolCount', pool);
+  set('sActive', rowsFor('active').length); set('tabActiveCount', rowsFor('active').length);
+  set('sVerify', rowsFor('verify').length); set('tabVerifyCount', rowsFor('verify').length);
+  set('sDone', rowsFor('done').length); set('tabDoneCount', rowsFor('done').length);
 }
 
 function isOpenLikeStatus(status) {
@@ -192,22 +226,18 @@ function timerClass(dateStr) {
 
 function renderList() {
   var list = $('ticketList');
-  var rows;
-  if (currentTab === 'pool') {
-    rows = poolTickets.slice();
-  } else if (currentTab === 'active') {
-    rows = tickets.filter(function(t) { return isOpenLikeStatus(t.status) || isActiveLikeStatus(t.status); });
-  } else if (currentTab === 'verify') {
-    rows = tickets.filter(function(t) { return t.status === 'RESOLVED_PENDING_VERIFY'; });
-  } else {
-    rows = tickets.filter(function(t) { return t.status === 'RESOLVED' || t.status === 'CANCELLED' || t.status === 'CLOSED'; });
+  if (currentTab === 'pool' && poolFailed) {
+    App.loadFailed(list, { what: 'new jobs', onRetry: loadTickets });
+    return;
   }
+  var rows = rowsFor(currentTab);
 
   if (!rows.length) {
-    var msg = currentTab === 'pool' ? 'No unassigned tickets in your coverage right now.' :
-              currentTab === 'active' ? 'No active tickets. Pick one from the Pool to start.' :
-              currentTab === 'verify' ? 'Nothing awaiting supervisor verification.' :
-              'No resolved tickets here.';
+    var msg = locationFilter ? 'No tickets at this location.' :
+              currentTab === 'pool' ? 'No new jobs in your area right now.' :
+              currentTab === 'active' ? 'You have no jobs in hand. Pick one from New jobs to start.' :
+              currentTab === 'verify' ? 'Nothing is waiting for your supervisor to check.' :
+              'No finished jobs here yet.';
     list.innerHTML = '<div class="el-empty">' + msg + '</div>';
     return;
   }
@@ -220,32 +250,33 @@ function renderList() {
   });
 
   list.innerHTML = rows.map(function(t) {
-    var canResolve = isActiveLikeStatus(t.status);
-    var canPickup = currentTab === 'pool' || (isOpenLikeStatus(t.status) && !isMine(t));
+    var canResolve = !viewOnly && isActiveLikeStatus(t.status);
+    var canPickup = !viewOnly && (currentTab === 'pool' || (isOpenLikeStatus(t.status) && !isMine(t)));
     var isPendingVerify = t.status === 'RESOLVED_PENDING_VERIFY';
     var isActive = isOpenLikeStatus(t.status) || isActiveLikeStatus(t.status);
     var timerHtml = isActive ? '<span class="' + timerClass(t.createdAt) + '">' + elapsedLabel(t.createdAt) + '</span>' : '';
     return '<article class="el-card">' +
       '<div class="el-top">' +
         '<div><div class="el-title">' + esc(t.title) + '</div></div>' +
-        '<div style="display:flex;gap:.3rem;flex-wrap:wrap;justify-content:flex-end;align-items:center">' +
+        '<div class="el-badges">' +
           timerHtml +
-          '<span class="el-pri ' + esc(t.priority) + '">' + esc(t.priority) + '</span>' +
-          '<span class="el-status ' + esc(t.status) + '">' + esc(t.status.replace(/_/g, ' ')) + '</span>' +
+          (t.priority === 'NORMAL' ? '' : App.priorityBadge(t.priority)) +
+          App.statusBadge(t.status) +
         '</div>' +
       '</div>' +
       '<div class="el-meta">' +
-        '<span>📍 ' + esc(t.location ? t.location.name : '—') + '</span>' +
-        '<span>🕒 ' + esc(App.fmtDate(t.createdAt)) + '</span>' +
+        '<span>' + esc(t.location ? t.location.name : '—') + '</span>' +
+        '<span>' + esc(App.fmtDate(t.createdAt)) + '</span>' +
       '</div>' +
       (t.description ? '<div class="el-desc">' + esc(t.description) + '</div>' : '') +
       (t.imageUrl ? '<img class="el-img" src="' + esc(App.imgUrl(t.imageUrl)) + '" alt="Ticket photo" loading="lazy">' : '') +
       (t.resolvedImageUrl ? '<img class="el-img" src="' + esc(App.imgUrl(t.resolvedImageUrl)) + '" alt="Resolved proof" loading="lazy">' : '') +
       '<div class="el-actions">' +
-        (canPickup ? '<button class="btn btn-sm btn-primary" onclick="pickupTicket(\'' + t.id + '\')">⚡ Pick Up</button>' : '') +
-        (canResolve ? '<button class="btn btn-sm btn-success" onclick="openResolve(\'' + t.id + '\')">📷 Resolve With Photo</button>' : '') +
-        (isPendingVerify ? '<span style="font-size:.75rem;color:#c084fc;font-weight:600">⚡ Awaiting supervisor verification</span>' : '') +
-        (!canPickup && !canResolve && !isPendingVerify ? '<span style="font-size:.75rem;color:var(--text-muted)">✓ Done</span>' : '') +
+        (canPickup ? '<button class="btn btn-primary" onclick="pickupTicket(\'' + t.id + '\', this)">Pick Up</button>' : '') +
+        (canResolve ? '<button class="btn btn-success" onclick="openResolve(\'' + t.id + '\')">Resolve With Photo</button>' : '') +
+        (isPendingVerify ? '<span class="el-note">Awaiting supervisor verification</span>' : '') +
+        (viewOnly && !isPendingVerify ? '<span class="el-note">Outside your area: view only</span>' :
+          !canPickup && !canResolve && !isPendingVerify ? '<span class="el-note">Done</span>' : '') +
       '</div>' +
     '</article>';
   }).join('');
@@ -257,22 +288,39 @@ function isMine(t) {
   return t.resolvedWorkers.some(function(w) { return w.id === me.id; });
 }
 
-async function pickupTicket(id) {
-  if (!confirm('Pick up this ticket and start work?')) return;
+async function pickupTicket(id, btn) {
+  if (!(await App.confirmDialog('Pick up this ticket and start work?', { yes: 'Pick up', danger: false }))) return;
+  btn.disabled = true; btn.textContent = 'Picking up…';
   var res = await App.elecFetch('/worker/tickets/' + encodeURIComponent(id) + '/pickup', { method: 'POST' });
-  if (!res) return;
-  if (!res.ok) {
-    var d = await res.json().catch(function(){ return {}; });
-    App.toast(d.error || 'Failed to pick up ticket', 'error');
+  if (!res || !res.ok) {
+    btn.disabled = false; btn.textContent = 'Pick Up';
+    if (res) {
+      var d = await res.json().catch(function(){ return {}; });
+      App.toast(d.error || 'Could not pick up this ticket. Try again.', 'error');
+    }
     return;
   }
-  App.toast('Ticket picked up — switched to Active', 'success');
+  App.toast('Picked up. It is now in My jobs.', 'success');
   setTab('active');
   loadTickets();
 }
 
+function photoChosen() {
+  var file = $('rPhoto').files[0];
+  var preview = $('rPhotoPreview');
+  if (preview.src) { URL.revokeObjectURL(preview.src); preview.removeAttribute('src'); }
+  preview.hidden = !file;
+  if (file) preview.src = URL.createObjectURL(file);
+  $('rPhotoArea').classList.toggle('has-photo', !!file);
+  $('rPhotoText').textContent = file ? 'Retake photo' : 'Take proof photo';
+  $('resolveBtn').disabled = !file;
+  $('resolveBtn').textContent = file ? 'Mark Resolved' : 'Add proof photo first';
+}
+$('rPhoto').addEventListener('change', photoChosen);
+
 function openResolve(id) {
   $('resolveForm').reset();
+  photoChosen();
   $('rTicketId').value = id;
   App.hideError('resolveError');
   App.openModal('resolveModal');
@@ -281,25 +329,37 @@ function openResolve(id) {
 $('resolveForm').addEventListener('submit', async function(e) {
   e.preventDefault();
   var id = $('rTicketId').value;
-  var fd = new FormData();
-  var file = $('rPhoto').files[0];
-  if (!file) { App.showError('resolveError', 'Please attach a proof photo.'); return; }
-  fd.append('image', file);
-  if ($('rNote').value.trim()) fd.append('note', $('rNote').value.trim());
+  var original = $('rPhoto').files[0];
+  if (!original) { App.showError('resolveError', 'Take a proof photo first.'); return; }
 
   var btn = $('resolveBtn');
-  btn.disabled = true; btn.textContent = 'Saving...';
-  var res = await App.elecFetch('/worker/tickets/' + encodeURIComponent(id) + '/resolve', { method: 'POST', body: fd });
-  btn.disabled = false; btn.textContent = 'Mark Resolved';
-  if (!res) return;
-  if (!res.ok) {
-    var d = await res.json().catch(function(){ return {}; });
-    App.showError('resolveError', d.error || 'Failed to resolve ticket');
-    return;
+  btn.disabled = true; btn.textContent = 'Saving…';
+  try {
+    var file = await Kit.shrinkPhoto(original);
+    if (file.size > 5 * 1024 * 1024) {
+      App.showError('resolveError', 'This photo is too big. Take it again closer up, or lower your camera quality.');
+      return;
+    }
+    var fd = new FormData();
+    fd.append('image', file);
+    if ($('rNote').value.trim()) fd.append('note', $('rNote').value.trim());
+    var res = await App.elecFetch('/worker/tickets/' + encodeURIComponent(id) + '/resolve', { method: 'POST', body: fd });
+    if (!res) {
+      App.showError('resolveError', 'No connection. Your photo is still here. Try again.');
+      return;
+    }
+    if (!res.ok) {
+      var d = await res.json().catch(function(){ return {}; });
+      App.showError('resolveError', d.error || 'Could not save. Your details are still here. Try again.');
+      return;
+    }
+    App.closeModal('resolveModal');
+    App.toast('Sent to your supervisor to check.', 'success');
+    setTab('verify');
+    loadTickets();
+  } finally {
+    btn.disabled = false; btn.textContent = 'Mark Resolved';
   }
-  App.closeModal('resolveModal');
-  App.toast('Ticket resolved successfully', 'success');
-  loadTickets();
 });
 
 loadTickets();

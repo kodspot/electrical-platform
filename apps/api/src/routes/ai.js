@@ -36,8 +36,9 @@ async function buildOrgDataContext(orgId) {
       select: {
         shift: true, status: true,
         location: { select: { name: true } },
-        supervisor: { select: { name: true } },
-        workers: { select: { name: true } },
+        // Counts, not names: what is sent to the AI provider stays aggregated, as the privacy
+        // notice says. [BUG-0074]
+        _count: { select: { workers: true } },
         items: { select: { status: true } }
       },
       take: 200
@@ -93,7 +94,7 @@ TEAM:
 - Active supervisors: ${supervisorCount}
 
 TODAY'S INSPECTION DETAILS:
-${todayRecords.length > 0 ? todayRecords.map(r => `- ${r.location?.name}: ${r.shift} shift by ${r.supervisor?.name} with ${r.workers.map(w => w.name).join(', ')} — ${r.status}`).join('\n') : '- No inspection records submitted yet today.'}
+${todayRecords.length > 0 ? todayRecords.map(r => `- ${r.location?.name}: ${r.shift} shift, ${r._count.workers} electrician(s) — ${r.status}`).join('\n') : '- No inspection records submitted yet today.'}
 
 LAST 7 DAYS (weekly totals by shift):
 ${Object.entries(weeklyByShift).map(([s, c]) => `- ${s}: ${c} records`).join('\n') || '- No records in the past week.'}
