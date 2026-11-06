@@ -29,9 +29,9 @@ workflow.
 ## Step 1: UI and UX
 
 ```sh
-npm run audit:render -- --label before     # screenshots + axe, every page, desktop and phone
+npm run audit:render -- before             # screenshots + axe, every page, desktop and phone
 # make the changes
-npm run audit:render -- --label after --before before
+npm run audit:render -- after --before before
 npm run audit:digest                       # a short text digest of each page, for review
 ```
 
