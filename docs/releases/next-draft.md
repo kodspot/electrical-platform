@@ -20,7 +20,7 @@
 - **QR stickers print only when all are ready,** and any that failed are named.
 - **Cancel means cancel** when flagging an inspection.
 - **Download my data** is in the account menu for all staff.
-- The privacy notice now states the real photo retention period: 30 days, and the real hosting provider.
+- The privacy notice now states the real photo retention period: 30 days, and where data is really held.
 - **Admin tables fit a phone,** and ticket statuses use the same words as the field app.
 - **Dropdowns and tabs work fully by keyboard** and are named for screen readers.
 - **Save opens the right tab** when a required field on the electrician form is empty.

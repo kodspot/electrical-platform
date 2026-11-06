@@ -12,7 +12,7 @@ const read = (file) => fs.readFileSync(path.join(__dirname, '..', '..', file), '
 module.exports = {
   id: 'BUG-0082',
   title: 'The privacy notice named the wrong hosting provider',
-  description: 'The notice said data was held on Google Cloud in Mumbai. Production runs on AWS EC2 (deploy.yml). The region was not confirmed, so the notice no longer states one: AUD-11/14.',
+  description: 'The notice said data was held on Google Cloud in Mumbai. Production runs on AWS EC2 in Mumbai (deploy.yml; the owner confirmed it, and the public address is in the ap-south-1 range). The project moved from Google Cloud to AWS and the notice was not updated. Cloudflare R2 holds photos and backups, and its location is not confirmed: AUD-11/14.',
   module: 'ele',
   category: 'privacy',
   severity: 'MEDIUM',
@@ -38,7 +38,8 @@ module.exports = {
   async validate() {
     if (!read('../../.github/workflows/deploy.yml').includes('AWS_HOST')) return { ok: false, detail: 'the deploy target changed: check the notice' };
     if (read('public/privacy.html').includes('Google Cloud Platform')) return { ok: false, detail: 'the notice names Google Cloud as the host' };
-    if (!read('public/privacy.html').includes('Amazon Web Services</strong>')) return { ok: false, detail: 'the notice does not name the host' };
+    if (!read('public/privacy.html').includes('Amazon Web Services</strong> in <strong>Mumbai, India')) return { ok: false, detail: 'the notice does not name the host and its location' };
+    if (read('public/privacy.html').includes('All data is stored')) return { ok: false, detail: 'the notice promises one location for all data' };
     return { ok: true, detail: 'the notice names the real host' };
   }
 };

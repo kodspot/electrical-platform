@@ -67,7 +67,7 @@
 
 <h2>4. Data Storage and Security</h2>
 <ul>
-<li>Application data is hosted on <strong>Amazon Web Services</strong>, and photos are stored with <strong>Cloudflare</strong>.</li>
+<li>The application and its database are hosted on <strong>Amazon Web Services</strong> in <strong>Mumbai, India</strong>. Photos and encrypted backups are stored with <strong>Cloudflare R2</strong>, whose servers may be outside India.</li>
 <li>Data is encrypted in transit using <strong>TLS 1.2+</strong> (HTTPS enforced via HSTS).</li>
 <li><strong>Sensitive personal data</strong> (Aadhar number, blood group) is <strong>encrypted at rest</strong> using AES-256-GCM with a server-side encryption key.</li>
 <li>Passwords are hashed using <strong>bcrypt</strong> with a cost factor of 12. Passwords must contain at least 8 characters, including uppercase, lowercase, and a digit.</li>
@@ -89,7 +89,7 @@
 <p>We do <strong>not</strong> sell, rent, or share your personal data with third parties for marketing purposes. Data may be shared with:</p>
 <ul>
 <li><strong>Your Organization:</strong> Administrators and supervisors within your organization can access data relevant to their role.</li>
-<li><strong>Infrastructure Providers:</strong> Amazon Web Services (hosting and email delivery) and Cloudflare (CDN/storage) — all bound by their respective data processing agreements.</li>
+<li><strong>Infrastructure Providers:</strong> Amazon Web Services (hosting and email delivery) and Cloudflare (photo and backup storage) — all bound by their respective data processing agreements.</li>
 <li><strong>Law Enforcement:</strong> When required by a valid court order or legal obligation under Indian law.</li>
 </ul>
 

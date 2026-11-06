@@ -1551,7 +1551,7 @@ Count: 82 bug scenario(s).
 - **Severity:** MEDIUM · **Status:** FIXED · **Module:** ele · **Category:** privacy
 - **Origin:** Audit 2026-11
 - **Introduced:** pre-audit · **Fixed:** 2026-11-07
-- **Description:** The notice said data was held on Google Cloud in Mumbai. Production runs on AWS EC2 (deploy.yml). The region was not confirmed, so the notice no longer states one: AUD-11/14.
+- **Description:** The notice said data was held on Google Cloud in Mumbai. Production runs on AWS EC2 in Mumbai (deploy.yml; the owner confirmed it, and the public address is in the ap-south-1 range). The project moved from Google Cloud to AWS and the notice was not updated. Cloudflare R2 holds photos and backups, and its location is not confirmed: AUD-11/14.
 - **Root cause:** The notice was written for an earlier host and not updated when the host changed.
 - **Expected behavior:** The notice names the providers the deployment really uses.
 - **Broken behavior:** The notice named a provider that does not hold the data.

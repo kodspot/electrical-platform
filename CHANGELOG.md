@@ -32,7 +32,7 @@ sections up to and including 2026-10-20 are in v1.0.0, and the later ones are no
   named comboboxes with full keyboard support; admin status words match the field app; every page
   has one `h1`; the dashboard shows active tickets first; a More menu on the super-admin row.
 - **Privacy:** Inter is served from `public/css`, and the CSP drops Google's font hosts. The
-  notice names the real hosting provider and no longer states a country (AUD-11/14).
+  notice names the real host, AWS in Mumbai, and says Cloudflare R2 may be outside India (AUD-11/14).
 - **Tests:** browser tests marked `[polish]` in `e2e/tests/forms.spec.js`,
   `test/integration/erase-reporter.test.js`, and two cases in `test/lib-storage.test.js`.
 
