@@ -38,7 +38,7 @@ in the repository; they are marked **owner to confirm**.
 
 | Recipient | What | Why | Owner to confirm |
 |---|---|---|---|
-| Cloudflare R2 | Photos, encrypted database backups | Storage | Contract, region |
+| Cloudflare R2 | Photos, and database backups (gzip files, encrypted only by Cloudflare at rest: AUD-11/15) | Storage | Contract, region (AUD-11/14) |
 | Amazon SES | Staff email address, ticket details in the email | Notifications | Contract, region |
 | Google Gemini or Azure OpenAI (only if AI is switched on) | Location names, shift and status counts, ticket titles, and chat text | AI summaries | Contract, region, the "no training" and "no retention" claims in the notice |
 | GitHub | No production personal data | Code and CI | Nothing |

@@ -67,7 +67,7 @@
 
 <h2>4. Data Storage and Security</h2>
 <ul>
-<li>The application and its database are hosted on <strong>Amazon Web Services</strong> in <strong>Mumbai, India</strong>. Photos and encrypted backups are stored with <strong>Cloudflare R2</strong>, whose servers may be outside India.</li>
+<li>The application and its database are hosted on <strong>Amazon Web Services</strong> in <strong>Mumbai, India</strong>. Photos and database backups are stored with <strong>Cloudflare R2</strong>, whose servers may be outside India.</li>
 <li>Data is encrypted in transit using <strong>TLS 1.2+</strong> (HTTPS enforced via HSTS).</li>
 <li><strong>Sensitive personal data</strong> (Aadhar number, blood group) is <strong>encrypted at rest</strong> using AES-256-GCM with a server-side encryption key.</li>
 <li>Passwords are hashed using <strong>bcrypt</strong> with a cost factor of 12. Passwords must contain at least 8 characters, including uppercase, lowercase, and a digit.</li>
