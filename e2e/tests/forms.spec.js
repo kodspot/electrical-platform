@@ -93,7 +93,7 @@ test.describe('Forms — admin, supervisor, electrician', () => {
     // Long enough for the field's own minlength, but against the server's rule (no capital):
     // the server's reason must be shown, and the password must not change.
     const before = (await db().user.findFirst({ where: { email } })).passwordHash;
-    await row.getByRole('button', { name: 'PW' }).click();
+    await row.getByRole('button', { name: 'Reset password' }).click();
     await page.locator('#pwNew').fill('alllowercase1');
     await page.locator('#resetBtn').click();
     await expect(page.locator('#pwError')).toBeVisible();
