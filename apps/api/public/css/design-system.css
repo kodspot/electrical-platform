@@ -1,3 +1,22 @@
+/* Inter (SIL Open Font License, css/inter-LICENSE.txt) is served from here, so no visitor's
+   address reaches a font service. Latin and Latin Extended, which holds the rupee sign. */
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 100 900;
+  src: url('/css/inter-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD;
+}
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 100 900;
+  src: url('/css/inter-latin-ext.woff2') format('woff2');
+  unicode-range: U+0100-02BA,U+02BD-02C5,U+02C7-02CC,U+02CE-02D7,U+02DD-02FF,U+0304,U+0308,U+0329,U+1D00-1DBF,U+1E00-1E9F,U+1EF2-1EFF,U+2020,U+20A0-20AB,U+20AD-20C0,U+2113,U+2C60-2C7F,U+A720-A7FF;
+}
+
 /* ========================================================================
    KODSPOT ELECTRICAL DESIGN SYSTEM v2.0
    Premium industrial-grade UI — Electric Blue + Amber Energy palette
@@ -972,6 +991,10 @@ tr:hover td { background: rgba(30,64,175,.03); }
   scrollbar-width: none;
 }
 .tabs::-webkit-scrollbar { display: none; }
+.q-nav { display: flex; gap: .25rem; margin-left: .75rem; }
+.q-nav a { color: rgba(255,255,255,.75); text-decoration: none; font-size: .82rem; padding: .35rem .65rem; border-radius: var(--radius-sm); }
+.q-nav a[aria-current="page"] { background: rgba(255,255,255,.15); color: #fff; font-weight: 600; }
+@media (max-width: 640px) { .q-nav { margin-left: .25rem; } }
 .tab {
   padding: .6rem 1.1rem;
   cursor: pointer;
@@ -1609,6 +1632,18 @@ tr:hover td { background: rgba(30,64,175,.03); }
 }
 
 /* Regions that scroll sideways are keyboard focusable (App.markScrollRegions) */
+/* A data table on a phone: one card per row, each cell labelled with its column (App.labelCardTables). */
+@media (max-width: 640px) {
+  table.table-cards, table.table-cards tbody, table.table-cards tr, table.table-cards td { display: block; width: 100%; }
+  table.table-cards { min-width: 0; }
+  table.table-cards thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+  table.table-cards tr { padding: .6rem .75rem; border-bottom: 1px solid var(--border); }
+  table.table-cards tbody td { position: relative; min-height: 1.6rem; padding: .2rem 0 .2rem 38%; border: 0; text-align: left; white-space: normal; overflow-wrap: anywhere; }
+  table.table-cards td::before { content: attr(data-label); position: absolute; left: 0; top: .25rem; width: 36%; font-size: var(--fs-xs); font-weight: 600; color: var(--text-muted); }
+  table.table-cards tbody td:not([data-label]) { padding-left: 0; }
+  table.table-cards td:not([data-label])::before { content: none; }
+  table.table-cards tbody td.hide-mobile { display: none; }
+}
 .table-wrap[role="region"]:focus-visible, [data-scroll][role="region"]:focus-visible { outline-offset: -3px; }
 
 /* Stays on screen while offline or while work is waiting to send */

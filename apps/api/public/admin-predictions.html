@@ -9,8 +9,8 @@
 <link rel="manifest" href="/site.webmanifest">
 <meta name="theme-color" content="#1E40AF">
 <title>Predictive Maintenance — Kodspot</title>
-<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/css/design-system.css?v=11">
+<link rel="preload" href="/css/inter-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="/css/design-system.css?v=12">
 <style>
 .pred-header{display:flex;align-items:center;justify-content:space-between;gap:1rem;margin-bottom:1.5rem;flex-wrap:wrap}
 .pred-title{display:flex;align-items:center;gap:.6rem}
@@ -39,10 +39,10 @@
 .risk-table tr:last-child td{border-bottom:none}
 .risk-table tr:hover td{background:var(--bg)}
 .risk-badge{display:inline-block;padding:.15rem .5rem;border-radius:10px;font-size:var(--fs-xs);font-weight:700;text-transform:uppercase;letter-spacing:.3px}
-.risk-CRITICAL{background:#fef2f2;color:#dc2626;border:1px solid #fecaca}
-.risk-HIGH{background:#fffbeb;color:#d97706;border:1px solid #fde68a}
-.risk-MEDIUM{background:#eff6ff;color:#2563eb;border:1px solid #bfdbfe}
-.risk-LOW{background:#ecfdf5;color:#059669;border:1px solid #a7f3d0}
+.risk-CRITICAL{background:#fef2f2;color:#b91c1c;border:1px solid #fecaca}
+.risk-HIGH{background:#fffbeb;color:#92400e;border:1px solid #fde68a}
+.risk-MEDIUM{background:#eff6ff;color:#1e40af;border:1px solid #bfdbfe}
+.risk-LOW{background:#ecfdf5;color:#047857;border:1px solid #a7f3d0}
 
 /* Risk bar */
 .risk-bar{width:80px;height:8px;background:var(--bg);border-radius:4px;overflow:hidden;display:inline-block;vertical-align:middle;margin-left:.4rem}
@@ -114,7 +114,7 @@
   <main class="container" id="content">
     <div class="pred-header">
       <div class="pred-title">
-        <h1>🔮 Predictive Maintenance</h1>
+        <h1>Predictive Maintenance</h1>
         <span class="pred-badge">AI-Powered</span>
       </div>
       <button class="btn btn-outline btn-sm" id="refreshBtn" onclick="loadAll()">↻ Refresh</button>
@@ -150,8 +150,8 @@
     <!-- Risk Table -->
     <div class="pred-section" id="riskSection" style="display:none">
       <div class="pred-section-title"><span class="icon">📊</span> Asset Risk Scores</div>
-      <div style="overflow-x:auto">
-        <table class="risk-table">
+      <div style="overflow-x:auto" data-scroll aria-label="Asset risk scores">
+        <table class="risk-table table-cards">
           <thead>
             <tr>
               <th>Asset</th>
@@ -172,7 +172,7 @@
     <!-- Trends -->
     <div class="pred-section" id="trendSection" style="display:none">
       <div class="pred-section-title"><span class="icon">📈</span> 12-Week Trends</div>
-      <div class="trend-container">
+      <div class="trend-container" data-scroll aria-label="Asset failure trend">
         <div class="trend-bars" id="trendBars"></div>
         <div class="trend-legend">
           <span class="trend-legend-item"><span class="trend-legend-dot" style="background:#3b82f6"></span> Inspections</span>
@@ -188,7 +188,7 @@
 <div id="toast-container"></div>
 
 <script src="/js/offline-sync.js?v=1"></script>
-<script src="/js/app.js?v=17"></script>
+<script src="/js/app.js?v=18"></script>
 <script>
 var $ = App.$, esc = App.esc;
 

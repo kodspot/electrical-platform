@@ -9,8 +9,8 @@
 <link rel="manifest" href="/site.webmanifest">
 <meta name="theme-color" content="#1E40AF">
 <title>Supervisors — Kodspot</title>
-<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/css/design-system.css?v=11">
+<link rel="preload" href="/css/inter-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="/css/design-system.css?v=12">
 <style>
 /* ── Summary ── */
 .sv-summary{display:flex;gap:1rem;flex-wrap:wrap;padding:.6rem 0 .5rem;border-bottom:1px solid var(--border-light);margin-bottom:.75rem}
@@ -146,7 +146,7 @@
 
 <main class="container">
   <div class="toolbar">
-    <h2 class="toolbar-title">Supervisors</h2>
+    <h1 class="toolbar-title">Supervisors</h1>
     <div class="flex items-center gap-sm" style="flex-wrap:wrap">
       <label class="form-check"><input type="checkbox" id="showInactive" onchange="loadSupervisors(1)"> Show inactive</label>
       <button class="btn btn-primary" onclick="openAdd()">+ Add Supervisor</button>
@@ -312,8 +312,8 @@
 </div>
 
 <script src="/js/offline-sync.js?v=1"></script>
-<script src="/js/app.js?v=17"></script>
-<script src="/js/custom-select.js"></script>
+<script src="/js/app.js?v=18"></script>
+<script src="/js/custom-select.js?v=2"></script>
 <script>
 if (!App.initAdmin('supervisors')) throw '';
 App.initNotifications(App.apiFetch);

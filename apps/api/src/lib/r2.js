@@ -129,20 +129,23 @@ async function localDelete(key) {
 // ── Public API (driver-agnostic) ──
 
 async function uploadToR2(buffer, mimetype, orgId) {
-  // Compress and convert to WebP for optimal delivery — shared across drivers.
+  // Compress and convert to WebP for optimal delivery — shared across drivers. Re-encoding also
+  // drops EXIF, which can hold where a photo was taken, so an image that cannot be re-encoded is
+  // refused rather than stored as it came. failOn 'none' keeps a photo cut short in transit. [BUG-0077]
   try {
-    buffer = await sharp(buffer)
+    buffer = await sharp(buffer, { failOn: 'none' })
       .resize(800, 800, { fit: 'inside', withoutEnlargement: true })
       .webp({ quality: 80 })
       .toBuffer();
     mimetype = 'image/webp';
   } catch (e) {
-    logger.warn('sharp compression failed, uploading original:', e.message);
+    logger.warn('sharp could not read an upload, refused:', e.message);
+    const refused = new Error('This photo could not be read. Please take it again or choose another.');
+    refused.statusCode = 400;
+    throw refused;
   }
 
-  const ext = mimetype === 'image/png' ? '.png' :
-    mimetype === 'image/webp' ? '.webp' : '.jpg';
-  const key = `uploads/${orgId}/${Date.now()}-${crypto.randomBytes(8).toString('hex')}${ext}`;
+  const key = `uploads/${orgId}/${Date.now()}-${crypto.randomBytes(8).toString('hex')}.webp`;
 
   if (currentDriver() === 'local') {
     await localPut(key, buffer);

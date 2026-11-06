@@ -9,8 +9,8 @@
 <link rel="manifest" href="/site.webmanifest">
 <meta name="theme-color" content="#0891b2">
 <title>Asset Management — Kodspot</title>
-<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/css/design-system.css?v=11">
+<link rel="preload" href="/css/inter-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="/css/design-system.css?v=12">
 <style>
 .page-title{display:flex;align-items:center;gap:.5rem;margin-bottom:1.25rem;flex-wrap:wrap;justify-content:space-between}
 .page-title h1{font-size:1.25rem;font-weight:700;margin:0}
@@ -72,6 +72,7 @@
 
 @media(max-width:768px){
   .a-tbl td,.a-tbl th{padding:.45rem .3rem;font-size:.75rem}
+  .a-filter-row .form-select{flex:1 1 45%!important}
   .a-stats{gap:.5rem}
   .a-stat{padding:.6rem .5rem}
   .a-stat-val{font-size:1.1rem}
@@ -96,9 +97,9 @@
 
 <main class="container">
   <div class="page-title">
-    <h1>🔧 Asset Management</h1>
+    <h1>Asset Management</h1>
     <div class="page-actions">
-      <button class="btn btn-sm btn-outline" onclick="exportCSV()">CSV</button>
+      <button class="btn btn-sm btn-outline" onclick="exportCSV()">Export CSV</button>
       <button class="btn btn-sm btn-primary" onclick="openCreateModal()">+ Add Asset</button>
     </div>
   </div>
@@ -135,7 +136,7 @@
   <!-- Table -->
   <div class="section">
     <div class="table-wrap">
-      <table class="a-tbl">
+      <table class="a-tbl table-cards">
         <thead>
           <tr>
             <th>Code</th><th>Name</th><th>Category</th><th>Location</th>
@@ -209,7 +210,7 @@
 </div>
 
 <script src="/js/offline-sync.js?v=1"></script>
-<script src="/js/app.js?v=17"></script>
+<script src="/js/app.js?v=18"></script>
 <script>
 if (!App.initAdmin('assets')) throw '';
 App.initNotifications(App.apiFetch);

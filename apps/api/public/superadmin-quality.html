@@ -8,13 +8,10 @@
 <meta name="theme-color" content="#1E40AF">
 <meta name="robots" content="noindex, nofollow">
 <title>Quality — Super Admin — Kodspot</title>
-<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/css/design-system.css?v=11">
+<link rel="preload" href="/css/inter-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="/css/design-system.css?v=12">
 <style>
 .sa-badge { display: inline-block; font-size:var(--fs-xs); font-weight: 600; background: rgba(255,255,255,.15); color: rgba(255,255,255,.9); padding: .15rem .5rem; border-radius: 50px; letter-spacing: .03em; white-space: nowrap; }
-.q-nav { display: flex; gap: .25rem; margin-left: .75rem; }
-.q-nav a { color: rgba(255,255,255,.75); text-decoration: none; font-size: .82rem; padding: .35rem .65rem; border-radius: var(--radius-sm); }
-.q-nav a[aria-current="page"] { background: rgba(255,255,255,.15); color: #fff; font-weight: 600; }
 .q-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1rem; margin-bottom: 1rem; }
 .q-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 1rem 1.15rem; min-width: 0; }
 .q-card h2 { font-size: .95rem; font-weight: 700; margin: 0 0 .65rem; color: var(--text); display: flex; align-items: center; gap: .5rem; flex-wrap: wrap; }
@@ -44,7 +41,6 @@
 .q-ci a { color: var(--primary); }
 .q-pager { display: flex; gap: .5rem; align-items: center; justify-content: flex-end; margin-top: .6rem; }
 @media (max-width: 640px) {
-  .q-nav { margin-left: .25rem; }
   .q-card { padding: .85rem; }
   .q-trend svg { height: 130px; }
 }
@@ -73,6 +69,7 @@
 </nav>
 
 <main class="container" style="max-width:1100px">
+  <h1 class="sr-only">Quality</h1>
   <div class="q-tabs" role="tablist" aria-label="Test suites">
     <button type="button" role="tab" id="tabUnit" aria-controls="panelUnit" aria-selected="true">Unit &amp; integration</button>
     <button type="button" role="tab" id="tabE2e" aria-controls="panelE2e" aria-selected="false" tabindex="-1" data-testid="qa-tab-e2e">End-to-end</button>
@@ -185,7 +182,7 @@
   </div>
 </main>
 
-<script src="/js/app.js?v=17"></script>
+<script src="/js/app.js?v=18"></script>
 <script src="/js/superadmin-quality.js?v=4"></script>
 </body>
 </html>

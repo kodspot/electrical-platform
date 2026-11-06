@@ -20,6 +20,22 @@ sections up to and including 2026-10-20 are in v1.0.0, and the later ones are no
 
 ## Unreleased
 
+### 2026-11-07: Polish and audit follow-up
+
+- **Fixed** BUG-0077 to BUG-0082
+  ([`docs/reference/bug-registry.generated.md`](docs/reference/bug-registry.generated.md)). The
+  audit report's follow-up section lists them.
+- **Added** `POST /tickets/:id/erase-reporter` (admin), to erase one resident from a complaint.
+- **Changed** `lib/r2.js`: an image that cannot be re-encoded is refused with a 400 instead of
+  stored as it came.
+- **Interface:** `App.initTabs`, `App.labelCardTables` and `table.table-cards`; dropdowns are
+  named comboboxes with full keyboard support; admin status words match the field app; every page
+  has one `h1`; the dashboard shows active tickets first; a More menu on the super-admin row.
+- **Privacy:** Inter is served from `public/css`, and the CSP drops Google's font hosts. The
+  notice names the real hosting provider and no longer states a country (AUD-11/14).
+- **Tests:** browser tests marked `[polish]` in `e2e/tests/forms.spec.js`,
+  `test/integration/erase-reporter.test.js`, and two cases in `test/lib-storage.test.js`.
+
 ### 2026-11-06: UI/UX pass and audit
 
 - **Fixed** BUG-0061 to BUG-0073 from the UX pass, and BUG-0074 to BUG-0076 from the audit

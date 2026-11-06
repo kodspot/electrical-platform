@@ -31,7 +31,7 @@ that period could not be confirmed. Re-check before relying on the date.
 | Erase when the purpose is over | s.8(7), Rule 8 | **Partly:** photos 30 days, resident details 180 days. A one-year minimum retention reported in Rule 8 may conflict with both: counsel to resolve | AUD-11/12 |
 | Grievance contact published | s.8(10), s.13, Rule 14 | **Met,** with a named contact. Response in 30 days, within the reported 90-day limit | `public/privacy.html` |
 | Children: verifiable parental consent, no tracking | s.9, Rule 10 | **Gap, and the most serious one.** Hostel residents can be under 18, and the notice says the service is not for them | AUD-11/04 |
-| Rights to access, correct, erase, and to nominate | ss.11–14 | **Partly.** Access is now self-service for all staff (BUG-0076). Nomination is not offered | AUD-11/06 |
+| Rights to access, correct, erase, and to nominate | ss.11–14 | **Partly.** Access is self-service for all staff (BUG-0076), and an admin can erase one resident (BUG-0081). Nomination is not offered | AUD-11/06 |
 | Transfers outside India | s.16 | **Permitted unless restricted.** AI providers and email may be abroad: owner to confirm regions | Inventory |
 | Significant Data Fiduciary duties | s.10 | **Not expected at this scale.** Depends on government notification | None |
 
