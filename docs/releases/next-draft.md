@@ -5,6 +5,23 @@
 > Charter §18 they use the words each audience would recognise, and security fixes describe
 > the improvement, not the mechanics. Publish them with the next tagged release.
 
+## Easier and clearer everywhere (2026-11)
+- **Electricians can attach the proof photo.** A large "Take proof photo" button opens the
+  camera. Before, there was nothing to tap, so a ticket could not be resolved from the app.
+- **The field app has a bottom bar** with the same links on every page, larger buttons, and a
+  Bright screen option in the account menu for daylight.
+- **Words you can act on.** Errors appear on the screen in plain language. If a page cannot
+  load, it says so and offers Try again; it no longer looks like there is no work.
+- **Residents** see a simpler report form, with a reference number at the end, and can use it
+  with a keyboard or screen reader.
+- **Setting up is guided.** The dashboard lists the first steps, adding an electrician goes
+  straight on to their PIN, and supervisors can now be given their locations on screen.
+- **Tapping a ticket count shows those tickets,** instead of all of them.
+- **QR stickers print only when all are ready,** and any that failed are named.
+- **Cancel means cancel** when flagging an inspection.
+- **Download my data** is in the account menu for all staff.
+- The privacy notice now states the real photo retention period: 30 days.
+
 ## For administrators
 - **Deactivating a supervisor hands over their open tickets.** Each open ticket goes to the
   other supervisor covering its location. If no one else covers it, the ticket goes back to

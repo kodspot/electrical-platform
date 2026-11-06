@@ -267,6 +267,7 @@ Run this table for **every** change. If an artifact's trigger condition isn't me
 | **User Documentation** | (external) | An end-user-facing (guest/electrician/supervisor/admin) workflow or UI element changes in a way a user would notice. |
 | **Admin Documentation** | (external) | An admin- or superadmin-facing capability, permission, or configuration option changes. |
 | **Storylane / Demo Artifacts** | (external) | The change would make an existing demo/onboarding walkthrough show outdated, broken, or misleading behavior. |
+| **Personal Data Documentation** | [`docs/reference/personal-data-inventory.md`](reference/personal-data-inventory.md), [`docs/reference/dpdp-requirements.md`](reference/dpdp-requirements.md), [`apps/api/public/privacy.html`](../apps/api/public/privacy.html) | A personal-data field, a retention period, a third-party recipient, or what is sent to an AI provider changes. The privacy notice must say what the code does. |
 | **ADR** | [`docs/adr/`](adr/) | The change makes an architecturally significant, hard-to-reverse decision — a new dependency, a deviation from an established pattern (§5), or a change to the security model (§6). Routine feature work does not need an ADR. |
 
 ---
@@ -300,6 +301,7 @@ This Charter is permanent in the sense that it always governs — it is not perm
 | 2026-10-13 | Recorded a deviation from §10's page-URL rule (`/{orgSlug}/{module}/{page}`): `/reset-password` and `/worker-reset-pin` are top-level pages | `[F12]`/BUG-0007: the reset emails already sent link to these exact URLs, and the pages serve people with no org context yet (like `/superadmin-login`). Both names are in `NON_ORG_PREFIXES` (`public/js/app.js`) and are routed in `routes/pages.js`. No other page may use a top-level URL without its own entry here. |
 | 2026-10-13 | §8.3 clarified in `docs/architecture/resilience.md`: only infrastructure errors count toward the database breaker | `[F15]`/BUG-0008: counting every Prisma error let one request type (an electrician's photo loads) open the shared breaker and take the whole platform to 503. |
 | 2026-10-25 | §6 credential-recovery rule: reset tokens are stored as their SHA-256 digest | BUG-0034 / PAR-10/21: the raw token was stored, so anyone who could read the database or a backup could reset any staff password or electrician PIN with a pending request. The e-mailed token stays the credential; a fast hash suffices for a 256-bit random value. Tokens issued before the change stop working (they expire within an hour anyway). |
+| 2026-11-06 | Added the Personal Data row to §22, and a repeatable audit (`docs/AUDIT_PLAYBOOK.md`) | The privacy notice said photos were kept 7 days while the code kept them 30 (BUG-0075), and staff names reached the AI provider while the notice said aggregated data (BUG-0074). Nothing tied the notice to the code. |
 
 ---
 

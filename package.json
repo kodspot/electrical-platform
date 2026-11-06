@@ -20,7 +20,11 @@
     "release:check": "npm --prefix apps/api run release:check",
     "e2e": "node e2e/scripts/run-e2e.js",
     "e2e:ui": "node e2e/scripts/run-e2e.js --ui-mode",
-    "e2e:codegen": "npm --prefix e2e run codegen -- http://localhost:3000"
+    "e2e:codegen": "npm --prefix e2e run codegen -- http://localhost:3000",
+    "audit:render": "node e2e/scripts/render-pages.js",
+    "audit:digest": "node e2e/scripts/page-digest.js",
+    "audit:tenancy": "node apps/api/scripts/audit-tenancy.js",
+    "audit:escaping": "node apps/api/scripts/audit-escaping.js"
   },
   "devDependencies": {
     "prisma": "^5.9.0"

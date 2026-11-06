@@ -20,6 +20,25 @@ sections up to and including 2026-10-20 are in v1.0.0, and the later ones are no
 
 ## Unreleased
 
+### 2026-11-06: UI/UX pass and audit
+
+- **Fixed** BUG-0061 to BUG-0073 from the UX pass, and BUG-0074 to BUG-0076 from the audit
+  ([`docs/reference/bug-registry.generated.md`](docs/reference/bug-registry.generated.md)).
+  BUG-0062 is the blocker: electricians could not attach the proof photo.
+- **Interface:** shared primitives in `public/js/app.js` and the new `public/js/kit.js`; a bottom
+  navigation on the field pages; contrast, focus, type-size and touch-target changes in
+  `design-system.css`; plain status names; the resident, sign-in and first-run admin flows
+  ([`docs/architecture/frontend.md`](docs/architecture/frontend.md)). `app.js?v=17`,
+  `design-system.css?v=11`, caches `kodspot-v19` and `kodspot-${mod}-v9`.
+- **New route:** `GET /auth/worker-export`, an electrician's own data.
+- **Privacy:** the notice now says 30 days for photos; AI prompts hold counts, not staff names.
+- **Dependencies:** `npm audit fix` cleared six moderate or low advisories.
+- **Audit tooling:** `npm run audit:render`, `audit:digest`, `audit:tenancy`, `audit:escaping`, and
+  the saved `.claude/workflows/product-audit.js`.
+- **Docs:** [`docs/AUDIT_PLAYBOOK.md`](docs/AUDIT_PLAYBOOK.md),
+  [`docs/history/audit-2026-11.md`](docs/history/audit-2026-11.md), the personal data inventory,
+  the DPDP register, and the breach procedure in [`docs/RUNBOOKS.md`](docs/RUNBOOKS.md).
+
 Complete and merged into the working tree as of this writing, pending its next deploy —
 see `docs/DEPLOYMENT.md` for how a change reaches production.
 

@@ -29,6 +29,8 @@ The knowledge base is organized into five layers. The layer a fact belongs to te
 where it lives.
 
 ### Governance — the rules
+- [`AUDIT_PLAYBOOK.md`](AUDIT_PLAYBOOK.md) — how to repeat the UI/UX, security, DPDP and
+  future-readiness audit.
 - [`ENGINEERING_CHARTER.md`](ENGINEERING_CHARTER.md) — the Definition of Engineering for
   this project: coding, security, tenancy, database, testing, deployment standards, plus
   a dated **Amendment Log** that is the authoritative record of *why* each significant
@@ -61,6 +63,10 @@ Engineering understanding, not code duplication. Each links to the code it descr
 - [`reference/bug-registry.generated.md`](reference/bug-registry.generated.md) — the bug
   reproduction library: every fixed defect with metadata, reproduction steps, and a
   regression test. **Generated** from `apps/api/scenarios/bugs/` (`npm run docs:bugs`).
+- [`reference/personal-data-inventory.md`](reference/personal-data-inventory.md) — every place
+  personal data is held, why, for how long, and who else receives it.
+- [`reference/dpdp-requirements.md`](reference/dpdp-requirements.md) — where the platform stands
+  against the DPDP Act and Rules.
 - The Prisma schema (`apps/api/prisma/schema.prisma`) is the canonical, commented source
   for the data model — read it directly rather than a hand-maintained copy.
 - [`apps/api/README.md`](../apps/api/README.md) — local development, test, and lint
@@ -92,6 +98,8 @@ Engineering understanding, not code duplication. Each links to the code it descr
   — a dated product and architecture review (findings `PAR-10/n`): how the product fits real
   colleges and hostels, a prioritised backlog, and the decisions for the owner. Its proposals
   are ADRs 0010 and 0011 (Proposed).
+- [`history/audit-2026-11.md`](history/audit-2026-11.md) — the UI/UX, security, DPDP and
+  future-readiness audit of November 2026, with its open items (`AUD-11/n`).
 
 ### Chronology
 - [`CHANGELOG.md`](../CHANGELOG.md) — every merged change, dated and Work-Package-tagged.
