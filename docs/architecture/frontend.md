@@ -53,6 +53,9 @@ ten public and reset pages do not load it, and use `public/js/kit.js` and the st
 | Form errors | `App.showError(id, msg, details, field)`: `role=alert`, scrolls into view, marks the field |
 | Lost connection | `apiFetch` and friends toast and answer null. Pass `throwOnNetwork` only when the caller has somewhere to put the work |
 | Choosing locations | `App.locationChecklist(tree, assignedMap)` |
+| Tabs | `App.initTabs(list)`, applied to `.tabs`, `.att-tabs`, `.wk-form-tabs` and `.sa-tabs`. Tabs must be `<button>`s; the page keeps its own switching by toggling `.active` |
+| A required field on a tab | Add `data-tab-for` to the tab and `data-tab-panel` to its panel, so a refused submit opens that tab |
+| Tables on a phone | `<table class="table-cards">`: each row becomes a card, labelled from `thead`. Keep sideways scroll, with `data-scroll` and an `aria-label` on the wrapper, for grids such as heatmaps |
 | Photos | `Kit.shrinkPhoto(file)` before upload. It returns the original on any failure |
 | Password or PIN field | `Kit.revealToggle(input)` |
 | Sign-in errors | `Kit.signInError(status, kind, serverError)`, `Kit.friendlyError(err)` |

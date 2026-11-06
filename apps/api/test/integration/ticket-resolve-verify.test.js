@@ -37,6 +37,7 @@ const {
   createTestSupervisorAssignment
 } = require('../helpers/db');
 const { prisma } = require('../../src/lib/prisma');
+const { getFromR2 } = require('../../src/lib/r2');
 
 const PNG = Buffer.from('89504e470d0a1a0a0000000d4948445200000001000000010806000000' + '1f15c4890000000d49444154789c6360000002000154a24f5d0000000049454e44ae426082', 'hex');
 
@@ -295,7 +296,12 @@ describe('ticket resolve → verify → reopen, every role', () => {
     const photo = await app.inject({ method: 'GET', url: review.ticket.photoUrl, headers: { 'x-forwarded-for': nextIp() } });
     assert.strictEqual(photo.statusCode, 200, photo.body.slice(0, 100));
     assert.match(photo.headers['content-type'], /^image\//);
-    assert.ok(photo.rawPayload.equals(PNG), 'the proof photo itself');
+    // Stored as re-encoded, so the bytes to match are the stored ones, not the upload's. [BUG-0077]
+    const { resolvedImageUrl } = await prisma.ticket.findUnique({ where: { id: ticket.id } });
+    const stored = await getFromR2(resolvedImageUrl.slice('/images/'.length));
+    const chunks = [];
+    for await (const chunk of stored.Body) chunks.push(chunk);
+    assert.ok(photo.rawPayload.equals(Buffer.concat(chunks)), 'the proof photo itself');
 
     const wrong = await app.inject({ method: 'GET', url: `/api/public/review/${'0'.repeat(64)}/photo`, headers: { 'x-forwarded-for': nextIp() } });
     assert.strictEqual(wrong.statusCode, 404);

@@ -9,8 +9,8 @@
 <link rel="manifest" href="/site.webmanifest">
 <meta name="theme-color" content="#1E40AF">
 <title>Locations — Kodspot</title>
-<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/css/design-system.css?v=11">
+<link rel="preload" href="/css/inter-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="/css/design-system.css?v=12">
 <style>
 /* ── Location Tree ── */
 .loc-tree{margin-top:.25rem}
@@ -76,7 +76,7 @@
 .room-meta-row{display:flex;align-items:center;gap:.35rem;margin-top:2px;flex-wrap:wrap}
 .room-type-tag{
   font-size:var(--fs-xs);padding:.1rem .4rem;border-radius:var(--radius-sm);font-weight:600;
-  text-transform:uppercase;letter-spacing:.3px;background:#f1f5f9;color:#64748b
+  text-transform:uppercase;letter-spacing:.3px;background:#f1f5f9;color:#475569
 }
 .sched-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0}
 .sched-dot.morning{background:#f59e0b}
@@ -181,7 +181,7 @@
 
 <main class="container">
   <div class="toolbar">
-    <h2 class="toolbar-title">Locations</h2>
+    <h1 class="toolbar-title">Locations</h1>
     <div class="flex items-center gap-sm" style="flex-wrap:wrap">
       <label class="form-check"><input type="checkbox" id="showInactive" onchange="loadTree()"> Show inactive</label>
       <button class="btn btn-outline btn-sm" onclick="openQRPrint()" style="display:inline-flex;align-items:center;gap:.35rem"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>Print All QR</button>
@@ -261,8 +261,8 @@
 
 
 <script src="/js/offline-sync.js?v=1"></script>
-<script src="/js/app.js?v=17"></script>
-<script src="/js/custom-select.js"></script>
+<script src="/js/app.js?v=18"></script>
+<script src="/js/custom-select.js?v=2"></script>
 <script>
 if (!App.initAdmin('locations')) throw '';
 App.initNotifications(App.apiFetch);
@@ -442,7 +442,7 @@ function renderNodes(nodes, depth) {
 
       html += '<div class="room-card' + inactiveC + '" data-id="' + n.id + '" data-name="' + esc(n.name) + '" data-type="' + n.type + '">' +
         '<div class="room-left">' +
-          '<div class="room-icon" style="background:' + ri.bg + ';color:' + ri.c + ';font-weight:700;font-size:.75rem;letter-spacing:.5px">' + ri.t + '</div>' +
+          '<div class="room-icon" style="background:' + ri.bg + ';color:#1e293b;font-weight:700;font-size:.75rem;letter-spacing:.5px">' + ri.t + '</div>' +
           '<div class="room-info">' +
             '<div class="room-name">' + esc(n.name) + ' ' + inactiveB + '</div>' +
             '<div class="room-meta-row">' +

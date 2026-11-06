@@ -92,8 +92,14 @@ Commands: `npm run bug:list` · `npm run bug:run -- <ID>` · `npm run bug:valida
 | BUG-0074 | MEDIUM | FIXED | ele | The AI assistant sent supervisors' and electricians' names to the outside AI provider | `apps/api/scenarios/bugs/bug-0074-ai-prompt-names-staff.js` |
 | BUG-0075 | HIGH | FIXED | ele | The privacy notice said photos are deleted after 7 days; they are kept 30 | `apps/api/scenarios/bugs/bug-0075-privacy-notice-wrong-photo-retention.js` |
 | BUG-0076 | MEDIUM | FIXED | ele | Electricians had no way to get a copy of their own data, and the staff export had no button | `apps/api/scenarios/bugs/bug-0076-electrician-cannot-export-own-data.js` |
+| BUG-0077 | LOW | FIXED | ele | An image that could not be re-encoded was stored as it came, metadata included | `apps/api/test/lib-storage.test.js` |
+| BUG-0078 | MEDIUM | FIXED | ele | The tabs on the alerts page could not be used by keyboard | `e2e/tests/forms.spec.js` |
+| BUG-0079 | MEDIUM | FIXED | ele | Dropdowns had no name for screen readers and only partial keyboard support | `e2e/tests/forms.spec.js` |
+| BUG-0080 | MEDIUM | FIXED | ele | Save did nothing when a required field was on another tab | `e2e/tests/forms.spec.js` |
+| BUG-0081 | MEDIUM | FIXED | ele | A resident erasure request could not be met before the 180-day cleanup | `apps/api/test/integration/erase-reporter.test.js` |
+| BUG-0082 | MEDIUM | FIXED | ele | The privacy notice named the wrong hosting provider | `apps/api/scenarios/bugs/bug-0082-privacy-notice-wrong-host.js` |
 
-Count: 76 bug scenario(s).
+Count: 82 bug scenario(s).
 
 ## BUG-0001 — Admin could set a ticket to RESOLVED_PENDING_VERIFY directly
 
@@ -1450,4 +1456,111 @@ Count: 76 bug scenario(s).
 1. Sign in as an electrician.
 2. Call GET /api/auth/worker-export.
 3. Broken: 404. Fixed: their own data.
+
+## BUG-0077 — An image that could not be re-encoded was stored as it came, metadata included
+
+- **Severity:** LOW · **Status:** FIXED · **Module:** ele · **Category:** privacy
+- **Origin:** Audit 2026-11
+- **Introduced:** pre-audit · **Fixed:** 2026-11-07
+- **Description:** lib/r2.js fell back to the original bytes when sharp failed. Re-encoding is what removes EXIF, so a photo cut short in transit kept the location it was taken at. AUD-11/13.
+- **Root cause:** The failure path favoured keeping the upload.
+- **Expected behavior:** A cut-short photo is recovered and re-encoded; one that cannot be read is refused.
+- **Broken behavior:** The original was stored unchanged.
+- **Scenario dependencies:** —
+- **Regression test:** `apps/api/test/lib-storage.test.js`
+
+**Reproduction steps:**
+
+1. Upload a JPEG with EXIF, cut short.
+2. Read the stored object.
+3. Broken: it is the original JPEG. Fixed: a WebP with no EXIF.
+
+## BUG-0078 — The tabs on the alerts page could not be used by keyboard
+
+- **Severity:** MEDIUM · **Status:** FIXED · **Module:** ele · **Category:** accessibility
+- **Origin:** Audit 2026-11
+- **Introduced:** pre-audit · **Fixed:** 2026-11-07
+- **Description:** The tabs were div elements with onclick, so they took no focus and were announced as plain text. Every tab row now shares App.initTabs.
+- **Root cause:** Each page built its own tabs.
+- **Expected behavior:** Tabs are buttons with tab roles and arrow keys.
+- **Broken behavior:** Keyboard users could not leave the Rules tab.
+- **Scenario dependencies:** —
+- **Regression test:** `e2e/tests/forms.spec.js`
+
+**Reproduction steps:**
+
+1. Open admin-alerts.
+2. Press Tab.
+3. Broken: focus skips the tabs. Fixed: arrow keys move between them.
+
+## BUG-0079 — Dropdowns had no name for screen readers and only partial keyboard support
+
+- **Severity:** MEDIUM · **Status:** FIXED · **Module:** ele · **Category:** accessibility
+- **Origin:** Audit 2026-11
+- **Introduced:** pre-audit · **Fixed:** 2026-11-07
+- **Description:** The styled trigger announced only its current value because the labelled select is hidden. Home, End and letters did nothing, and arrows started from the top rather than the selected item.
+- **Root cause:** The name stayed on the hidden native select.
+- **Expected behavior:** The trigger is a named combobox with the keys a native select has.
+- **Broken behavior:** A filter was read out as All Status, with no word of what it filtered.
+- **Scenario dependencies:** —
+- **Regression test:** `e2e/tests/forms.spec.js`
+
+**Reproduction steps:**
+
+1. Focus a filter on admin-assets with a screen reader.
+2. Broken: only the value is read. Fixed: its name is read too.
+
+## BUG-0080 — Save did nothing when a required field was on another tab
+
+- **Severity:** MEDIUM · **Status:** FIXED · **Module:** ele · **Category:** ux
+- **Origin:** Audit 2026-11
+- **Introduced:** pre-audit · **Fixed:** 2026-11-07
+- **Description:** In the electrician form, pressing Save from Personal or Notes with an empty name was refused by the browser, which cannot show a message on a hidden field, so nothing appeared to happen.
+- **Root cause:** Native validation cannot reach a hidden control.
+- **Expected behavior:** The tab with the empty field opens and the field takes focus.
+- **Broken behavior:** The button appeared dead.
+- **Scenario dependencies:** —
+- **Regression test:** `e2e/tests/forms.spec.js`
+
+**Reproduction steps:**
+
+1. Add an electrician.
+2. Open Notes and press Save.
+3. Broken: nothing happens. Fixed: Basic Info opens at Name.
+
+## BUG-0081 — A resident erasure request could not be met before the 180-day cleanup
+
+- **Severity:** MEDIUM · **Status:** FIXED · **Module:** ele · **Category:** privacy
+- **Origin:** Audit 2026-11
+- **Introduced:** pre-audit · **Fixed:** 2026-11-07
+- **Description:** The privacy notice offers erasure, but no tool cleared one person, so a request waited for the scheduled job. AUD-11/06.
+- **Root cause:** Only the scheduled job could clear guest details.
+- **Expected behavior:** An admin erases the reporter of one complaint; the ticket stays and the erasure is audited without the name.
+- **Broken behavior:** The details stayed until day 180.
+- **Scenario dependencies:** —
+- **Regression test:** `apps/api/test/integration/erase-reporter.test.js`
+
+**Reproduction steps:**
+
+1. Open a resident complaint as an admin.
+2. Press Erase this person’s details.
+3. Fixed: name, phone, address hash and browser string are gone, on the ticket and in its audit row.
+
+## BUG-0082 — The privacy notice named the wrong hosting provider
+
+- **Severity:** MEDIUM · **Status:** FIXED · **Module:** ele · **Category:** privacy
+- **Origin:** Audit 2026-11
+- **Introduced:** pre-audit · **Fixed:** 2026-11-07
+- **Description:** The notice said data was held on Google Cloud in Mumbai. Production runs on AWS EC2 in Mumbai (deploy.yml; the owner confirmed it, and the public address is in the ap-south-1 range). The project moved from Google Cloud to AWS and the notice was not updated. Cloudflare R2 holds photos and backups, and its location is not confirmed: AUD-11/14.
+- **Root cause:** The notice was written for an earlier host and not updated when the host changed.
+- **Expected behavior:** The notice names the providers the deployment really uses.
+- **Broken behavior:** The notice named a provider that does not hold the data.
+- **Scenario dependencies:** —
+- **Regression test:** `apps/api/scenarios/bugs/bug-0082-privacy-notice-wrong-host.js`
+
+**Reproduction steps:**
+
+1. Read section 4 of /privacy.
+2. Compare it with the AWS_HOST secret in deploy.yml.
+3. Broken: Google Cloud. Fixed: Amazon Web Services.
 

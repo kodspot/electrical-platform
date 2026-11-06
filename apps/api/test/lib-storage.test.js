@@ -100,6 +100,23 @@ describe('lib/r2 — local storage driver (M1)', () => {
   });
 });
 
+describe('an image that cannot be re-encoded [BUG-0077]', () => {
+  it('is refused, not stored: the original can carry the location it was taken at', async () => {
+    const junk = Buffer.concat([Buffer.from([0xFF, 0xD8, 0xFF, 0xE0]), Buffer.from('Exif GPS 17.38 78.48, not really an image')]);
+    await assert.rejects(uploadToR2(junk, 'image/jpeg', 'org-refused'), (err) => err.statusCode === 400 && /could not be read/.test(err.message));
+    assert.equal(fs.existsSync(path.join(TMP_ROOT, 'uploads', 'org-refused')), false);
+  });
+
+  it('still accepts a photo cut short by a weak signal, re-encoded without its metadata', async () => {
+    const photo = await sharp({ create: { width: 400, height: 300, channels: 3, background: { r: 90, g: 20, b: 200 } } })
+      .withExif({ IFD3: { GPSLatitude: '17/1 23/1 0/1' } }).jpeg().toBuffer();
+    const url = await uploadToR2(photo.subarray(0, Math.floor(photo.length * 0.8)), 'image/jpeg', 'org-abc');
+    const meta = await sharp(fs.readFileSync(path.join(TMP_ROOT, url.slice('/images/'.length)))).metadata();
+    assert.equal(meta.format, 'webp');
+    assert.equal(meta.exif, undefined);
+  });
+});
+
 describe('validateImageBuffer — magic-byte check before any image reaches sharp', () => {
   const { validateImageBuffer } = require('../src/errors');
   const jpeg = Buffer.from([0xFF, 0xD8, 0xFF, 0xE0, 0, 0]);

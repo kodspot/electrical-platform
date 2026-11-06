@@ -9,11 +9,11 @@
 <link rel="manifest" href="/site.webmanifest">
 <meta name="theme-color" content="#1E40AF">
 <title>Alerts & Automation — Admin</title>
-<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/css/design-system.css?v=11">
+<link rel="preload" href="/css/inter-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="/css/design-system.css?v=12">
 <style>
 .tabs{display:flex;border-bottom:2px solid var(--border);margin-bottom:1rem;gap:0}
-.tab{padding:.55rem 1.1rem;font-size:.82rem;font-weight:600;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-2px;color:var(--text-muted);transition:all .15s}
+.tab{padding:.55rem 1.1rem;font-size:.82rem;font-weight:600;cursor:pointer;background:none;border:0;border-bottom:2px solid transparent;margin-bottom:-2px;color:var(--text-muted);transition:all .15s}
 .tab:hover{color:var(--text)}
 .tab.active{color:var(--primary);border-bottom-color:var(--primary)}
 .tab-panel{display:none}.tab-panel.active{display:block}
@@ -92,9 +92,9 @@
 
   <!-- Tabs -->
   <div class="tabs">
-    <div class="tab active" onclick="switchTab('rules')">Rules</div>
-    <div class="tab" onclick="switchTab('history')">Alert History</div>
-    <div class="tab" onclick="switchTab('insights')">AI Insights</div>
+    <button class="tab active" onclick="switchTab('rules')">Rules</button>
+    <button class="tab" onclick="switchTab('history')">Alert History</button>
+    <button class="tab" onclick="switchTab('insights')">AI Insights</button>
   </div>
 
   <!-- ═══ RULES TAB ═══ -->
@@ -227,7 +227,7 @@
 </div>
 
 <script src="/js/offline-sync.js?v=1"></script>
-<script src="/js/app.js?v=17"></script>
+<script src="/js/app.js?v=18"></script>
 <script>
 if (!App.initAdmin('admin-alerts')) throw '';
 var esc = App.esc, $ = App.$, apiFetch = App.apiFetch;

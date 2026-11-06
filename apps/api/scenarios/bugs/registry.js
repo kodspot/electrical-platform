@@ -84,7 +84,13 @@ const BUGS_LIST = [
   require('./bug-0073-failed-load-shown-as-empty'),
   require('./bug-0074-ai-prompt-names-staff'),
   require('./bug-0075-privacy-notice-wrong-photo-retention'),
-  require('./bug-0076-electrician-cannot-export-own-data')
+  require('./bug-0076-electrician-cannot-export-own-data'),
+  require('./bug-0077-unreadable-image-stored-with-metadata'),
+  require('./bug-0078-alert-tabs-keyboard'),
+  require('./bug-0079-dropdown-no-name-or-full-keyboard'),
+  require('./bug-0080-required-field-on-hidden-tab'),
+  require('./bug-0081-no-way-to-erase-one-resident'),
+  require('./bug-0082-privacy-notice-wrong-host')
 ];
 
 const BUGS = Object.fromEntries(BUGS_LIST.map((b) => [b.id, b]));

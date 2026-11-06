@@ -38,10 +38,9 @@ in the repository; they are marked **owner to confirm**.
 
 | Recipient | What | Why | Owner to confirm |
 |---|---|---|---|
-| Cloudflare R2 | Photos, encrypted database backups | Storage | Contract, region |
+| Cloudflare R2 | Photos, and database backups (gzip files, encrypted only by Cloudflare at rest: AUD-11/15) | Storage | Contract, region (AUD-11/14) |
 | Amazon SES | Staff email address, ticket details in the email | Notifications | Contract, region |
 | Google Gemini or Azure OpenAI (only if AI is switched on) | Location names, shift and status counts, ticket titles, and chat text | AI summaries | Contract, region, the "no training" and "no retention" claims in the notice |
-| Google Fonts | Each visitor's IP address, on every page load | Web font | Roadmap: self-host the font (AUD-11/09) |
 | GitHub | No production personal data | Code and CI | Nothing |
 | The hosting provider | Everything, at rest on the server | Hosting | Provider, region, disk encryption |
 
@@ -54,5 +53,5 @@ could still contain a name, because it is sent as written.
 |---|---|
 | Access, portability | "Download my data" in the account menu (`/auth/export`, `/auth/worker-export`) |
 | Correction | Profile screen for contact details; otherwise the admin |
-| Erasure | The admin deletes the person; residents write to the Grievance Officer. There is no built-in erasure of a named resident before 180 days (AUD-11/06) |
+| Erasure | The admin deletes the person. Residents write to the Grievance Officer, and an admin uses "Erase this person's details" on the complaint (`POST /tickets/:id/erase-reporter`) |
 | Grievance | `privacy@kodspot.in`, named in the privacy notice |

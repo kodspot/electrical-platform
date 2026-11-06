@@ -9,8 +9,8 @@
 <link rel="manifest" href="/site.webmanifest">
 <meta name="theme-color" content="#1E40AF">
 <title>Analytics — Kodspot</title>
-<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/css/design-system.css?v=11">
+<link rel="preload" href="/css/inter-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="/css/design-system.css?v=12">
 <style>
 /* ── Period Selector ── */
 .period-bar{display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;margin-bottom:1rem}
@@ -197,6 +197,7 @@
 <div class="sa-banner" id="sa-banner"></div>
 
 <main class="container">
+  <h1 class="sr-only">Analytics</h1>
   <!-- Period Selector -->
   <div class="period-bar" id="periodBar">
     <button class="period-btn active" data-period="today">Today</button>
@@ -250,14 +251,14 @@
     <div class="an-title">Location Status Heatmap <span id="hmCount" style="font-size:var(--fs-xs);font-weight:400;color:var(--text-muted)"></span></div>
     <div id="hmToolbar"></div>
     <div id="hmLegend"></div>
-    <div class="hm-wrap" style="max-height:450px;overflow-y:auto" id="hmBody"></div>
+    <div class="hm-wrap" style="max-height:450px;overflow-y:auto" id="hmBody" data-scroll aria-label="Location status heatmap"></div>
   </div>
 
   <!-- Location Breakdown -->
   <div class="an-section">
     <div class="an-title">Location Breakdown <span id="locCount" style="font-size:var(--fs-xs);font-weight:400;color:var(--text-muted)"></span></div>
     <div id="locToolbar"></div>
-    <div style="max-height:400px;overflow-y:auto" id="locTable"></div>
+    <div style="max-height:400px;overflow-y:auto" id="locTable" data-scroll aria-label="Location breakdown"></div>
   </div>
 
   <!-- Row 2: Tickets + Issue Types -->
@@ -292,8 +293,8 @@
 </main>
 
 <script src="/js/offline-sync.js?v=1"></script>
-<script src="/js/app.js?v=17"></script>
-<script src="/js/custom-select.js"></script>
+<script src="/js/app.js?v=18"></script>
+<script src="/js/custom-select.js?v=2"></script>
 <script>
 if (!App.initAdmin('analytics')) throw '';
 App.initNotifications(App.apiFetch);
@@ -683,7 +684,7 @@ function renderHeatmap() {
       var tip = esc(dates[c] + ': ' + (statusTip[day.status] || day.status) + (day.done > 0 ? ' (' + day.done + '/' + day.required + ')' : ''));
       html += '<td><div class="hm-cell ' + cls + '" title="' + tip + '"></div></td>';
     }
-    var scoreColor = loc.score >= 80 ? '#10b981' : loc.score >= 50 ? '#f59e0b' : '#ef4444';
+    var scoreColor = loc.score >= 80 ? 'var(--success-text)' : loc.score >= 50 ? 'var(--warning-text)' : 'var(--danger-text)';
     html += '<td><span class="hm-score" style="color:' + scoreColor + '">' + loc.score + '%</span></td></tr>';
   }
 

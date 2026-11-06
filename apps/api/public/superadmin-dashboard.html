@@ -9,8 +9,8 @@
 <link rel="manifest" href="/site.webmanifest">
 <meta name="theme-color" content="#1E40AF">
 <title>Super Admin — Kodspot</title>
-<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/css/design-system.css?v=11">
+<link rel="preload" href="/css/inter-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="/css/design-system.css?v=12">
 <style>
 :root { --sa: #4338CA; --sa-hover: #3730A3; --sa-light: #EEF2FF; --sa-border: #C7D2FE; }
 .topbar-sa { background: var(--sa); }
@@ -53,6 +53,11 @@
 .sa-table .name-cell b { font-weight: 600; }
 .sa-table .actions-cell { white-space: nowrap; }
 .sa-table .actions-cell .btn { font-size:var(--fs-xs); padding: .2rem .5rem; margin-right: .25rem; }
+.row-menu { display: inline-block; }
+.row-menu-list { position: fixed; z-index: 400; min-width: 170px; padding: .25rem; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: 0 8px 24px rgba(15,23,42,.18); }
+.row-menu-list button { display: block; width: 100%; min-height: 40px; padding: .4rem .6rem; border: 0; border-radius: var(--radius-sm); background: none; color: var(--text); font: inherit; font-size: .82rem; text-align: left; cursor: pointer; }
+.row-menu-list button:hover, .row-menu-list button:focus-visible { background: var(--sa-light); }
+.row-menu-list .row-menu-danger { color: var(--danger-text); }
 
 /* Status badges */
 .status-badge { display: inline-block; padding: .15rem .5rem; border-radius: 10px; font-size:var(--fs-xs); font-weight: 600; }
@@ -197,7 +202,10 @@
   <div class="topbar-left">
     <span class="topbar-brand">Kodspot</span>
     <span class="sa-badge">Super Admin</span>
-    <a href="/superadmin-quality" class="btn btn-sm btn-ghost" style="margin-left:.5rem" data-testid="nav-quality">Quality</a>
+    <div class="q-nav">
+      <a href="/superadmin-dashboard" aria-current="page">Dashboard</a>
+      <a href="/superadmin-quality" data-testid="nav-quality">Quality</a>
+    </div>
   </div>
   <div class="topbar-right">
     <span class="topbar-user" id="userName"></span>
@@ -206,6 +214,7 @@
 </nav>
 
 <main class="container" style="max-width:1100px">
+  <h1 class="sr-only">Super Admin</h1>
   <!-- Stats -->
   <div class="sa-stats" id="statsGrid">
     <div class="skeleton skeleton-card"></div><div class="skeleton skeleton-card"></div>
@@ -232,7 +241,7 @@
       <button class="btn btn-sa" onclick="openOrgModal()">+ New Organization</button>
     </div>
     <div class="table-wrap">
-      <table class="sa-table"><thead><tr>
+      <table class="sa-table table-cards"><thead><tr>
         <th>Name</th><th>Type</th><th class="hide-mobile">Modules</th><th class="hide-mobile">AI</th><th class="hide-mobile">Phone</th><th>Status</th>
         <th class="hide-mobile">Users</th><th class="hide-mobile">Electricians</th><th>Actions</th>
       </tr></thead><tbody id="orgBody"><tr><td colspan="9" class="loading-center">Loading…</td></tr></tbody></table>
@@ -247,7 +256,7 @@
       <button class="btn btn-sa" onclick="openAdminModal()">+ New Admin</button>
     </div>
     <div class="table-wrap">
-      <table class="sa-table"><thead><tr>
+      <table class="sa-table table-cards"><thead><tr>
         <th>Name</th><th>Email</th><th class="hide-mobile">Phone</th><th class="hide-mobile">Organization</th><th>Status</th><th>Actions</th>
       </tr></thead><tbody id="adminBody"><tr><td colspan="6" class="loading-center">Loading…</td></tr></tbody></table>
     </div>
@@ -261,7 +270,7 @@
       <button class="btn btn-sa" onclick="openSupModal()">+ New Supervisor</button>
     </div>
     <div class="table-wrap">
-      <table class="sa-table"><thead><tr>
+      <table class="sa-table table-cards"><thead><tr>
         <th>Name</th><th>Email</th><th class="hide-mobile">Phone</th><th class="hide-mobile">Organization</th><th>Status</th><th>Actions</th>
       </tr></thead><tbody id="supBody"><tr><td colspan="6" class="loading-center">Loading…</td></tr></tbody></table>
     </div>
@@ -275,7 +284,7 @@
       <button class="btn btn-sa" onclick="openWorkerModal()">+ New Electrician</button>
     </div>
     <div class="table-wrap">
-      <table class="sa-table"><thead><tr>
+      <table class="sa-table table-cards"><thead><tr>
         <th>Name</th><th>Emp ID</th><th class="hide-mobile">Phone</th><th class="hide-mobile">Dept</th><th>Records</th><th>Actions</th>
       </tr></thead><tbody id="workerBody"><tr><td colspan="6" class="empty-state">Select an organization above</td></tr></tbody></table>
     </div>
@@ -315,7 +324,7 @@
       <div class="cc-card">
         <div class="cc-card-title">Module Catalog</div>
         <div class="table-wrap">
-          <table class="sa-table">
+          <table class="sa-table table-cards">
             <thead>
               <tr>
                 <th>Code</th>
@@ -656,8 +665,8 @@
 </div>
 
 <script src="/js/offline-sync.js?v=1"></script>
-<script src="/js/app.js?v=17"></script>
-<script src="/js/custom-select.js"></script>
+<script src="/js/app.js?v=18"></script>
+<script src="/js/custom-select.js?v=2"></script>
 <script>
 var esc = App.esc, $ = App.$, fmtDate = App.fmtDate;
 
@@ -1016,9 +1025,12 @@ async function loadOrgs() {
       '<td class="actions-cell">' +
         '<button class="btn btn-sm btn-sa" onclick="enterOrg(\'' + o.id + '\',\'' + App.escJs(o.name) + '\',\'' + App.escJs(o.slug || '') + '\')">Enter</button>' +
         '<button class="btn btn-sm btn-outline" onclick="editOrg(\'' + o.id + '\')">Edit</button>' +
-        '<button class="btn btn-sm btn-outline" onclick="openAiConfig(\'' + o.id + '\',\'' + App.escJs(o.name) + '\')" title="AI Assistant Config">🤖</button>' +
-        '<button class="btn btn-sm btn-outline" onclick="showLoginQR(\'' + o.id + '\')" title="Login QR Codes">QR</button>' +
-        (o.status !== 'DELETED' ? '<button class="btn btn-sm btn-danger" onclick="deleteOrg(\'' + o.id + '\')">Delete</button>' : '') +
+        '<div class="row-menu"><button type="button" class="btn btn-sm btn-outline" aria-haspopup="menu" aria-expanded="false" onclick="toggleRowMenu(this)">More</button>' +
+          '<div class="row-menu-list" role="menu" hidden>' +
+            '<button type="button" role="menuitem" onclick="openAiConfig(\'' + o.id + '\',\'' + App.escJs(o.name) + '\')">AI settings</button>' +
+            '<button type="button" role="menuitem" onclick="showLoginQR(\'' + o.id + '\')">Login QR codes</button>' +
+            (o.status !== 'DELETED' ? '<button type="button" role="menuitem" class="row-menu-danger" onclick="deleteOrg(\'' + o.id + '\')">Delete</button>' : '') +
+          '</div></div>' +
       '</td></tr>';
   }).join('');
 }
@@ -1126,6 +1138,43 @@ $('orgForm').addEventListener('submit', async function(e) {
   App.closeModal('orgModal'); App.toast(id ? 'Organization updated' : 'Organization created', 'success');
   loadOrgs(); loadStats();
 });
+
+// The table scrolls, so the menu is placed against the window, not inside the row.
+var _rowMenu = null;
+function closeRowMenu(refocus) {
+  if (!_rowMenu) return;
+  _rowMenu.btn.setAttribute('aria-expanded', 'false');
+  _rowMenu.list.hidden = true;
+  if (refocus) _rowMenu.btn.focus();
+  _rowMenu = null;
+}
+function toggleRowMenu(btn) {
+  var wasOpen = _rowMenu && _rowMenu.btn === btn;
+  closeRowMenu();
+  if (wasOpen) return;
+  var list = btn.nextElementSibling;
+  list.hidden = false;
+  btn.setAttribute('aria-expanded', 'true');
+  var r = btn.getBoundingClientRect();
+  list.style.left = Math.max(8, Math.min(r.left, window.innerWidth - list.offsetWidth - 8)) + 'px';
+  list.style.top = (r.bottom + list.offsetHeight + 8 > window.innerHeight ? r.top - list.offsetHeight - 4 : r.bottom + 4) + 'px';
+  _rowMenu = { btn: btn, list: list };
+  list.querySelector('button').focus();
+}
+document.addEventListener('click', function(e) {
+  if (_rowMenu && !e.target.closest('.row-menu')) closeRowMenu();
+  else if (_rowMenu && e.target.closest('.row-menu-list')) closeRowMenu();
+});
+document.addEventListener('keydown', function(e) {
+  if (!_rowMenu) return;
+  if (e.key === 'Escape') { e.stopPropagation(); closeRowMenu(true); return; }
+  if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
+  e.preventDefault();
+  var items = _rowMenu.list.querySelectorAll('button');
+  var at = Array.prototype.indexOf.call(items, document.activeElement);
+  items[(at + (e.key === 'ArrowDown' ? 1 : items.length - 1)) % items.length].focus();
+});
+window.addEventListener('scroll', function() { closeRowMenu(); }, true);
 
 async function deleteOrg(id) {
   if (!await App.confirmDialog('Delete this organization? It will be purged after 30 days.')) return;

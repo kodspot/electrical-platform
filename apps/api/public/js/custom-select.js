@@ -38,6 +38,7 @@
     var trigger = document.createElement('button');
     trigger.type = 'button';
     trigger.className = 'cs-trigger';
+    trigger.setAttribute('role', 'combobox');
     trigger.setAttribute('aria-haspopup', 'listbox');
     trigger.setAttribute('aria-expanded', 'false');
     if (sel.id) trigger.setAttribute('aria-controls', 'cs-list-' + sel.id);
@@ -75,6 +76,7 @@
         var opt = options[i];
         var item = document.createElement('div');
         item.className = 'cs-option';
+        if (dropdown.id) item.id = dropdown.id + '-' + i;
         item.setAttribute('role', 'option');
         item.setAttribute('data-value', opt.value);
         item.textContent = opt.textContent;
@@ -91,9 +93,20 @@
       updateTriggerText();
     }
 
+    // The native select is hidden from assistive technology, so its name moves to the trigger.
+    function labelText() {
+      var label = sel.getAttribute('aria-label');
+      if (label) return label;
+      var before = wrap.previousElementSibling;
+      var el = (sel.labels && sel.labels[0]) || (before && before.matches('label.form-label') ? before : null);
+      return el ? el.textContent.replace(/\s*\*\s*$/, '').trim() : '';
+    }
+
     function updateTriggerText() {
       var selected = sel.options[sel.selectedIndex];
       triggerText.textContent = selected ? selected.textContent : '';
+      var name = labelText() || triggerText.textContent;
+      if (name) trigger.setAttribute('aria-label', name);
       // Mark trigger empty-state if placeholder option selected (value="")
       if (selected && selected.value === '') {
         trigger.classList.add('cs-placeholder');
@@ -114,11 +127,8 @@
       var modal = wrap.closest('.modal');
       if (modal) modal.style.overflow = 'visible';
 
-      // Scroll selected item into view
-      var selectedEl = dropdown.querySelector('.cs-option-selected');
-      if (selectedEl) {
-        selectedEl.scrollIntoView({ block: 'nearest' });
-      }
+      // Start from the selected item, as a native select does
+      focusItem(Array.prototype.indexOf.call(enabledItems(), dropdown.querySelector('.cs-option-selected')));
 
       // Position dropdown above if not enough space below
       positionDropdown();
@@ -128,6 +138,7 @@
       dropdown.classList.remove('cs-open', 'cs-above', 'cs-align-right');
       trigger.setAttribute('aria-expanded', 'false');
       trigger.classList.remove('cs-active');
+      trigger.removeAttribute('aria-activedescendant');
       if (_openDropdown === wrap) _openDropdown = null;
       _focusIdx = -1;
 
@@ -176,12 +187,55 @@
 
     // Keyboard navigation
     var _focusIdx = -1;
+    var _typed = '';
+    var _typedAt = 0;
+
+    function enabledItems() {
+      return dropdown.querySelectorAll('.cs-option:not(.cs-option-disabled)');
+    }
+
+    function focusItem(idx) {
+      var items = enabledItems();
+      items.forEach(function (o) { o.classList.remove('cs-option-focus'); });
+      _focusIdx = idx;
+      if (idx < 0 || idx >= items.length) { trigger.removeAttribute('aria-activedescendant'); return; }
+      items[idx].classList.add('cs-option-focus');
+      items[idx].scrollIntoView({ block: 'nearest' });
+      if (items[idx].id) trigger.setAttribute('aria-activedescendant', items[idx].id);
+    }
+
+    // Letters jump to the next option that starts with them.
+    function typeAhead(key) {
+      var now = Date.now();
+      _typed = now - _typedAt > 700 ? key : _typed + key;
+      _typedAt = now;
+      var items = enabledItems();
+      for (var i = 0; i < items.length; i++) {
+        var at = (_focusIdx + (_typed.length === 1 ? 1 : 0) + i) % items.length;
+        if (items[at].textContent.trim().toLowerCase().indexOf(_typed) === 0) { focusItem(at); return; }
+      }
+    }
+
+    trigger.addEventListener('focus', updateTriggerText);
+    sel.addEventListener('focus', function () { trigger.focus(); });
+
     trigger.addEventListener('keydown', function (e) {
-      if (e.key === 'Enter' || e.key === ' ') {
+      var open = dropdown.classList.contains('cs-open');
+      if (e.key === 'Tab') {
+        if (open) closeDropdown();
+      } else if (e.key === 'Home' || e.key === 'End') {
+        if (!open) return;
+        e.preventDefault();
+        focusItem(e.key === 'Home' ? 0 : enabledItems().length - 1);
+      } else if (e.key.length === 1 && e.key !== ' ' && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        e.preventDefault();
+        if (!open) openDropdown();
+        typeAhead(e.key.toLowerCase());
+      } else if (e.key === 'Enter' || e.key === ' ') {
         e.preventDefault();
         if (dropdown.classList.contains('cs-open')) {
           // Select focused item
-          var items = dropdown.querySelectorAll('.cs-option:not(.cs-option-disabled)');
+          var items = enabledItems();
           if (_focusIdx >= 0 && _focusIdx < items.length) {
             items[_focusIdx].click();
           } else {
@@ -191,21 +245,20 @@
           openDropdown();
         }
       } else if (e.key === 'Escape') {
+        if (!open) return; // Escape then belongs to the modal around the select
+        e.stopPropagation();
         closeDropdown();
         trigger.focus();
       } else if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
         e.preventDefault();
         if (!dropdown.classList.contains('cs-open')) { openDropdown(); return; }
-        var items = dropdown.querySelectorAll('.cs-option:not(.cs-option-disabled)');
+        var items = enabledItems();
         if (!items.length) return;
         if (e.key === 'ArrowDown') {
-          _focusIdx = _focusIdx < items.length - 1 ? _focusIdx + 1 : 0;
+          focusItem(_focusIdx < items.length - 1 ? _focusIdx + 1 : 0);
         } else {
-          _focusIdx = _focusIdx > 0 ? _focusIdx - 1 : items.length - 1;
+          focusItem(_focusIdx > 0 ? _focusIdx - 1 : items.length - 1);
         }
-        items.forEach(function (o) { o.classList.remove('cs-option-focus'); });
-        items[_focusIdx].classList.add('cs-option-focus');
-        items[_focusIdx].scrollIntoView({ block: 'nearest' });
       }
     });
 

@@ -9,8 +9,8 @@
 <link rel="manifest" href="/site.webmanifest">
 <meta name="theme-color" content="#0891b2">
 <title>Asset Failures — Kodspot</title>
-<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/css/design-system.css?v=11">
+<link rel="preload" href="/css/inter-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="/css/design-system.css?v=12">
 <style>
 .page-title{display:flex;align-items:center;gap:.5rem;margin-bottom:1.25rem;flex-wrap:wrap;justify-content:space-between}
 .page-title h1{font-size:1.25rem;font-weight:700;margin:0}
@@ -48,9 +48,9 @@
 .sev-critical{background:rgba(239,68,68,.2);color:var(--danger);font-weight:700}
 
 /* Failure status */
-.fs-open{background:rgba(239,68,68,.1);color:var(--danger)}
+.fs-open{background:rgba(239,68,68,.1);color:var(--danger-text)}
 .fs-acknowledged{background:rgba(245,158,11,.1);color:var(--warning-text)}
-.fs-in_progress{background:rgba(8,145,178,.1);color:#0891b2}
+.fs-in_progress{background:rgba(8,145,178,.1);color:var(--primary-text)}
 .fs-resolved{background:rgba(16,185,129,.1);color:var(--success)}
 .fs-closed{background:rgba(120,120,120,.1);color:var(--text-muted)}
 
@@ -85,7 +85,7 @@
 
 <main class="container">
   <div class="page-title">
-    <h1>🔴 Asset Failures</h1>
+    <h1>Asset Failures</h1>
     <div style="display:flex;gap:.5rem">
       <button class="btn btn-sm btn-outline" onclick="exportCSV()">CSV</button>
       <button class="btn btn-sm btn-danger" onclick="openReportModal()">+ Report Failure</button>
@@ -126,7 +126,7 @@
 
   <div class="section">
     <div class="table-wrap">
-      <table class="f-tbl">
+      <table class="f-tbl table-cards">
         <thead>
           <tr>
             <th>Asset</th><th>Title</th><th>Severity</th><th>Status</th>
@@ -191,7 +191,7 @@
 </div>
 
 <script src="/js/offline-sync.js?v=1"></script>
-<script src="/js/app.js?v=17"></script>
+<script src="/js/app.js?v=18"></script>
 <script>
 if (!App.initAdmin('failures')) throw '';
 App.initNotifications(App.apiFetch);

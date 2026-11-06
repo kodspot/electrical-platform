@@ -507,7 +507,9 @@ test.describe('Forms — admin, supervisor, electrician', () => {
     await expect(page.getByText('Organization not found')).toHaveCount(0);
 
     await page.goto('/superadmin-dashboard');
-    await page.locator('#orgBody tr', { hasText: `${name} (renamed)` }).getByRole('button', { name: 'Delete' }).click();
+    const renamed = page.locator('#orgBody tr', { hasText: `${name} (renamed)` });
+    await renamed.getByRole('button', { name: 'More' }).click();
+    await renamed.getByRole('menuitem', { name: 'Delete' }).click();
     await confirmYes(page);
     await expect.poll(async () => (await db().organization.findUnique({ where: { id: org.id } }))?.status ?? 'GONE').not.toBe('ACTIVE');
   });
@@ -746,4 +748,123 @@ test.describe('Forms — admin, supervisor, electrician', () => {
       }
     });
   }
+});
+
+test.describe('Polish — keyboard, tabs, plain words and phone tables', () => {
+  let s, x, slug;
+  test.beforeAll(() => { s = seed(); x = s.explorer; slug = x.org.slug; });
+
+  test('[polish] the alerts tabs work by keyboard [BUG-0078]', async ({ page }) => {
+    await signIn(page, 'admin', x.admin, slug);
+    await page.goto(orgPage(slug, 'admin-alerts'));
+    const rules = page.getByRole('tab', { name: 'Rules' });
+    await expect(rules).toHaveAttribute('aria-selected', 'true');
+    await rules.focus();
+    await page.keyboard.press('ArrowRight');
+    const history = page.getByRole('tab', { name: 'Alert History' });
+    await expect(history).toHaveAttribute('aria-selected', 'true');
+    await expect(history).toBeFocused();
+    await expect(page.locator('#panel-history')).toBeVisible();
+    await page.keyboard.press('Home');
+    await expect(rules).toBeFocused();
+    await expect(page.locator('#panel-rules')).toBeVisible();
+  });
+
+  test('[polish] a dropdown has a name and works by keyboard [BUG-0079]', async ({ page }) => {
+    await signIn(page, 'admin', x.admin, slug);
+    await page.goto(orgPage(slug, 'admin-tickets'));
+    const status = page.getByRole('combobox', { name: 'Filter by status' });
+    await status.focus();
+    await page.keyboard.press('Enter');
+    await expect(page.locator('#cs-list-filterStatus .cs-option-focus')).toHaveText('All Status');
+    await page.keyboard.press('End');
+    await expect(page.locator('#cs-list-filterStatus .cs-option-focus')).toHaveText('Closed');
+    await page.keyboard.press('Enter');
+    await expect(page.locator('#filterStatus')).toHaveValue('CLOSED');
+    await page.keyboard.press('ArrowDown');
+    await expect(page.locator('#cs-list-filterStatus .cs-option-focus')).toHaveText('Closed');
+    await page.keyboard.press('w');
+    await expect(page.locator('#cs-list-filterStatus .cs-option-focus')).toHaveText('Waiting for check');
+    await page.keyboard.press('Tab');
+    await expect(page.locator('#cs-list-filterStatus')).toBeHidden();
+    await expect(page.locator('#filterStatus')).toHaveValue('CLOSED');
+  });
+
+  test('[polish] saving from another tab shows the empty required field [BUG-0080]', async ({ page }) => {
+    await signIn(page, 'admin', x.admin, slug);
+    await page.goto(orgPage(slug, 'admin-workers'));
+    await page.getByRole('button', { name: '+ Add Electrician' }).click();
+    await page.getByRole('tab', { name: 'Notes' }).click();
+    await page.locator('#saveBtn').click();
+    await expect(page.locator('#wName')).toBeVisible();
+    await expect(page.locator('#wName')).toBeFocused();
+    await expect(page.getByRole('tab', { name: 'Basic Info' })).toHaveAttribute('aria-selected', 'true');
+  });
+
+  test('[polish] admin pages use the same status words as the field app', async ({ page }) => {
+    const title = `Plain words ${s.run}`;
+    await db().ticket.create({ data: { orgId: x.org.id, locationId: x.locationId, title, status: 'IN_PROGRESS', priority: 'URGENT', source: 'INTERNAL', module: 'ele' } });
+    await signIn(page, 'admin', x.admin, slug);
+    await page.goto(orgPage(slug, 'admin-tickets'));
+    const row = page.locator('#ticketBody tr', { hasText: title });
+    await expect(row.locator('td[data-label="Status"]')).toHaveText('In progress');
+    await expect(row.locator('td[data-label="Priority"]')).toHaveText('Urgent');
+    await page.goto(orgPage(slug, 'admin-dashboard'));
+    await expect(page.locator('#ticketList tr', { hasText: title })).toContainText('In progress');
+  });
+
+  test('[polish] an admin can erase one resident from a complaint [BUG-0081]', async ({ page }) => {
+    const title = `Erase me ${s.run}`;
+    const ticket = await db().ticket.create({ data: { orgId: x.org.id, locationId: x.locationId, title, source: 'PUBLIC', module: 'ele', guestName: 'Asha Rao', guestPhone: '+91 98765 43210' } });
+    await signIn(page, 'admin', x.admin, slug);
+    await page.goto(orgPage(slug, 'admin-tickets'));
+    await page.locator('#ticketBody tr', { hasText: title }).getByRole('button', { name: 'View' }).click();
+    await expect(page.locator('#detailContent')).toContainText('Asha Rao');
+    await page.getByRole('button', { name: "Erase this person's details" }).click();
+    await confirmYes(page);
+    await expect(page.locator('#detailContent')).toContainText('Anonymous');
+    await expect(page.getByRole('button', { name: "Erase this person's details" })).toHaveCount(0);
+    const after = await db().ticket.findUnique({ where: { id: ticket.id } });
+    expect([after.guestName, after.guestPhone]).toEqual([null, null]);
+  });
+
+  test('[polish] on a phone, a data table reads as cards with no sideways scroll', async ({ page }) => {
+    const code = `EXPL-A1-${s.run}`;
+    await signIn(page, 'admin', x.admin, slug);
+    await page.setViewportSize({ width: 390, height: 800 });
+    await page.goto(orgPage(slug, 'admin-assets'));
+    const cell = page.locator('tbody tr', { hasText: code }).locator('td').first();
+    await expect(cell).toBeVisible();
+    await expect(cell).toHaveAttribute('data-label', /.+/);
+    const wrap = await page.locator('.table-wrap').first().evaluate((el) => ({ s: el.scrollWidth, c: el.clientWidth }));
+    expect(wrap.s).toBeLessThanOrEqual(wrap.c + 1);
+  });
+
+  test('[polish] on a phone, a card label never sits on top of its value', async ({ page }) => {
+    await signIn(page, 'superadmin', s.superAdmin);
+    await page.setViewportSize({ width: 390, height: 800 });
+    await page.goto('/superadmin-dashboard');
+    const cell = page.locator('#orgBody td[data-label]').first();
+    await expect(cell).toBeVisible();
+    const gap = await cell.evaluate((td) => {
+      const padding = parseFloat(getComputedStyle(td).paddingLeft);
+      const label = parseFloat(getComputedStyle(td, '::before').width);
+      return padding - label;
+    });
+    expect(gap).toBeGreaterThan(0);
+  });
+
+  test('[polish] the super-admin row keeps Delete behind More', async ({ page }) => {
+    const org = await db().organization.findUnique({ where: { id: x.org.id } });
+    await signIn(page, 'superadmin', s.superAdmin);
+    await page.goto('/superadmin-dashboard');
+    const row = page.locator('#orgBody tr', { hasText: org.name });
+    await expect(row.getByRole('button', { name: 'Enter' })).toBeVisible();
+    await expect(row.getByRole('menuitem', { name: 'Delete' })).toBeHidden();
+    await row.getByRole('button', { name: 'More' }).click();
+    await expect(row.getByRole('menuitem', { name: 'Delete' })).toBeVisible();
+    await expect(row.getByRole('menuitem', { name: 'AI settings' })).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(row.getByRole('menuitem', { name: 'Delete' })).toBeHidden();
+  });
 });

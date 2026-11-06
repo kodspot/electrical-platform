@@ -1463,6 +1463,64 @@ window.App = (function () {
   }
 
   // A region that scrolls sideways must be reachable by keyboard, and only then.
+  // ─── Tabs ───
+  // Each page keeps its own switching (onclick toggles .active); this adds the roles and the
+  // keyboard, and keeps aria-selected in step however the tab was changed.
+  function initTabs(list) {
+    var tabs = list.querySelectorAll('button');
+    if (!tabs.length || list.getAttribute('role') === 'tablist') return;
+    list.setAttribute('role', 'tablist');
+    function sync() {
+      Array.prototype.forEach.call(tabs, function (t) {
+        var on = t.classList.contains('active');
+        t.setAttribute('aria-selected', String(on));
+        t.setAttribute('tabindex', on ? '0' : '-1');
+      });
+    }
+    Array.prototype.forEach.call(tabs, function (t) {
+      t.setAttribute('role', 'tab');
+      t.type = 'button';
+    });
+    list.addEventListener('keydown', function (e) {
+      var at = Array.prototype.indexOf.call(tabs, document.activeElement);
+      if (at < 0) return;
+      var next = e.key === 'ArrowRight' ? (at + 1) % tabs.length
+        : e.key === 'ArrowLeft' ? (at - 1 + tabs.length) % tabs.length
+        : e.key === 'Home' ? 0 : e.key === 'End' ? tabs.length - 1 : -1;
+      if (next < 0) return;
+      e.preventDefault();
+      tabs[next].click();
+      tabs[next].focus();
+    });
+    if (window.MutationObserver) new MutationObserver(sync).observe(list, { attributes: true, attributeFilter: ['class'], subtree: true });
+    sync();
+  }
+
+  // ─── Tables that become cards on a phone ───
+  // <table class="table-cards">: every cell takes its column's heading, which the stylesheet shows.
+  function labelCardTables(root) {
+    Array.prototype.forEach.call((root || document).querySelectorAll('table.table-cards'), function (table) {
+      var heads = Array.prototype.map.call(table.querySelectorAll('thead th'), function (th) { return th.textContent.trim(); });
+      Array.prototype.forEach.call(table.querySelectorAll('tbody tr'), function (tr) {
+        Array.prototype.forEach.call(tr.children, function (td, i) {
+          if (td.tagName === 'TD' && td.colSpan === 1 && heads[i] && !td.hasAttribute('data-label')) td.setAttribute('data-label', heads[i]);
+        });
+      });
+    });
+  }
+
+  // A required field on a hidden tab cannot show its own message, so the browser refuses the
+  // submit in silence. Open that tab first. [BUG-0080]
+  function _showInvalidField(e) {
+    var field = e.target;
+    if (!field || !field.closest || field.getClientRects().length) return;
+    var panel = field.closest('[data-tab-panel]');
+    var tab = panel && document.querySelector('[data-tab-for="' + panel.getAttribute('data-tab-panel') + '"]');
+    if (!tab) return;
+    tab.click();
+    field.focus();
+  }
+
   function markScrollRegions(root) {
     Array.prototype.forEach.call((root || document).querySelectorAll('.table-wrap,[data-scroll]'), function (el) {
       if (el.scrollWidth > el.clientWidth + 1) {
@@ -1497,9 +1555,15 @@ window.App = (function () {
     _pageLandmarks();
     _linkLabels(document);
     _updateOfflineBadge();
+    Array.prototype.forEach.call(document.querySelectorAll('.tabs,.att-tabs,.wk-form-tabs,.sa-tabs'), initTabs);
+    document.addEventListener('invalid', _showInvalidField, true);
+    labelCardTables(document);
     markScrollRegions(document);
     var timer = null;
-    var later = function () { clearTimeout(timer); timer = setTimeout(function () { markScrollRegions(document); }, 250); };
+    var later = function () {
+      clearTimeout(timer);
+      timer = setTimeout(function () { labelCardTables(document); markScrollRegions(document); }, 100);
+    };
     window.addEventListener('resize', later);
     if (window.MutationObserver) new MutationObserver(later).observe(document.body, { childList: true, subtree: true });
   });
@@ -1961,6 +2025,7 @@ window.App = (function () {
     logout: logout, logoutSA: logoutSA, logoutSup: logoutSup, logoutElec: logoutElec,
     toast: toast, toastFailure: toastFailure, confirmDialog: confirmDialog, promptDialog: promptDialog,
     statusLabel: statusLabel, statusBadge: statusBadge, priorityBadge: priorityBadge, moduleLabel: moduleLabel,
+    initTabs: initTabs, labelCardTables: labelCardTables,
     emptyState: emptyState, loadFailed: loadFailed, markScrollRegions: markScrollRegions, locationChecklist: locationChecklist,
     initAdmin: initAdmin, initSupervisor: initSupervisor, initElectrician: initElectrician,
     initModulePWA: initModulePWA,

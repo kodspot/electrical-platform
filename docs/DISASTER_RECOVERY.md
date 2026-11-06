@@ -2,8 +2,9 @@
 
 ## Backup strategy
 
-`infrastructure/backup-db.sh` runs daily at 2 AM IST via cron (installed by
-`infrastructure/setup-vm.sh`). Each run:
+`infrastructure/backup-db.sh` runs daily via cron (installed by
+`infrastructure/setup-vm.sh`, which says 2 AM IST). The files in R2 show production runs it at
+21:15 UTC, which is 02:45 IST (seen 2026-11-07). Each run:
 
 1. Takes a `pg_dump` of the production database from inside the `electrical-db`
    container (`--clean --if-exists`, so a restore drops and recreates cleanly).

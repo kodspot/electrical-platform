@@ -9,8 +9,8 @@
 <link rel="manifest" href="/site.webmanifest">
 <meta name="theme-color" content="#1E40AF">
 <title>Dashboard — Kodspot</title>
-<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/css/design-system.css?v=11">
+<link rel="preload" href="/css/inter-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="/css/design-system.css?v=12">
 <style>
 /* ── Dashboard KPI Cards ── */
 .kpi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:.75rem;margin-bottom:1.25rem}
@@ -296,6 +296,7 @@
 <div class="sa-banner" id="sa-banner"></div>
 
 <main class="container">
+  <h1 class="sr-only">Dashboard</h1>
   <!-- Refresh indicator -->
   <div class="dash-refresh" id="refreshBar">
     <span id="lastRefresh"></span>
@@ -316,6 +317,20 @@
   </div>
 
   <!-- Inspection Status Board (full width) -->
+  <!-- What needs attention first: open tickets and problem locations -->
+  <div class="dash-grid dash-grid-2" style="margin-bottom:1rem">
+    <div class="dash-section">
+      <div class="dash-section-title">Active Tickets <span class="badge badge-warning" id="ticketBadge">0</span></div>
+      <div id="ticketList" class="dash-scroll"></div>
+      <div id="ticketViewAll" style="display:none;text-align:right;padding-top:.4rem"><a href="#" class="btn btn-sm btn-outline dash-link" data-page="admin-tickets" style="font-size:var(--fs-xs)">View All Tickets →</a></div>
+    </div>
+    <div class="dash-section">
+      <div class="dash-section-title">Problem Locations <span class="badge badge-warning" id="problemBadge">0</span></div>
+      <div id="problemList" class="dash-scroll"></div>
+      <div id="problemViewAll" style="display:none;text-align:right;padding-top:.4rem"><a href="#" class="btn btn-sm btn-outline dash-link" data-page="admin-analytics" style="font-size:var(--fs-xs)">View Analytics →</a></div>
+    </div>
+  </div>
+
   <div class="dash-section" style="margin-bottom:1rem">
     <div class="dash-section-title" style="justify-content:space-between;flex-wrap:wrap">
       <span>Location Inspection Status <span class="badge badge-info" id="roomBadge"></span></span>
@@ -332,20 +347,6 @@
   <div class="dash-section" style="margin-bottom:1rem">
     <div class="dash-section-title">Inspection Activity (7 Days)</div>
     <div id="trendChart"></div>
-  </div>
-
-  <!-- Row 2: Open Tickets + Problem Locations -->
-  <div class="dash-grid dash-grid-2" style="margin-bottom:1rem">
-    <div class="dash-section">
-      <div class="dash-section-title">Active Tickets <span class="badge badge-warning" id="ticketBadge">0</span></div>
-      <div id="ticketList" class="dash-scroll"></div>
-      <div id="ticketViewAll" style="display:none;text-align:right;padding-top:.4rem"><a href="#" class="btn btn-sm btn-outline dash-link" data-page="admin-tickets" style="font-size:var(--fs-xs)">View All Tickets →</a></div>
-    </div>
-    <div class="dash-section">
-      <div class="dash-section-title">Problem Locations <span class="badge badge-warning" id="problemBadge">0</span></div>
-      <div id="problemList" class="dash-scroll"></div>
-      <div id="problemViewAll" style="display:none;text-align:right;padding-top:.4rem"><a href="#" class="btn btn-sm btn-outline dash-link" data-page="admin-analytics" style="font-size:var(--fs-xs)">View Analytics →</a></div>
-    </div>
   </div>
 
   <!-- Row 3: Electrician Performance -->
@@ -397,7 +398,7 @@
 </div>
 
 <script src="/js/offline-sync.js?v=1"></script>
-<script src="/js/app.js?v=17"></script>
+<script src="/js/app.js?v=18"></script>
 <script>
 if (!App.initAdmin('dashboard')) throw '';
 App.initNotifications(App.apiFetch);
@@ -701,15 +702,13 @@ async function loadTickets() {
     $('ticketList').innerHTML = '<div class="dash-empty"><span class="dash-empty-icon">✓</span><div class="dash-empty-text">No active tickets</div><div class="dash-empty-sub">All issues are resolved</div></div>';
     return;
   }
-  var prCls = {URGENT:'badge-urgent',HIGH:'badge-high',NORMAL:'badge-normal',LOW:'badge-low'};
-  var stCls = {OPEN:'badge-open',ACKNOWLEDGED:'badge-open',ASSIGNED:'badge-in_progress',IN_PROGRESS:'badge-in_progress',ON_HOLD:'badge-warning'};
   var html = '<table class="dash-table"><thead><tr><th>Title</th><th>Priority</th><th class="hide-mobile">Status</th></tr></thead><tbody>';
   for (var i = 0; i < data.tickets.length; i++) {
     var t = data.tickets[i];
     html += '<tr style="cursor:pointer" onclick="location.href=App.orgPath(\'admin-tickets\')">' +
       '<td>' + esc(t.title) + '<br><span style="font-size:var(--fs-xs);color:var(--text-muted)">' + esc(t.location.name) + '</span></td>' +
-      '<td><span class="badge ' + (prCls[t.priority] || '') + '">' + t.priority + '</span></td>' +
-      '<td class="hide-mobile"><span class="badge ' + (stCls[t.status] || '') + '">' + t.status.replace('_',' ') + '</span></td></tr>';
+      '<td>' + App.priorityBadge(t.priority) + '</td>' +
+      '<td class="hide-mobile">' + App.statusBadge(t.status) + '</td></tr>';
   }
   html += '</tbody></table>';
   if (data.total > 10) html += '<div style="text-align:center;padding:.4rem;font-size:var(--fs-xs);color:var(--text-muted)">Showing 10 of ' + data.total + ' tickets</div>';

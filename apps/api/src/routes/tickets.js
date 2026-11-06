@@ -705,6 +705,43 @@ async function ticketRoutes(fastify, opts) {
     return sanitizeTicket(response);
   });
 
+  // ── Admin: Erase the reporter of one complaint, on a resident's request (DPDP s.12) ──
+  // The ticket stays as the maintenance record; the audit row of its creation held the name too,
+  // and the row recording this erasure names no one. [BUG-0081]
+  fastify.post('/tickets/:id/erase-reporter', {
+    preHandler: [requirePolicy('ORG_ADMIN')]
+  }, async (request, reply) => {
+    const { id } = request.params;
+    const orgId = request.user.orgId;
+
+    const ticket = await prisma.ticket.findFirst({ where: { id, orgId } });
+    if (!ticket) return reply.code(404).send({ error: 'Ticket not found' });
+    if (ticket.source !== 'PUBLIC') return reply.code(400).send({ error: 'Only a resident complaint has a reporter to erase' });
+
+    const created = await prisma.auditLog.findMany({
+      where: { orgId, entityId: id, action: 'ticket_public_create' },
+      select: { id: true, newValue: true }
+    });
+    await prisma.$transaction([
+      prisma.ticket.updateMany({ where: { id, orgId }, data: { guestName: null, guestPhone: null, sourceIp: null, userAgent: null } }),
+      ...created.map((row) => {
+        const { guestName, ...rest } = row.newValue || {}; // eslint-disable-line no-unused-vars
+        return prisma.auditLog.update({ where: { id: row.id }, data: { actorId: 'anonymous', newValue: rest } });
+      }),
+      prisma.auditLog.create({
+        data: {
+          orgId,
+          actorType: 'admin',
+          actorId: request.user.id,
+          action: 'ticket_reporter_erased',
+          entityType: 'Ticket',
+          entityId: id
+        }
+      })
+    ]);
+    return { ok: true };
+  });
+
   // ── Supervisor/Admin: Reopen ticket (reject worker resolution) ──
   fastify.post('/tickets/:id/reopen', {
     preHandler: [requirePolicy('ORG_STAFF')]
