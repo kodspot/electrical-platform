@@ -10,7 +10,7 @@
 <meta name="theme-color" content="#1E40AF">
 <title>Analytics — Kodspot</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/css/design-system.css?v=10">
+<link rel="stylesheet" href="/css/design-system.css?v=11">
 <style>
 /* ── Period Selector ── */
 .period-bar{display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;margin-bottom:1rem}
@@ -19,8 +19,8 @@
 .period-btn.active{background:var(--primary);color:#fff;border-color:var(--primary)}
 .period-custom{display:flex;align-items:center;gap:.35rem;flex-wrap:wrap}
 .period-custom input[type=date]{padding:.3rem .5rem;border:1px solid var(--border);border-radius:var(--radius);font-size:.75rem;background:var(--surface);color:var(--text);min-height:var(--touch-min)}
-.period-label{font-size:.72rem;color:var(--text-muted)}
-.period-info{margin-left:auto;font-size:.68rem;color:var(--text-muted);display:flex;align-items:center;gap:.5rem}
+.period-label{font-size:var(--fs-xs);color:var(--text-muted)}
+.period-info{margin-left:auto;font-size:var(--fs-xs);color:var(--text-muted);display:flex;align-items:center;gap:.5rem}
 
 /* ── Summary cards ── */
 .sum-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:.6rem;margin-bottom:1.25rem}
@@ -34,10 +34,10 @@
 .sum-card.sc-comp::before{background:#1E40AF}
 .sum-card.sc-avg::before{background:#8b5cf6}
 .sum-val{font-size:1.5rem;font-weight:700;color:var(--text);line-height:1.2}
-.sum-label{font-size:.68rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.03em;font-weight:600}
-.sum-change{font-size:.65rem;font-weight:600;margin-top:.15rem}
-.sum-change.up{color:#10b981}
-.sum-change.down{color:#ef4444}
+.sum-label{font-size:var(--fs-xs);color:var(--text-muted);text-transform:uppercase;letter-spacing:.03em;font-weight:600}
+.sum-change{font-size:var(--fs-xs);font-weight:600;margin-top:.15rem}
+.sum-change.up{color:var(--success-text)}
+.sum-change.down{color:var(--danger-text)}
 .sum-change.flat{color:var(--text-light)}
 
 /* ── Section container ── */
@@ -54,25 +54,25 @@
 .shift-bar-fill.afternoon{background:linear-gradient(180deg,#3b82f6,#60a5fa)}
 .shift-bar-fill.night{background:linear-gradient(180deg,#8b5cf6,#a78bfa)}
 .shift-bar-fill.general{background:linear-gradient(180deg,#10b981,#34d399)}
-.shift-bar-val{font-size:.7rem;font-weight:600;color:var(--text)}
-.shift-bar-pct{font-size:.58rem;color:var(--text-muted)}
-.shift-bar-label{font-size:.62rem;color:var(--text-muted);font-weight:500}
+.shift-bar-val{font-size:var(--fs-xs);font-weight:600;color:var(--text)}
+.shift-bar-pct{font-size:var(--fs-xs);color:var(--text-muted)}
+.shift-bar-label{font-size:var(--fs-xs);color:var(--text-muted);font-weight:500}
 
 /* ── Trend chart ── */
 .an-trend{display:flex;align-items:flex-end;gap:0;height:140px;padding-top:.5rem}
 .an-trend-col{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:.2rem;height:100%}
 .an-trend-fill{width:60%;min-width:4px;max-width:36px;border-radius:var(--radius-sm) var(--radius-sm) 0 0;background:linear-gradient(180deg,#1E40AF,#3B82F6);transition:height .3s;min-height:2px}
-.an-trend-val{font-size:.6rem;font-weight:600;color:var(--text)}
-.an-trend-day{font-size:.55rem;color:var(--text-muted)}
+.an-trend-val{font-size:var(--fs-xs);font-weight:600;color:var(--text)}
+.an-trend-day{font-size:var(--fs-xs);color:var(--text-muted)}
 
 /* ── Location table ── */
 .loc-toolbar{display:flex;align-items:center;gap:.5rem;margin-bottom:.65rem;flex-wrap:wrap}
 .loc-search{padding:.3rem .6rem;border:1px solid var(--border);border-radius:var(--radius);font-size:.75rem;background:var(--surface);color:var(--text);flex:1;min-width:140px;max-width:280px}
-.loc-sort{padding:.3rem .5rem;border:1px solid var(--border);border-radius:var(--radius);font-size:.72rem;background:var(--surface);color:var(--text)}
+.loc-sort{padding:.3rem .5rem;border:1px solid var(--border);border-radius:var(--radius);font-size:var(--fs-xs);background:var(--surface);color:var(--text)}
 .loc-tbl{width:100%;border-collapse:collapse;font-size:.78rem}
-.loc-tbl th{text-align:left;padding:.4rem .5rem;color:var(--text-muted);border-bottom:1px solid var(--border);font-size:.65rem;font-weight:600;text-transform:uppercase;letter-spacing:.03em;cursor:pointer;user-select:none}
+.loc-tbl th{text-align:left;padding:.4rem .5rem;color:var(--text-muted);border-bottom:1px solid var(--border);font-size:var(--fs-xs);font-weight:600;text-transform:uppercase;letter-spacing:.03em;cursor:pointer;user-select:none}
 .loc-tbl th:hover{color:var(--primary)}
-.loc-tbl th .sort-arrow{font-size:.6rem;margin-left:.2rem}
+.loc-tbl th .sort-arrow{font-size:var(--fs-xs);margin-left:.2rem}
 .loc-tbl td{padding:.4rem .5rem;border-bottom:1px solid var(--border-light);vertical-align:middle}
 .loc-tbl tr:last-child td{border-bottom:none}
 .comp-bar{width:70px;height:7px;background:var(--border-light);border-radius:var(--radius-sm);overflow:hidden;display:inline-block;vertical-align:middle;margin-right:.35rem}
@@ -93,8 +93,8 @@
 .an-perf-fill{height:100%;border-radius:var(--radius);display:flex;align-items:center;padding:0 .5rem;min-width:fit-content;transition:width .4s}
 .an-perf-fill.worker{background:linear-gradient(90deg,#6366f1,#818cf8)}
 .an-perf-fill.supervisor{background:linear-gradient(90deg,#8b5cf6,#a78bfa)}
-.an-perf-lbl{font-size:.65rem;font-weight:600;color:#fff;white-space:nowrap}
-.an-perf-meta{font-size:.65rem;color:var(--text-muted);min-width:80px;text-align:right;display:flex;gap:.35rem;justify-content:flex-end;flex-wrap:wrap}
+.an-perf-lbl{font-size:var(--fs-xs);font-weight:600;color:#fff;white-space:nowrap}
+.an-perf-meta{font-size:var(--fs-xs);color:var(--text-muted);min-width:80px;text-align:right;display:flex;gap:.35rem;justify-content:flex-end;flex-wrap:wrap}
 
 /* ── Empty state ── */
 .an-empty{text-align:center;padding:2rem 1rem;color:var(--text-muted);font-size:.85rem}
@@ -104,7 +104,7 @@
 .it-label{font-size:.75rem;min-width:100px;color:var(--text)}
 .it-track{flex:1;height:8px;background:var(--border-light);border-radius:var(--radius-sm);overflow:hidden}
 .it-fill{height:100%;border-radius:var(--radius-sm);background:#f59e0b}
-.it-count{font-size:.72rem;font-weight:600;color:var(--text);min-width:24px;text-align:right}
+.it-count{font-size:var(--fs-xs);font-weight:600;color:var(--text);min-width:24px;text-align:right}
 
 /* ── Shift Completion Cards ── */
 .sc-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:.6rem}
@@ -115,13 +115,13 @@
 .sc-card.sc-night::before{background:#8b5cf6}
 .sc-card.sc-general::before{background:#10b981}
 .sc-rate{font-size:1.5rem;font-weight:800;line-height:1.2}
-.sc-label{font-size:.7rem;font-weight:600;text-transform:uppercase;letter-spacing:.03em;color:var(--text-muted);margin-bottom:.15rem}
-.sc-detail{font-size:.65rem;color:var(--text-muted);margin-top:.1rem}
+.sc-label{font-size:var(--fs-xs);font-weight:600;text-transform:uppercase;letter-spacing:.03em;color:var(--text-muted);margin-bottom:.15rem}
+.sc-detail{font-size:var(--fs-xs);color:var(--text-muted);margin-top:.1rem}
 
 /* ── Location Heatmap ── */
 .hm-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
-.hm-table{border-collapse:collapse;font-size:.72rem;width:100%;min-width:500px}
-.hm-table th{padding:.3rem .4rem;font-size:.62rem;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.02em;text-align:center;white-space:nowrap;position:sticky;top:0;background:var(--surface);z-index:1}
+.hm-table{border-collapse:collapse;font-size:var(--fs-xs);width:100%;min-width:500px}
+.hm-table th{padding:.3rem .4rem;font-size:var(--fs-xs);font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.02em;text-align:center;white-space:nowrap;position:sticky;top:0;background:var(--surface);z-index:1}
 .hm-table th:first-child{text-align:left;min-width:130px;position:sticky;left:0;z-index:2}
 .hm-table td{padding:.2rem .25rem;text-align:center;vertical-align:middle}
 .hm-table td:first-child{text-align:left;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:160px;position:sticky;left:0;background:var(--surface);z-index:1}
@@ -132,11 +132,11 @@
 .hm-dirty{background:#ef4444;border-color:#dc2626}
 .hm-upcoming{background:#93c5fd;border-color:#60a5fa}
 .hm-nosched{background:#e2e8f0;border-color:#cbd5e1}
-.hm-score{font-size:.68rem;font-weight:600;min-width:38px;text-align:right}
+.hm-score{font-size:var(--fs-xs);font-weight:600;min-width:38px;text-align:right}
 .hm-toolbar{display:flex;align-items:center;gap:.5rem;margin-bottom:.5rem;flex-wrap:wrap}
-.hm-search{padding:.3rem .5rem;border:1px solid var(--border);border-radius:var(--radius);font-size:.72rem;background:var(--surface);color:var(--text);flex:1;min-width:120px;max-width:220px}
-.hm-sort{padding:.3rem .4rem;border:1px solid var(--border);border-radius:var(--radius);font-size:.72rem;background:var(--surface);color:var(--text)}
-.hm-legend{display:flex;gap:.75rem;flex-wrap:wrap;font-size:.68rem;color:var(--text-muted);margin-bottom:.5rem}
+.hm-search{padding:.3rem .5rem;border:1px solid var(--border);border-radius:var(--radius);font-size:var(--fs-xs);background:var(--surface);color:var(--text);flex:1;min-width:120px;max-width:220px}
+.hm-sort{padding:.3rem .4rem;border:1px solid var(--border);border-radius:var(--radius);font-size:var(--fs-xs);background:var(--surface);color:var(--text)}
+.hm-legend{display:flex;gap:.75rem;flex-wrap:wrap;font-size:var(--fs-xs);color:var(--text-muted);margin-bottom:.5rem}
 .hm-legend-item{display:flex;align-items:center;gap:.25rem}
 .hm-legend-dot{width:10px;height:10px;border-radius:3px}
 
@@ -149,8 +149,8 @@
 .st-bar.st-night{background:#8b5cf6;border-radius:0}
 .st-bar.st-general{background:#10b981;border-radius:0}
 .st-bar.st-top{border-radius:4px 4px 0 0}      
-.st-val{font-size:.58rem;font-weight:600;color:var(--text)}
-.st-day{font-size:.52rem;color:var(--text-muted);margin-top:.15rem}
+.st-val{font-size:var(--fs-xs);font-weight:600;color:var(--text)}
+.st-day{font-size:var(--fs-xs);color:var(--text-muted);margin-top:.15rem}
 
 @media(max-width:1024px){
   .an-grid-2{grid-template-columns:1fr}
@@ -159,7 +159,7 @@
   .sum-grid{grid-template-columns:repeat(2,1fr)}
   .ticket-stats{grid-template-columns:1fr}
   .shift-bars{height:100px}
-  .an-perf-name{min-width:70px;max-width:100px;font-size:.72rem}
+  .an-perf-name{min-width:70px;max-width:100px;font-size:var(--fs-xs)}
   .an-perf-meta{min-width:60px}
   .period-info{margin-left:0;width:100%}
 }
@@ -169,10 +169,10 @@
   .sum-val{font-size:1.2rem}
   .an-section{padding:.85rem}
   .period-bar{gap:.35rem}
-  .period-btn{padding:.3rem .5rem;font-size:.72rem}
+  .period-btn{padding:.3rem .5rem;font-size:var(--fs-xs)}
   .an-trend{height:100px}
-  .an-perf-name{min-width:60px;max-width:80px;font-size:.68rem}
-  .it-label{min-width:70px;font-size:.68rem}
+  .an-perf-name{min-width:60px;max-width:80px;font-size:var(--fs-xs)}
+  .it-label{min-width:70px;font-size:var(--fs-xs)}
   .loc-toolbar{flex-direction:column;align-items:stretch}
   .loc-search{max-width:none}
 }
@@ -241,13 +241,13 @@
 
   <!-- Shift Trend (per-shift daily breakdown) -->
   <div class="an-section">
-    <div class="an-title">Shift Trend (Daily Breakdown) <span style="font-size:.68rem;font-weight:400;color:var(--text-muted);margin-left:auto">per-shift daily counts</span></div>
+    <div class="an-title">Shift Trend (Daily Breakdown) <span style="font-size:var(--fs-xs);font-weight:400;color:var(--text-muted);margin-left:auto">per-shift daily counts</span></div>
     <div id="shiftTrendChart"></div>
   </div>
 
   <!-- Location Status Heatmap -->
   <div class="an-section">
-    <div class="an-title">Location Status Heatmap <span id="hmCount" style="font-size:.7rem;font-weight:400;color:var(--text-muted)"></span></div>
+    <div class="an-title">Location Status Heatmap <span id="hmCount" style="font-size:var(--fs-xs);font-weight:400;color:var(--text-muted)"></span></div>
     <div id="hmToolbar"></div>
     <div id="hmLegend"></div>
     <div class="hm-wrap" style="max-height:450px;overflow-y:auto" id="hmBody"></div>
@@ -255,7 +255,7 @@
 
   <!-- Location Breakdown -->
   <div class="an-section">
-    <div class="an-title">Location Breakdown <span id="locCount" style="font-size:.7rem;font-weight:400;color:var(--text-muted)"></span></div>
+    <div class="an-title">Location Breakdown <span id="locCount" style="font-size:var(--fs-xs);font-weight:400;color:var(--text-muted)"></span></div>
     <div id="locToolbar"></div>
     <div style="max-height:400px;overflow-y:auto" id="locTable"></div>
   </div>
@@ -281,18 +281,18 @@
   <!-- Row 3: Electrician + Supervisor Performance -->
   <div class="an-grid-2">
     <div class="an-section">
-      <div class="an-title">Top Electricians <span style="font-size:.68rem;font-weight:400;color:var(--text-muted);margin-left:auto">by inspection count</span></div>
+      <div class="an-title">Top Electricians <span style="font-size:var(--fs-xs);font-weight:400;color:var(--text-muted);margin-left:auto">by inspection count</span></div>
       <div id="workerPerf"></div>
     </div>
     <div class="an-section">
-      <div class="an-title">Top Supervisors <span style="font-size:.68rem;font-weight:400;color:var(--text-muted);margin-left:auto">by verifications</span></div>
+      <div class="an-title">Top Supervisors <span style="font-size:var(--fs-xs);font-weight:400;color:var(--text-muted);margin-left:auto">by verifications</span></div>
       <div id="supPerf"></div>
     </div>
   </div>
 </main>
 
 <script src="/js/offline-sync.js?v=1"></script>
-<script src="/js/app.js?v=16"></script>
+<script src="/js/app.js?v=17"></script>
 <script src="/js/custom-select.js"></script>
 <script>
 if (!App.initAdmin('analytics')) throw '';
@@ -403,11 +403,12 @@ async function loadReport(from, to) {
 
 // ── Renderers ──
 function renderSummary(s) {
-  function card(cls, val, label, change, sub) {
+  function card(cls, val, label, change, sub, higherIsBad) {
     var changeHtml = '';
     if (change !== null && change !== undefined) {
-      var changeCls = change > 0 ? 'up' : change < 0 ? 'down' : 'flat';
-      var changeText = change > 0 ? '↑ ' + change + '% vs prev' : change < 0 ? '↓ ' + Math.abs(change) + '% vs prev' : 'Same as prev';
+      var good = higherIsBad ? change < 0 : change > 0;
+      var changeCls = change === 0 ? 'flat' : good ? 'up' : 'down';
+      var changeText = change > 0 ? '↑ ' + change + '% more than previous period' : change < 0 ? '↓ ' + Math.abs(change) + '% less than previous period' : 'Same as previous period';
       changeHtml = '<div class="sum-change ' + changeCls + '">' + changeText + '</div>';
     }
     if (sub) changeHtml += '<div class="sum-change flat">' + sub + '</div>';
@@ -425,7 +426,7 @@ function renderSummary(s) {
   $('sumGrid').innerHTML =
     card('sc-clean', s.totalInspections, 'Inspection Records', s.changePercent, null) +
     card('sc-flag', s.flaggedInspections, 'Flagged Records', null, flagSub) +
-    card('sc-ticket', s.totalTickets, 'Tickets Raised', ticketChange, null) +
+    card('sc-ticket', s.totalTickets, 'Tickets Raised', ticketChange, null, true) +
     card('sc-photo', s.totalImages, 'Photos Taken', null, null) +
     card('sc-comp', compVal, 'Completion Rate', null, compSub) +
     card('sc-avg', s.avgPerDay, 'Avg / Day', null, s.totalLocations + ' locations · ' + s.totalWorkers + 'E / ' + s.totalSupervisors + 'S');
@@ -458,7 +459,7 @@ function renderTrend(trend, periodDays) {
   var max = Math.max.apply(null, displayTrend.map(function(d) { return d.count; }).concat([1]));
   var total = displayTrend.reduce(function(s, d) { return s + d.count; }, 0);
   var labelStep = displayTrend.length > 14 ? Math.ceil(displayTrend.length / 10) : 1;
-  var totalLabel = '<div style="font-size:.68rem;color:var(--text-muted);margin-bottom:.3rem">Total: <b style="color:var(--text)">' + total + '</b>' + aggLabel + '</div>';
+  var totalLabel = '<div style="font-size:var(--fs-xs);color:var(--text-muted);margin-bottom:.3rem">Total: <b style="color:var(--text)">' + total + '</b>' + aggLabel + '</div>';
 
   $('trendChart').innerHTML = totalLabel + '<div class="an-trend">' + displayTrend.map(function(d, idx) {
     var pct = Math.max(Math.round(d.count / max * 100), d.count > 0 ? 6 : 1);
@@ -572,7 +573,7 @@ function renderShiftTrend(st, periodDays) {
   }
   html += '</div>';
   // Legend
-  html += '<div style="display:flex;gap:.75rem;flex-wrap:wrap;font-size:.65rem;color:var(--text-muted);margin-top:.4rem;justify-content:center">';
+  html += '<div style="display:flex;gap:.75rem;flex-wrap:wrap;font-size:var(--fs-xs);color:var(--text-muted);margin-top:.4rem;justify-content:center">';
   html += '<span style="display:flex;align-items:center;gap:.2rem"><span style="width:8px;height:8px;border-radius:2px;background:#f59e0b;display:inline-block"></span>Morning</span>';
   html += '<span style="display:flex;align-items:center;gap:.2rem"><span style="width:8px;height:8px;border-radius:2px;background:#3b82f6;display:inline-block"></span>Afternoon</span>';
   html += '<span style="display:flex;align-items:center;gap:.2rem"><span style="width:8px;height:8px;border-radius:2px;background:#8b5cf6;display:inline-block"></span>Night</span>';
@@ -687,7 +688,7 @@ function renderHeatmap() {
   }
 
   html += '</tbody></table>';
-  if (locs.length > count) html += '<div style="text-align:center;padding:.5rem;font-size:.72rem;color:var(--text-muted)">Showing ' + count + ' of ' + locs.length + ' locations</div>';
+  if (locs.length > count) html += '<div style="text-align:center;padding:.5rem;font-size:var(--fs-xs);color:var(--text-muted)">Showing ' + count + ' of ' + locs.length + ' locations</div>';
   $('hmBody').innerHTML = html;
 }
 
@@ -756,13 +757,13 @@ function renderLocTable(locs) {
     var color = rate == null ? '#cbd5e1' : rate >= 80 ? '#10b981' : rate >= 50 ? '#f59e0b' : '#ef4444';
     var rateText = rate != null ? rate + '%' : '—';
     var parent = l.parentName ? esc(l.parentName) + ' → ' : '';
-    html += '<tr><td>' + parent + esc(l.name) + '<br><span style="font-size:.65rem;color:var(--text-light)">' + l.type.replace('_',' ') + '</span></td>' +
+    html += '<tr><td>' + parent + esc(l.name) + '<br><span style="font-size:var(--fs-xs);color:var(--text-light)">' + l.type.replace('_',' ') + '</span></td>' +
       '<td>' + l.inspections + '</td><td>' + (l.expected != null ? l.expected : '—') + '</td>' +
-      '<td><div class="comp-bar"><div class="comp-fill" style="width:' + (rate || 0) + '%;background:' + color + '"></div></div><span style="font-size:.72rem;font-weight:600;color:' + color + '">' + rateText + '</span></td>' +
+      '<td><div class="comp-bar"><div class="comp-fill" style="width:' + (rate || 0) + '%;background:' + color + '"></div></div><span style="font-size:var(--fs-xs);font-weight:600;color:' + color + '">' + rateText + '</span></td>' +
       '<td>' + (l.tickets > 0 ? '<span style="color:var(--danger);font-weight:600">' + l.tickets + '</span>' : '0') + '</td></tr>';
   }
   html += '</tbody></table>';
-  if (filtered.length > shown) html += '<div style="text-align:center;padding:.4rem;font-size:.72rem;color:var(--text-muted)">Showing ' + shown + ' of ' + filtered.length + '</div>';
+  if (filtered.length > shown) html += '<div style="text-align:center;padding:.4rem;font-size:var(--fs-xs);color:var(--text-muted)">Showing ' + shown + ' of ' + filtered.length + '</div>';
   $('locTable').innerHTML = html;
 }
 

@@ -10,7 +10,7 @@
 <meta name="theme-color" content="#1E40AF">
 <title>Supervisors — Kodspot</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/css/design-system.css?v=10">
+<link rel="stylesheet" href="/css/design-system.css?v=11">
 <style>
 /* ── Summary ── */
 .sv-summary{display:flex;gap:1rem;flex-wrap:wrap;padding:.6rem 0 .5rem;border-bottom:1px solid var(--border-light);margin-bottom:.75rem}
@@ -26,14 +26,14 @@
 
 /* ── Table ── */
 .sv-tbl{width:100%;border-collapse:collapse;font-size:.84rem}
-.sv-tbl thead th{text-align:left;padding:.55rem .65rem;color:var(--text-muted);border-bottom:2px solid var(--border);font-weight:600;font-size:.72rem;text-transform:uppercase;letter-spacing:.04em;white-space:nowrap;position:sticky;top:0;background:var(--surface);z-index:1}
+.sv-tbl thead th{text-align:left;padding:.55rem .65rem;color:var(--text-muted);border-bottom:2px solid var(--border);font-weight:600;font-size:var(--fs-xs);text-transform:uppercase;letter-spacing:.04em;white-space:nowrap;position:sticky;top:0;background:var(--surface);z-index:1}
 .sv-tbl tbody td{padding:.55rem .65rem;border-bottom:1px solid var(--border-light);vertical-align:middle}
 .sv-tbl tbody tr:nth-child(even) td{background:rgba(248,250,252,.5)}
 .sv-tbl tbody tr:hover td{background:rgba(30,64,175,.04)}
 .sv-tbl td:last-child{white-space:nowrap}
 .sv-row-inactive td{opacity:.55}
 .sv-name-cell{font-weight:600}
-.sv-desig-sub{font-size:.7rem;color:var(--text-muted);font-weight:400;display:block;margin-top:1px}
+.sv-desig-sub{font-size:var(--fs-xs);color:var(--text-muted);font-weight:400;display:block;margin-top:1px}
 .sv-email{font-size:.8rem;color:var(--text-muted)}
 .sv-joined{font-size:.75rem;color:var(--text-muted)}
 .sv-records{font-weight:700;color:var(--primary)}
@@ -45,17 +45,17 @@
 .sv-stat-card{text-align:center;padding:.6rem .5rem;border-radius:var(--radius-lg);background:var(--bg);transition:box-shadow .15s}
 .sv-stat-card:hover{box-shadow:var(--shadow-sm)}
 .sv-stat-val{font-size:1.3rem;font-weight:700;color:var(--primary)}
-.sv-stat-label{font-size:.68rem;color:var(--text-muted);margin-top:2px}
+.sv-stat-label{font-size:var(--fs-xs);color:var(--text-muted);margin-top:2px}
 .sv-stat-section{margin-top:.75rem;padding-top:.6rem;border-top:1px solid var(--border-light)}
-.sv-stat-section-title{font-size:.72rem;font-weight:600;text-transform:uppercase;letter-spacing:.04em;color:var(--text-muted);margin-bottom:.4rem}
+.sv-stat-section-title{font-size:var(--fs-xs);font-weight:600;text-transform:uppercase;letter-spacing:.04em;color:var(--text-muted);margin-bottom:.4rem}
 .sv-stat-row{display:flex;justify-content:space-between;align-items:center;padding:.2rem 0;font-size:.82rem}
 .sv-stat-row-val{font-weight:600}
-.sv-stat-footer{font-size:.72rem;color:var(--text-muted);text-align:center;margin-top:.6rem}
+.sv-stat-footer{font-size:var(--fs-xs);color:var(--text-muted);text-align:center;margin-top:.6rem}
 
 /* ── Detail modal ── */
 .sv-detail-grid{display:grid;grid-template-columns:1fr 1fr;gap:.5rem .75rem}
 .sv-detail-item{padding:.35rem 0}
-.sv-detail-label{font-size:.7rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.03em;margin-bottom:1px}
+.sv-detail-label{font-size:var(--fs-xs);color:var(--text-muted);text-transform:uppercase;letter-spacing:.03em;margin-bottom:1px}
 .sv-detail-val{font-size:.88rem;font-weight:500;word-break:break-word}
 
 /* ── Pagination ── */
@@ -88,7 +88,7 @@
   .sv-tbl tbody tr{display:block;padding:.75rem;margin-bottom:.5rem;border:1px solid var(--border-light);border-radius:var(--radius);background:var(--surface)}
   .sv-tbl tbody tr:nth-child(even){background:var(--surface)}
   .sv-tbl tbody td{display:flex;justify-content:space-between;align-items:center;padding:.25rem 0;border:none;font-size:.82rem}
-  .sv-tbl tbody td::before{content:attr(data-label);font-weight:600;font-size:.7rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.03em;flex-shrink:0;margin-right:.5rem}
+  .sv-tbl tbody td::before{content:attr(data-label);font-weight:600;font-size:var(--fs-xs);color:var(--text-muted);text-transform:uppercase;letter-spacing:.03em;flex-shrink:0;margin-right:.5rem}
   .sv-tbl tbody td:first-child{padding-top:0}
   .sv-tbl tbody td:last-child{padding-top:.35rem;justify-content:flex-start}
   .sv-tbl tbody td:last-child::before{display:none}
@@ -108,7 +108,7 @@
 @media(min-width:769px) and (max-width:960px){
   .sv-tbl{font-size:.78rem}
   .sv-tbl thead th,.sv-tbl tbody td{padding:.4rem .45rem}
-  .sv-actions .btn-sm{font-size:.7rem;padding:.15rem .3rem}
+  .sv-actions .btn-sm{font-size:var(--fs-xs);padding:.15rem .3rem}
   .sv-search{max-width:180px}
 }
 
@@ -120,7 +120,7 @@
 /* ── Small phones ≤380px ── */
 @media(max-width:380px){
   .sv-summary{flex-direction:column;gap:.25rem}
-  .sv-pager button{padding:.2rem .4rem;font-size:.72rem;min-height:28px}
+  .sv-pager button{padding:.2rem .4rem;font-size:var(--fs-xs);min-height:28px}
   .sv-stat-val{font-size:1.1rem}
 }
 
@@ -176,7 +176,7 @@
             <th>Email</th>
             <th class="hide-mobile">Phone</th>
             <th class="hide-mobile">Joined</th>
-            <th>Records</th>
+            <th>Inspections</th>
             <th class="hide-mobile">Tickets</th>
             <th>Status</th>
             <th>Actions</th>
@@ -295,8 +295,24 @@
   </div>
 </div>
 
+<!-- Location assignments: the API existed and resident routing depends on it, but no screen
+     could set it, so new complaints went unassigned. [BUG-0065] -->
+<div class="modal-overlay" id="locModal">
+  <div class="modal" style="max-width:480px">
+    <h2 class="modal-title" id="locTitle">Assign Locations</h2>
+    <p style="font-size:.875rem;color:var(--text-muted);margin-bottom:.65rem">Choose the blocks or floors this supervisor looks after. New complaints from those rooms go to them.</p>
+    <div id="locError" class="error-msg"></div>
+    <input type="hidden" id="locSupId">
+    <div id="locList" class="fa-loc-list"><div class="loading-center">Loading…</div></div>
+    <div class="modal-actions">
+      <button type="button" class="btn btn-outline" onclick="App.closeModal('locModal')">Cancel</button>
+      <button type="button" class="btn btn-primary" id="locSaveBtn" onclick="saveLocations()">Save</button>
+    </div>
+  </div>
+</div>
+
 <script src="/js/offline-sync.js?v=1"></script>
-<script src="/js/app.js?v=16"></script>
+<script src="/js/app.js?v=17"></script>
 <script src="/js/custom-select.js"></script>
 <script>
 if (!App.initAdmin('supervisors')) throw '';
@@ -354,7 +370,9 @@ async function loadSupervisors(page) {
   '</div>';
 
   if (!sups.length) {
-    $('supBody').innerHTML = '<tr><td colspan="9" class="empty">' + (search ? 'No supervisors match "' + esc(search) + '"' : 'No supervisors found') + '</td></tr>';
+    $('supBody').innerHTML = '<tr><td colspan="9" class="empty" id="supEmpty"></td></tr>';
+    if (search) $('supEmpty').textContent = 'No supervisors match "' + search + '"';
+    else App.emptyState($('supEmpty'), { title: 'No supervisors yet', body: 'Add a supervisor, then choose the locations they look after.', actionLabel: '+ Add Supervisor', onAction: openAdd });
     $('pager').innerHTML = '';
     return;
   }
@@ -373,7 +391,8 @@ async function loadSupervisors(page) {
     var actions = '<div class="sv-actions">' +
       '<button class="btn btn-sm btn-outline" onclick="viewSupervisor(\'' + s.id + '\')" title="View details">View</button>' +
       '<button class="btn btn-sm btn-outline" onclick="openEdit(\'' + s.id + '\')" title="Edit">Edit</button>' +
-      '<button class="btn btn-sm btn-outline" onclick="openPwReset(\'' + s.id + '\')" title="Reset password">PW</button>' +
+      '<button class="btn btn-sm btn-outline" onclick="openLocations(\'' + s.id + '\',\'' + App.escJs(s.name) + '\')" title="Location assignments">Locations</button>' +
+      '<button class="btn btn-sm btn-outline" onclick="openPwReset(\'' + s.id + '\')" title="Reset password">Reset password</button>' +
       '<button class="btn btn-sm btn-outline" onclick="showStats(\'' + s.id + '\',\'' + App.escJs(s.name) + '\')" title="Analytics">Stats</button>';
 
     if (s.isActive !== false) {
@@ -495,8 +514,15 @@ $('supForm').addEventListener('submit', async function(e) {
       return;
     }
     App.closeModal('modal');
-    App.toast(id ? 'Supervisor updated' : 'Supervisor created', 'success');
     loadSupervisors(currentPage);
+    if (id) {
+      App.toast('Supervisor updated', 'success');
+    } else {
+      var created = await res.json();
+      var sup = created.user || created.supervisor || created;
+      App.toast('Supervisor added. Choose the locations they look after.', 'success');
+      openLocations(sup.id, sup.name);
+    }
   } catch (err) {
     App.showError('modalError', 'Network error');
   }
@@ -675,6 +701,50 @@ async function showStats(id, name) {
 }
 
 loadSupervisors(1);
+
+/* ── Location Assignments ── */
+async function openLocations(id, name) {
+  $('locTitle').textContent = 'Assign Locations — ' + name;
+  $('locSupId').value = id;
+  $('locList').innerHTML = '<div class="loading-center">Loading…</div>';
+  App.hideError('locError');
+  App.openModal('locModal');
+
+  var results = await Promise.all([App.apiFetch('/locations?tree=true'), App.apiFetch('/supervisors/' + id + '/assignments')]);
+  if (!results[0] || !results[0].ok || !results[1] || !results[1].ok) {
+    App.loadFailed($('locList'), { what: 'the locations', onRetry: function() { openLocations(id, name); } });
+    return;
+  }
+  var data = await results[0].json();
+  var tree = data.locations || data || [];
+  if (!tree.length) {
+    $('locList').innerHTML = '<div style="text-align:center;padding:1rem;color:var(--text-muted);font-size:.875rem">No locations found. Create locations first.</div>';
+    return;
+  }
+  var assignedMap = {};
+  ((await results[1].json()).assignments || []).forEach(function(a) { assignedMap[a.locationId] = true; });
+  $('locList').innerHTML = App.locationChecklist(tree, assignedMap);
+}
+
+async function saveLocations() {
+  var locationIds = Array.prototype.map.call($('locList').querySelectorAll('input[type=checkbox]:checked'), function(el) { return el.value; });
+  var btn = $('locSaveBtn');
+  btn.disabled = true; btn.textContent = 'Saving…';
+  App.hideError('locError');
+  var res = await App.apiFetch('/supervisors/' + $('locSupId').value + '/assignments', {
+    method: 'PUT',
+    body: JSON.stringify({ locationIds: locationIds })
+  });
+  btn.disabled = false; btn.textContent = 'Save';
+  if (!res) return;
+  if (!res.ok) {
+    var d = await res.json().catch(function() { return {}; });
+    App.showError('locError', d.error || 'Could not save. Please try again.');
+    return;
+  }
+  App.closeModal('locModal');
+  App.toast('Locations updated (' + locationIds.length + ')', 'success');
+}
 </script>
 </body>
 </html>

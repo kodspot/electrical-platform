@@ -19,9 +19,12 @@ doubt, read the code: the repository is the source of truth.
 - **Local dev, test, lint commands:** [`apps/api/README.md`](apps/api/README.md);
   tests and their safety guard: [`apps/api/test/README.md`](apps/api/test/README.md).
 - **Known open production risks:**
-  [`docs/history/production-readiness-audit-2026-07.md`](docs/history/production-readiness-audit-2026-07.md)
+  [`docs/history/production-readiness-audit-2026-07.md`](docs/history/production-readiness-audit-2026-07.md),
+  [`docs/history/audit-2026-11.md`](docs/history/audit-2026-11.md)
   and the characterisation findings in
   [`docs/testing/COVERAGE_MATRIX.md`](docs/testing/COVERAGE_MATRIX.md).
+- **Repeating the UI/UX, security and DPDP audit:**
+  [`docs/AUDIT_PLAYBOOK.md`](docs/AUDIT_PLAYBOOK.md).
 
 ## How to work
 
@@ -40,7 +43,7 @@ doubt, read the code: the repository is the source of truth.
 - **Finding IDs:** `PRA-07/Cn` = the 2026-07 production-readiness audit (critical findings
   C1…), `EP/Cn` = the engineering execution plan's items (`[WPn]` work packages in code
   comments and the Charter log), `Fn` = the characterisation findings in
-  `docs/testing/COVERAGE_MATRIX.md`, `BUG-nnnn` = the bug registry.
+  `docs/testing/COVERAGE_MATRIX.md`, `AUD-11/n` = the 2026-11 audit, `BUG-nnnn` = the bug registry.
 
 ## Where new code goes
 

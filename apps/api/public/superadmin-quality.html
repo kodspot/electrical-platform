@@ -9,9 +9,9 @@
 <meta name="robots" content="noindex, nofollow">
 <title>Quality — Super Admin — Kodspot</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/css/design-system.css?v=10">
+<link rel="stylesheet" href="/css/design-system.css?v=11">
 <style>
-.sa-badge { display: inline-block; font-size: .65rem; font-weight: 600; background: rgba(255,255,255,.15); color: rgba(255,255,255,.9); padding: .15rem .5rem; border-radius: 50px; letter-spacing: .03em; white-space: nowrap; }
+.sa-badge { display: inline-block; font-size:var(--fs-xs); font-weight: 600; background: rgba(255,255,255,.15); color: rgba(255,255,255,.9); padding: .15rem .5rem; border-radius: 50px; letter-spacing: .03em; white-space: nowrap; }
 .q-nav { display: flex; gap: .25rem; margin-left: .75rem; }
 .q-nav a { color: rgba(255,255,255,.75); text-decoration: none; font-size: .82rem; padding: .35rem .65rem; border-radius: var(--radius-sm); }
 .q-nav a[aria-current="page"] { background: rgba(255,255,255,.15); color: #fff; font-weight: 600; }
@@ -23,14 +23,14 @@
 .q-counts { display: grid; grid-template-columns: repeat(auto-fit, minmax(80px, 1fr)); gap: .5rem; margin: .65rem 0; }
 .q-count { background: var(--bg); border-radius: var(--radius-sm); padding: .5rem .6rem; }
 .q-count b { display: block; font-size: 1.2rem; color: var(--text); }
-.q-count span { font-size: .7rem; color: var(--text-muted); }
+.q-count span { font-size:var(--fs-xs); color: var(--text-muted); }
 .q-warn { background: var(--warning-bg); color: var(--warning-text); border-radius: var(--radius-sm); padding: .5rem .7rem; font-size: .8rem; font-weight: 600; margin: .5rem 0; }
 .q-trend svg { width: 100%; height: 160px; display: block; }
-.q-legend { display: flex; gap: .9rem; flex-wrap: wrap; font-size: .72rem; color: var(--text-muted); margin-top: .35rem; }
+.q-legend { display: flex; gap: .9rem; flex-wrap: wrap; font-size:var(--fs-xs); color: var(--text-muted); margin-top: .35rem; }
 .q-legend i { display: inline-block; width: .7rem; height: .7rem; border-radius: 2px; margin-right: .3rem; vertical-align: -1px; }
 .q-table { width: 100%; border-collapse: collapse; font-size: .8rem; }
 .q-table th, .q-table td { text-align: left; padding: .45rem .5rem; border-bottom: 1px solid var(--border-light); white-space: nowrap; }
-.q-table th { color: var(--text-muted); font-weight: 600; font-size: .72rem; text-transform: uppercase; letter-spacing: .03em; }
+.q-table th { color: var(--text-muted); font-weight: 600; font-size:var(--fs-xs); text-transform: uppercase; letter-spacing: .03em; }
 .q-table tbody tr[data-run-id] { cursor: pointer; }
 .q-table tbody tr[data-run-id]:hover, .q-table tbody tr[data-run-id]:focus { background: var(--primary-light); outline: none; }
 .q-detail { margin-top: .75rem; }
@@ -185,7 +185,7 @@
   </div>
 </main>
 
-<script src="/js/app.js?v=16"></script>
+<script src="/js/app.js?v=17"></script>
 <script src="/js/superadmin-quality.js?v=4"></script>
 </body>
 </html>

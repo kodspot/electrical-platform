@@ -10,7 +10,7 @@
 <meta name="theme-color" content="#0891b2">
 <title>Asset Failures — Kodspot</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/css/design-system.css?v=10">
+<link rel="stylesheet" href="/css/design-system.css?v=11">
 <style>
 .page-title{display:flex;align-items:center;gap:.5rem;margin-bottom:1.25rem;flex-wrap:wrap;justify-content:space-between}
 .page-title h1{font-size:1.25rem;font-weight:700;margin:0}
@@ -19,7 +19,7 @@
 .f-stats{display:flex;gap:.75rem;margin-bottom:1rem;flex-wrap:wrap}
 .f-stat{flex:1;min-width:100px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:.85rem .75rem;text-align:center}
 .f-stat-val{font-size:1.4rem;font-weight:700;line-height:1.1}
-.f-stat-label{font-size:.68rem;color:var(--text-muted);margin-top:.15rem}
+.f-stat-label{font-size:var(--fs-xs);color:var(--text-muted);margin-top:.15rem}
 .f-stat.stat-open .f-stat-val{color:var(--danger)}
 .f-stat.stat-progress .f-stat-val{color:var(--warning-text)}
 .f-stat.stat-resolved .f-stat-val{color:var(--success)}
@@ -30,7 +30,7 @@
 
 /* Table */
 .f-tbl{width:100%;border-collapse:collapse;font-size:.82rem}
-.f-tbl th{text-align:left;padding:.5rem .4rem;font-size:.7rem;font-weight:600;color:var(--text-muted);border-bottom:1px solid var(--border);white-space:nowrap}
+.f-tbl th{text-align:left;padding:.5rem .4rem;font-size:var(--fs-xs);font-weight:600;color:var(--text-muted);border-bottom:1px solid var(--border);white-space:nowrap}
 .f-tbl td{padding:.55rem .4rem;border-bottom:1px solid var(--border-light,var(--border));vertical-align:middle}
 .f-tbl tr:hover{background:var(--hover-bg,rgba(8,145,178,.03))}
 .empty{text-align:center;padding:2rem;color:var(--text-muted)}
@@ -56,7 +56,7 @@
 
 /* Detail */
 .fd-grid{display:grid;grid-template-columns:1fr 1fr;gap:.4rem .75rem;font-size:.82rem;margin-bottom:.75rem}
-.fd-label{font-weight:600;color:var(--text-muted);font-size:.72rem}
+.fd-label{font-weight:600;color:var(--text-muted);font-size:var(--fs-xs)}
 .fd-val{margin-bottom:.3rem}
 
 .img-grid{display:flex;gap:.4rem;flex-wrap:wrap;margin:.5rem 0}
@@ -191,7 +191,7 @@
 </div>
 
 <script src="/js/offline-sync.js?v=1"></script>
-<script src="/js/app.js?v=16"></script>
+<script src="/js/app.js?v=17"></script>
 <script>
 if (!App.initAdmin('failures')) throw '';
 App.initNotifications(App.apiFetch);
@@ -243,12 +243,12 @@ async function loadFailures(page){
 
   $('tableBody').innerHTML = failures.map(function(f){
     return '<tr>'+
-      '<td><span style="font-weight:600;font-size:.78rem">'+esc(f.asset?f.asset.assetCode:'')+'</span><br><span style="font-size:.72rem;color:var(--text-muted)">'+esc(f.asset?f.asset.name:'')+'</span></td>'+
+      '<td><span style="font-weight:600;font-size:.78rem">'+esc(f.asset?f.asset.assetCode:'')+'</span><br><span style="font-size:var(--fs-xs);color:var(--text-muted)">'+esc(f.asset?f.asset.name:'')+'</span></td>'+
       '<td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(f.title)+'</td>'+
       '<td><span class="badge '+(SEV_CLS[f.severity]||'')+'">'+f.severity+'</span></td>'+
       '<td><span class="badge '+(FS_CLS[f.status]||'')+'">'+(FS_LABEL[f.status]||f.status)+'</span></td>'+
-      '<td class="hide-mobile" style="font-size:.72rem">'+App.fmtDateShort(f.failedAt)+'</td>'+
-      '<td class="hide-mobile" style="font-size:.72rem">'+esc(f.loggedBy?f.loggedBy.name:'')+'</td>'+
+      '<td class="hide-mobile" style="font-size:var(--fs-xs)">'+App.fmtDateShort(f.failedAt)+'</td>'+
+      '<td class="hide-mobile" style="font-size:var(--fs-xs)">'+esc(f.loggedBy?f.loggedBy.name:'')+'</td>'+
       '<td><button class="btn btn-sm btn-outline" onclick="viewDetail(\''+f.id+'\')">View</button></td>'+
     '</tr>';
   }).join('');

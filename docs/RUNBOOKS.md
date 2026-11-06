@@ -87,6 +87,41 @@ caught by the next interval by design.
 lock design means you do not need to worry about a restart causing duplicate runs — the
 locks coordinate correctly across a restart or across multiple instances.
 
+## Personal data breach
+
+A breach is any unauthorized access to, or loss, change or disclosure of, personal data: a
+stolen backup, a leaked token, a bug that showed one hostel another's records, a lost laptop
+with a database copy. If in doubt, treat it as one and start the clock. This procedure follows
+the DPDP Act s.8(6) and commentary on Rule 7; have counsel confirm it
+([`reference/dpdp-requirements.md`](reference/dpdp-requirements.md)).
+
+1. **Start the record.** Note the time you became aware. Everything below is timed from that
+   moment. Add a row to the breach register (below).
+2. **Contain.** Stop the leak without destroying evidence: rotate the exposed secret, disable
+   the account, or take the feature down. To sign everyone out, rotate `JWT_SECRET`. Save logs
+   before any restart.
+3. **Assess.** Which organizations, which people, and which fields
+   ([`reference/personal-data-inventory.md`](reference/personal-data-inventory.md)). Note whether
+   encrypted fields were exposed with their key.
+4. **Tell the organizations at once.** Kodspot probably acts as their processor, and they need
+   to know to meet their own duty (AUD-11/01).
+5. **Tell the Data Protection Board and the people affected, without delay.** Commentary on
+   Rule 7 reports a first intimation without delay and a detailed report **within 72 hours**:
+   causes, impact, mitigation, and what people were told. Tell the people affected in plain
+   words: what happened, what it means for them, what was done, what they should do, and who to
+   contact.
+6. **Fix and verify.** Fix with a regression test and a bug registry entry.
+7. **Review within two weeks.** Add what changed to the register, and update this procedure.
+
+Contact point for all of this: `privacy@kodspot.in`.
+
+**The breach register.** Keep it outside the repository, since it can hold sensitive detail,
+in a private file the owner controls. The privacy notice says one is maintained. For each
+event record: time aware, time contained, what happened, the data and people affected,
+notifications sent and when, and the fix.
+
+**Practise.** Walk through this once a year with a made-up event. It has not been exercised yet.
+
 ## Related
 
 - [`MONITORING.md`](MONITORING.md) · [`DEPLOYMENT.md`](DEPLOYMENT.md) ·

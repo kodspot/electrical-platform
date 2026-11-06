@@ -10,17 +10,17 @@
 <meta name="theme-color" content="#1E40AF">
 <title>Electrical Inspections — Kodspot</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/css/design-system.css?v=10">
+<link rel="stylesheet" href="/css/design-system.css?v=11">
 <style>
 .page-title{display:flex;align-items:center;gap:.5rem;margin-bottom:1.25rem;flex-wrap:wrap}
 .page-title h1{font-size:1.25rem;font-weight:700;margin:0}
-.page-title .badge{font-size:.7rem}
+.page-title .badge{font-size:var(--fs-xs)}
 
 /* Stats row */
 .ei-stats{display:flex;gap:.75rem;margin-bottom:1rem;flex-wrap:wrap}
 .ei-stat{flex:1;min-width:110px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:.85rem .75rem;text-align:center}
 .ei-stat-val{font-size:1.4rem;font-weight:700;line-height:1.1}
-.ei-stat-label{font-size:.68rem;color:var(--text-muted);margin-top:.15rem}
+.ei-stat-label{font-size:var(--fs-xs);color:var(--text-muted);margin-top:.15rem}
 .ei-stat.stat-faults .ei-stat-val{color:var(--danger)}
 .ei-stat.stat-late .ei-stat-val{color:var(--warning-text)}
 .ei-stat.stat-flagged .ei-stat-val{color:var(--danger)}
@@ -38,11 +38,11 @@
 
 /* Table */
 .ei-tbl{width:100%;border-collapse:collapse;font-size:.82rem}
-.ei-tbl th{text-align:left;padding:.5rem .4rem;font-size:.7rem;font-weight:600;color:var(--text-muted);border-bottom:1px solid var(--border);white-space:nowrap}
+.ei-tbl th{text-align:left;padding:.5rem .4rem;font-size:var(--fs-xs);font-weight:600;color:var(--text-muted);border-bottom:1px solid var(--border);white-space:nowrap}
 .ei-tbl td{padding:.55rem .4rem;border-bottom:1px solid var(--border-light,var(--border));vertical-align:middle}
 .ei-tbl tr:hover{background:var(--hover-bg,rgba(30,64,175,.03))}
 .ei-location{font-weight:600;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.ei-date{font-size:.72rem;color:var(--text-muted);white-space:nowrap}
+.ei-date{font-size:var(--fs-xs);color:var(--text-muted);white-space:nowrap}
 .ei-faults{font-weight:700;color:var(--danger)}
 .ei-no-faults{color:var(--success);font-weight:600}
 .empty{text-align:center;padding:2rem;color:var(--text-muted)}
@@ -61,11 +61,11 @@
 .ei-check-list{list-style:none;padding:0;margin:.25rem 0}
 .ei-check-list li{display:flex;align-items:center;gap:.4rem;padding:.3rem 0;font-size:.8rem;border-bottom:1px solid var(--border-light,var(--border))}
 .ei-check-list li:last-child{border:none}
-.ei-check-status{font-weight:700;font-size:.72rem;padding:.1rem .35rem;border-radius:3px}
+.ei-check-status{font-weight:700;font-size:var(--fs-xs);padding:.1rem .35rem;border-radius:3px}
 .ei-check-ok{background:rgba(16,185,129,.1);color:var(--success)}
 .ei-check-faulty{background:rgba(239,68,68,.1);color:var(--danger)}
 .ei-check-na{background:rgba(120,120,120,.08);color:var(--text-muted)}
-.ei-check-remarks{font-size:.72rem;color:var(--text-muted);font-style:italic;margin-left:.25rem}
+.ei-check-remarks{font-size:var(--fs-xs);color:var(--text-muted);font-style:italic;margin-left:.25rem}
 
 .lightbox-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.88);z-index:1000;align-items:center;justify-content:center}
 .lightbox-overlay.active{display:flex}
@@ -187,7 +187,7 @@
 </div>
 
 <script src="/js/offline-sync.js?v=1"></script>
-<script src="/js/app.js?v=16"></script>
+<script src="/js/app.js?v=17"></script>
 <script>
 if (!App.initAdmin('electrical')) throw '';
 App.initNotifications(App.apiFetch);
@@ -235,7 +235,7 @@ async function loadRecords(page) {
 
   $('tableBody').innerHTML = records.map(function(r, i) {
     var num = (currentPage - 1) * PAGE_SIZE + i + 1;
-    var lateBadge = r.isLate ? ' <span class="badge badge-warning" style="font-size:.58rem">LATE</span>' : '';
+    var lateBadge = r.isLate ? ' <span class="badge badge-warning" style="font-size:var(--fs-xs)">LATE</span>' : '';
     var statusCls = r.status === 'FLAGGED' ? 'badge-danger' : 'badge-success';
     var faultHtml = r.faultyCount > 0
       ? '<span class="ei-faults">' + r.faultyCount + ' fault' + (r.faultyCount > 1 ? 's' : '') + '</span>'
@@ -306,13 +306,13 @@ async function viewDetail(id) {
   }
 
   // Checklist items — show reading + template name
-  var templateInfo = r.template ? ' <span style="font-size:.68rem;color:var(--text-light)">(Template: ' + esc(r.template.name) + ')</span>' : '';
+  var templateInfo = r.template ? ' <span style="font-size:var(--fs-xs);color:var(--text-light)">(Template: ' + esc(r.template.name) + ')</span>' : '';
   html += '<div style="margin-top:.75rem;font-weight:600;font-size:.82rem">Checklist (' + r.faultyCount + ' fault' + (r.faultyCount !== 1 ? 's' : '') + ')' + templateInfo + '</div>';
   html += '<ul class="ei-check-list">';
   (r.items || []).forEach(function(item) {
     var stCls = item.status === 'OK' || item.status === 'YES' ? 'ei-check-ok' : item.status === 'FAULTY' || item.status === 'NO' ? 'ei-check-faulty' : 'ei-check-na';
     html += '<li><span class="ei-check-status ' + stCls + '">' + item.status + '</span> ' + (CHECK_LABELS[item.checkType] || item.checkType);
-    if (item.reading != null) html += ' <span style="font-size:.72rem;color:var(--info-text);font-weight:600">[' + item.reading + ']</span>';
+    if (item.reading != null) html += ' <span style="font-size:var(--fs-xs);color:var(--info-text);font-weight:600">[' + item.reading + ']</span>';
     if (item.remarks) html += '<span class="ei-check-remarks">— ' + esc(item.remarks) + '</span>';
     html += '</li>';
   });
@@ -346,7 +346,9 @@ async function viewDetail(id) {
 async function toggleFlag(id, currentStatus) {
   var reason = '';
   if (currentStatus !== 'FLAGGED') {
-    reason = prompt('Flag reason (optional):') || '';
+    // Cancel in the prompt still flagged the inspection, with no reason. [BUG-0070]
+    reason = await App.promptDialog({ title: 'Flag this inspection', label: 'Why are you flagging this? (optional)', yes: 'Flag inspection' });
+    if (reason === null) return;
   }
   var res = await App.apiFetch('/electrical-inspections/' + id + '/flag', {
     method: 'PATCH',
@@ -354,7 +356,7 @@ async function toggleFlag(id, currentStatus) {
     body: JSON.stringify({ reason: reason })
   });
   if (res && res.ok) {
-    App.toast(currentStatus === 'FLAGGED' ? 'Unflagged' : 'Flagged', 'success');
+    App.toast(currentStatus === 'FLAGGED' ? 'Flag removed' : 'Inspection flagged', 'success');
     App.closeModal('detailModal');
     loadRecords(currentPage);
   } else if (res) {

@@ -272,8 +272,12 @@ window.App = (function () {
         if (i < 2) await _wait(1000 * Math.pow(2, i) + Math.random() * 500);
       }
     }
-    toast('Network error. Please check your connection.', 'error');
-    throw lastErr;
+    toast('No connection. Check your signal and try again.', 'error');
+    // Callers treat null as "nothing came back", as they do for a 401, so a lost connection
+    // cannot leave a page stuck on "Saving…". A caller with its own offline handling asks for
+    // the error with throwOnNetwork. [BUG-0061]
+    if (fetchOpts.throwOnNetwork) throw lastErr;
+    return null;
   }
 
   function _wait(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
@@ -353,28 +357,46 @@ window.App = (function () {
 
   // ─── Toast Notifications ───
   var toastWrap = null;
+  var toastStatus = null; // announced politely: success and information
+  var toastAlert = null;  // announced at once: errors and warnings
 
   function _ensureToast() {
     if (!toastWrap) {
       toastWrap = document.createElement('div');
       toastWrap.className = 'toast-wrap';
+      toastStatus = document.createElement('div');
+      toastStatus.setAttribute('role', 'status');
+      toastAlert = document.createElement('div');
+      toastAlert.setAttribute('role', 'alert');
+      toastWrap.appendChild(toastAlert);
+      toastWrap.appendChild(toastStatus);
       document.body.appendChild(toastWrap);
     }
   }
 
   function toast(msg, type, duration) {
     type = type || 'info';
-    duration = duration || 4000;
+    var serious = type === 'error' || type === 'warning';
+    duration = duration || (serious ? 10000 : 5000);
     _ensureToast();
     var el = document.createElement('div');
     el.className = 'toast toast-' + type;
     var icons = { success: '✓', error: '✕', warning: '⚠', info: 'ℹ' };
-    el.innerHTML = '<span>' + (icons[type] || '') + '</span><span>' + esc(msg) + '</span>';
-    toastWrap.appendChild(el);
-    setTimeout(function () {
+    el.innerHTML = '<span aria-hidden="true">' + (icons[type] || '') + '</span><span>' + esc(msg) + '</span>';
+    var remove = function () {
       el.classList.add('removing');
       setTimeout(function () { el.remove(); }, 300);
-    }, duration);
+    };
+    if (serious) {
+      var close = document.createElement('button');
+      close.className = 'toast-close';
+      close.setAttribute('aria-label', 'Dismiss');
+      close.textContent = '×';
+      close.addEventListener('click', remove);
+      el.appendChild(close);
+    }
+    (serious ? toastAlert : toastStatus).appendChild(el);
+    setTimeout(remove, duration);
   }
 
   // An action the server refused says why — its own error message, else the fallback.
@@ -386,23 +408,77 @@ window.App = (function () {
   }
 
   // ─── Confirm Dialog ───
-  function confirmDialog(msg) {
+  // confirmDialog(msg, { yes: 'Pick up', danger: false }). Red, with focus on Cancel, unless the
+  // caller says the action is not destructive.
+  function confirmDialog(msg, opts) {
+    opts = opts || {};
+    var danger = opts.danger !== false;
     return new Promise(function (resolve) {
+      var opener = document.activeElement;
       var overlay = document.createElement('div');
       overlay.className = 'modal-overlay show';
       overlay.style.zIndex = '150';
       overlay.innerHTML =
-        '<div class="modal" style="max-width:380px;text-align:center;animation:modalSlideIn .25s ease">' +
-        '<div style="font-size:2rem;margin-bottom:.75rem">⚠️</div>' +
-        '<p style="margin-bottom:1.25rem;font-size:.95rem;line-height:1.5;color:var(--text)">' + esc(msg) + '</p>' +
+        '<div class="modal" style="max-width:380px;text-align:center;animation:modalSlideIn .25s ease" role="alertdialog" aria-modal="true" aria-describedby="_cfmMsg">' +
+        '<div style="font-size:2rem;margin-bottom:.75rem" aria-hidden="true">⚠️</div>' +
+        '<p id="_cfmMsg" style="margin-bottom:1.25rem;font-size:.95rem;line-height:1.5;color:var(--text)">' + esc(msg) + '</p>' +
         '<div class="modal-actions" style="justify-content:center;border-top:none;padding-top:0">' +
         '<button class="btn btn-outline" id="_cfmNo">Cancel</button>' +
-        '<button class="btn btn-danger" id="_cfmYes">Confirm</button>' +
+        '<button class="btn ' + (danger ? 'btn-danger' : 'btn-primary') + '" id="_cfmYes">' + esc(opts.yes || 'Confirm') + '</button>' +
         '</div></div>';
       document.body.appendChild(overlay);
-      overlay.querySelector('#_cfmYes').onclick = function () { overlay.remove(); resolve(true); };
-      overlay.querySelector('#_cfmNo').onclick = function () { overlay.remove(); resolve(false); };
-      overlay.addEventListener('click', function (e) { if (e.target === overlay) { overlay.remove(); resolve(false); } });
+      var box = overlay.querySelector('.modal');
+      var done = function (answer) {
+        document.removeEventListener('keydown', onKey);
+        overlay.remove();
+        if (opener && opener.focus) opener.focus();
+        resolve(answer);
+      };
+      var onKey = function (e) {
+        if (e.key === 'Escape') done(false);
+        else _trapTab(box, e);
+      };
+      document.addEventListener('keydown', onKey);
+      overlay.querySelector('#_cfmYes').onclick = function () { done(true); };
+      overlay.querySelector('#_cfmNo').onclick = function () { done(false); };
+      overlay.addEventListener('click', function (e) { if (e.target === overlay) done(false); });
+      overlay.querySelector(danger ? '#_cfmNo' : '#_cfmYes').focus();
+    });
+  }
+
+  // promptDialog({ title, label, yes }): the typed text, or null if cancelled.
+  function promptDialog(opts) {
+    return new Promise(function (resolve) {
+      var opener = document.activeElement;
+      var overlay = document.createElement('div');
+      overlay.className = 'modal-overlay show';
+      overlay.style.zIndex = '150';
+      overlay.innerHTML =
+        '<div class="modal" style="max-width:420px" role="dialog" aria-modal="true" aria-labelledby="_prmTitle">' +
+        '<h2 class="modal-title" id="_prmTitle">' + esc(opts.title || '') + '</h2>' +
+        '<label class="form-label" for="_prmInput">' + esc(opts.label || '') + '</label>' +
+        '<textarea class="form-textarea" id="_prmInput" rows="3" maxlength="500"></textarea>' +
+        '<div class="modal-actions">' +
+        '<button class="btn btn-outline" id="_prmNo">Cancel</button>' +
+        '<button class="btn btn-primary" id="_prmYes">' + esc(opts.yes || 'Save') + '</button>' +
+        '</div></div>';
+      document.body.appendChild(overlay);
+      var box = overlay.querySelector('.modal');
+      var input = overlay.querySelector('#_prmInput');
+      var done = function (answer) {
+        document.removeEventListener('keydown', onKey);
+        overlay.remove();
+        if (opener && opener.focus) opener.focus();
+        resolve(answer);
+      };
+      var onKey = function (e) {
+        if (e.key === 'Escape') done(null);
+        else _trapTab(box, e);
+      };
+      document.addEventListener('keydown', onKey);
+      overlay.querySelector('#_prmYes').onclick = function () { done(input.value.trim()); };
+      overlay.querySelector('#_prmNo').onclick = function () { done(null); };
+      input.focus();
     });
   }
 
@@ -416,38 +492,86 @@ window.App = (function () {
   }
 
   // ─── Admin Navigation ───
+  // The daily pages stay in the bar; the rest sit under More, so that nothing is pushed out of
+  // sight on a laptop screen. At 1024px and below the hamburger lists them all.
   var NAV_ITEMS = [
     { page: 'admin-dashboard', label: 'Dashboard' },
-    { page: 'admin-analytics', label: 'Analytics' },
-    { page: 'admin-locations', label: 'Locations' },
-    { page: 'admin-workers', label: 'Workers' },
-    { page: 'admin-supervisors', label: 'Supervisors' },
+    { page: 'admin-tickets', label: 'Tickets' },
     { page: 'admin-electrical', label: 'Electrical' },
+    { page: 'admin-attendance', label: 'Attendance' },
+    { page: 'admin-locations', label: 'Locations' },
+    { page: 'admin-workers', label: 'Electricians' }
+  ];
+  var NAV_MORE = [
+    { page: 'admin-analytics', label: 'Analytics' },
+    { page: 'admin-alerts', label: 'Alerts' },
+    { page: 'admin-supervisors', label: 'Supervisors' },
     { page: 'admin-templates', label: 'Templates' },
     { page: 'admin-categories', label: 'Categories' },
     { page: 'admin-assets', label: 'Assets', mod: 'asset' },
     { page: 'admin-failures', label: 'Failures', mod: 'asset' },
-    { page: 'admin-alerts', label: 'Alerts' },
     { page: 'admin-predictions', label: 'Predictions', mod: 'asset' },
-    { page: 'admin-tickets', label: 'Tickets' },
-    { page: 'admin-attendance', label: 'Attendance' },
     { page: 'admin-audit-logs', label: 'Audit Logs' }
   ];
+  var _aiNavOn = false; // the module sync re-renders the nav, so this must outlive it
 
   function _renderAdminNav(activePage) {
     var navEl = $('topbar-nav');
     if (!navEl) return;
     var enabledMods = getEnabledModules();
-    var html = '';
-    for (var i = 0; i < NAV_ITEMS.length; i++) {
-      var n = NAV_ITEMS[i];
-      if (n.mod && enabledMods.indexOf(n.mod) === -1) continue;
-      var href = orgPath(n.page);
-      var cls = n.page.indexOf(activePage) !== -1 ? ' class="active"' : '';
-      html += '<a href="' + href + '"' + cls + '>' + n.label + '</a>';
-    }
-    navEl.innerHTML = html;
+    var show = function (n) { return !n.mod || enabledMods.indexOf(n.mod) !== -1; };
+    var isActive = function (n) { return n.page.indexOf(activePage) !== -1; };
+    var link = function (n) {
+      return '<a href="' + orgPath(n.page) + '"' + (isActive(n) ? ' class="active" aria-current="page"' : '') + '>' + n.label + '</a>';
+    };
+    var more = NAV_MORE.filter(show);
+    if (_aiNavOn) more.splice(more.length - 1, 0, { page: 'admin-ai', label: 'AI Assistant' });
+    navEl.innerHTML = NAV_ITEMS.filter(show).map(link).join('') +
+      '<div class="nav-more">' +
+        '<button type="button" class="nav-more-btn' + (more.some(isActive) ? ' active' : '') + '" id="navMoreBtn" aria-expanded="false" aria-controls="navMoreMenu">More' +
+          '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg>' +
+        '</button>' +
+        '<div class="nav-more-menu" id="navMoreMenu">' + more.map(link).join('') + '</div>' +
+      '</div>';
+    _wireNavMore();
   }
+
+  function _wireNavMore() {
+    var btn = $('navMoreBtn');
+    var menu = $('navMoreMenu');
+    if (!btn || !menu) return;
+    btn.addEventListener('click', function (e) {
+      e.stopPropagation();
+      var open = menu.classList.toggle('open');
+      btn.setAttribute('aria-expanded', String(open));
+      if (open) {
+        var r = btn.getBoundingClientRect();
+        menu.style.top = (r.bottom + 6) + 'px';
+        menu.style.left = Math.max(8, Math.min(r.left, window.innerWidth - 216)) + 'px';
+      }
+    });
+    menu.addEventListener('keydown', function (e) {
+      var links = Array.prototype.slice.call(menu.querySelectorAll('a'));
+      var i = links.indexOf(document.activeElement);
+      if (e.key === 'ArrowDown') { e.preventDefault(); links[(i + 1) % links.length].focus(); }
+      if (e.key === 'ArrowUp') { e.preventDefault(); links[(i - 1 + links.length) % links.length].focus(); }
+    });
+    btn.addEventListener('keydown', function (e) {
+      if (e.key === 'ArrowDown' && menu.classList.contains('open')) { e.preventDefault(); menu.querySelector('a').focus(); }
+    });
+    if (!_navMoreDocWired) {
+      _navMoreDocWired = true;
+      document.addEventListener('click', function (e) {
+        var m = $('navMoreMenu');
+        if (m && m.classList.contains('open') && !e.target.closest('.nav-more')) { m.classList.remove('open'); $('navMoreBtn').setAttribute('aria-expanded', 'false'); }
+      });
+      document.addEventListener('keydown', function (e) {
+        var m = $('navMoreMenu');
+        if (e.key === 'Escape' && m && m.classList.contains('open')) { m.classList.remove('open'); var b = $('navMoreBtn'); b.setAttribute('aria-expanded', 'false'); b.focus(); }
+      });
+    }
+  }
+  var _navMoreDocWired = false;
 
   function _applyRoleNavScope(navId) {
     var navEl = $(navId);
@@ -530,17 +654,8 @@ window.App = (function () {
       return res.json();
     }).then(function(data) {
       if (!data || !data.enabled) return;
-      var navEl = $('topbar-nav');
-      if (!navEl || navEl.querySelector('[data-ai-nav]')) return;
-      // Insert before Audit Logs
-      var auditLink = navEl.querySelector('a[href*="admin-audit-logs"]');
-      var a = document.createElement('a');
-      a.href = orgPath('admin-ai');
-      a.textContent = 'AI Assistant';
-      if (activePage === 'admin-ai') a.className = 'active';
-      a.setAttribute('data-ai-nav', '1');
-      if (auditLink) navEl.insertBefore(a, auditLink);
-      else navEl.appendChild(a);
+      _aiNavOn = true;
+      _renderAdminNav(activePage);
     }).catch(function() { /* AI disabled or error — skip */ });
   }
 
@@ -569,6 +684,7 @@ window.App = (function () {
 
     // Build user menu
     _buildUserMenu(user, 'admin');
+    initNotifications(apiFetch);
 
     // SA Banner
     if (isSA) {
@@ -610,7 +726,13 @@ window.App = (function () {
     if (scanNext) scanNext.href = orgPath('supervisor-scan');
 
     _buildUserMenu(user, 'supervisor');
+    _markBottomNav();
     return true;
+  }
+
+  // The role navigation becomes a fixed bottom bar on phones; the page keeps room for it.
+  function _markBottomNav() {
+    if ($('sv-nav') && document.body && document.body.classList) document.body.classList.add('has-bottom-nav');
   }
 
   function initElectrician() {
@@ -627,6 +749,7 @@ window.App = (function () {
     _syncEnabledModulesForElectrician();
 
     _buildUserMenu(user, 'electrician');
+    _markBottomNav();
     return true;
   }
 
@@ -653,8 +776,8 @@ window.App = (function () {
     var wrap = document.createElement('div');
     wrap.className = 'user-menu-wrap';
     wrap.innerHTML =
-      '<button class="user-menu-trigger" id="userMenuTrigger">' +
-        '<span class="user-avatar">' + esc(initials) + '</span>' +
+      '<button class="user-menu-trigger" id="userMenuTrigger" aria-expanded="false" aria-controls="userMenuDropdown" aria-label="Account menu for ' + esc(name) + '">' +
+        '<span class="user-avatar" aria-hidden="true">' + esc(initials) + '</span>' +
         '<span class="user-menu-name">' + esc(name) + '</span>' +
         '<svg class="user-menu-chevron" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>' +
       '</button>' +
@@ -668,6 +791,18 @@ window.App = (function () {
           '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>' +
           'Profile' +
         '</button>' +
+        (role === 'admin' || role === 'supervisor' || role === 'electrician'
+          ? '<button class="user-menu-item" id="userMenuExport">' +
+              '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>' +
+              'Download my data' +
+            '</button>'
+          : '') +
+        (role === 'supervisor' || role === 'electrician'
+          ? '<button class="user-menu-item" id="userMenuBright" role="switch" aria-checked="' + _brightScreen() + '">' +
+              '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>' +
+              'Bright screen' +
+            '</button>'
+          : '') +
         '<div class="user-menu-divider"></div>' +
         '<button class="user-menu-item user-menu-logout" id="userMenuLogout">' +
           '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>' +
@@ -690,23 +825,44 @@ window.App = (function () {
     // Toggle dropdown
     var trigger = wrap.querySelector('#userMenuTrigger');
     var dropdown = wrap.querySelector('#userMenuDropdown');
+    var closeMenu = function () {
+      dropdown.classList.remove('open');
+      trigger.setAttribute('aria-expanded', 'false');
+    };
     trigger.addEventListener('click', function(e) {
       e.stopPropagation();
-      dropdown.classList.toggle('open');
+      var open = dropdown.classList.toggle('open');
+      trigger.setAttribute('aria-expanded', String(open));
     });
 
     // Close on outside click
     document.addEventListener('click', function(e) {
-      if (!e.target.closest('.user-menu-wrap')) {
-        dropdown.classList.remove('open');
-      }
+      if (!e.target.closest('.user-menu-wrap')) closeMenu();
+    });
+    document.addEventListener('keydown', function(e) {
+      if (e.key === 'Escape' && dropdown.classList.contains('open')) { closeMenu(); trigger.focus(); }
     });
 
     // Profile
     var profileEl = wrap.querySelector('#userMenuProfile');
     profileEl.addEventListener('click', function() {
-      dropdown.classList.remove('open');
+      closeMenu();
       _openProfileModal(role);
+    });
+
+    // The person's own data (the privacy notice promises this export)
+    var exportEl = wrap.querySelector('#userMenuExport');
+    if (exportEl) exportEl.addEventListener('click', function() {
+      closeMenu();
+      _downloadMyData(role);
+    });
+
+    // Bright screen
+    var brightEl = wrap.querySelector('#userMenuBright');
+    if (brightEl) brightEl.addEventListener('click', function() {
+      var on = !_brightScreen();
+      _setBrightScreen(on);
+      brightEl.setAttribute('aria-checked', String(on));
     });
 
     // Logout
@@ -720,6 +876,21 @@ window.App = (function () {
   }
 
   // ─── Profile Modal ───
+  async function _downloadMyData(role) {
+    var res = role === 'electrician' ? await elecFetch('/auth/worker-export')
+      : role === 'supervisor' ? await supFetch('/auth/export') : await apiFetch('/auth/export');
+    if (!res) return;
+    if (!res.ok) { toast('Could not download your data. Please try again.', 'error'); return; }
+    var url = URL.createObjectURL(await res.blob());
+    var link = document.createElement('a');
+    link.href = url;
+    link.download = 'kodspot-my-data.json';
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+  }
+
   function _openProfileModal(role) {
     // Determine fetcher and token
     var fetcher = role === 'supervisor' ? supFetch : role === 'electrician' ? elecFetch : apiFetch;
@@ -908,12 +1079,24 @@ window.App = (function () {
     var toggle = $('nav-toggle');
     var navEl = $('topbar-nav');
     if (!toggle || !navEl) return;
+    toggle.setAttribute('aria-expanded', 'false');
+    toggle.setAttribute('aria-controls', 'topbar-nav');
+    if (!toggle.getAttribute('aria-label')) toggle.setAttribute('aria-label', 'Menu');
+    navEl.setAttribute('role', 'navigation');
+    navEl.setAttribute('aria-label', 'Main');
+    var close = function () {
+      navEl.classList.remove('open');
+      toggle.setAttribute('aria-expanded', 'false');
+    };
     toggle.addEventListener('click', function (e) {
       e.stopPropagation();
-      navEl.classList.toggle('open');
+      toggle.setAttribute('aria-expanded', String(navEl.classList.toggle('open')));
     });
     document.addEventListener('click', function (e) {
-      if (!e.target.closest('.topbar')) navEl.classList.remove('open');
+      if (!e.target.closest('.topbar')) close();
+    });
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape' && navEl.classList.contains('open')) { close(); toggle.focus(); }
     });
   }
 
@@ -1045,33 +1228,43 @@ window.App = (function () {
     }).catch(function () { /* will retry on next online event */ });
   }
 
+  // Stays on screen while offline or while saved work is waiting. A toast was gone in seconds,
+  // and with it the only sign that a submission had not reached the server.
   function _updateOfflineBadge() {
-    if (!window.KodspotSync) return;
-    window.KodspotSync.count().then(function (n) {
-      var badge = document.getElementById('offline-queue-badge');
-      if (badge) {
-        badge.textContent = n;
-        badge.style.display = n > 0 ? 'inline-block' : 'none';
+    var show = function (waiting) {
+      var bar = $('offlineBar');
+      if (!bar) {
+        var top = document.querySelector('.topbar');
+        if (!top) return;
+        bar = document.createElement('div');
+        bar.id = 'offlineBar';
+        bar.className = 'offline-bar';
+        bar.setAttribute('role', 'status');
+        top.parentNode.insertBefore(bar, top.nextSibling);
       }
-    }).catch(function () {});
+      var offline = navigator.onLine === false;
+      var text = offline ? 'You are offline. Your work is saved on this phone and will be sent when you are back online.' : '';
+      if (waiting > 0) text += (text ? ' ' : '') + waiting + (waiting === 1 ? ' report' : ' reports') + ' waiting to send.';
+      bar.textContent = text;
+      bar.classList.toggle('show', !!text);
+    };
+    if (!window.KodspotSync) return show(0);
+    window.KodspotSync.count().then(show).catch(function () { show(0); });
   }
 
   // Online/offline events
   window.addEventListener('online', function () {
-    toast('Back online — syncing queued data...', 'success');
+    toast('Back online. Sending your saved work…', 'success');
+    _updateOfflineBadge();
     _processQueue();
   });
-  window.addEventListener('offline', function () {
-    toast('You are offline. Submissions will be queued.', 'warning', 6000);
-  });
-
-  // Show pending count on load
-  if (window.KodspotSync) {
-    _updateOfflineBadge();
-  }
+  window.addEventListener('offline', _updateOfflineBadge);
 
   // ─── Error Helpers ───
-  function showError(id, msg, details) {
+  // showError(id, msg, details, field): `field` is the input at fault, marked invalid and
+  // focused. The message is scrolled into view, because a long form's submit button is often
+  // far from it.
+  function showError(id, msg, details, field) {
     var el = $(id);
     if (!el) return;
     if (details && details.length) {
@@ -1081,6 +1274,15 @@ window.App = (function () {
     }
     el.classList.add('show');
     el.style.display = 'block';
+    el.setAttribute('role', 'alert');
+    if (el.scrollIntoView) el.scrollIntoView({ block: 'center' });
+    var input = typeof field === 'string' ? $(field) : field;
+    if (input) {
+      input.setAttribute('aria-invalid', 'true');
+      input.setAttribute('aria-describedby', id);
+      el._field = input;
+      input.focus();
+    }
   }
 
   function hideError(id) {
@@ -1088,28 +1290,228 @@ window.App = (function () {
     if (!el) return;
     el.classList.remove('show');
     el.style.display = 'none';
+    if (el._field) {
+      el._field.removeAttribute('aria-invalid');
+      el._field.removeAttribute('aria-describedby');
+      el._field = null;
+    }
   }
 
   // ─── Modal Helpers ───
+  function _focusable(root) {
+    return Array.prototype.filter.call(
+      root.querySelectorAll('a[href],button:not([disabled]),input:not([disabled]):not([type=hidden]),select:not([disabled]):not(.cs-native-hidden),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])'),
+      function (n) { return n.getClientRects().length > 0; }
+    );
+  }
+
+  // Keeps Tab inside a dialog.
+  function _trapTab(box, e) {
+    if (e.key !== 'Tab') return;
+    var items = _focusable(box);
+    if (!items.length) { e.preventDefault(); return; }
+    var first = items[0], last = items[items.length - 1];
+    if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+    else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+    else if (!box.contains(document.activeElement)) { e.preventDefault(); first.focus(); }
+  }
+
+  var _idSeq = 0;
   function openModal(id) {
     var el = $(id);
     if (!el) return;
     el.classList.add('show');
     document.body.style.overflow = 'hidden';
+    var box = el.querySelector('.modal') || el;
+    box.setAttribute('role', 'dialog');
+    box.setAttribute('aria-modal', 'true');
+    var title = box.querySelector('.modal-title, h1, h2, h3');
+    if (title) {
+      if (!title.id) title.id = 'dlgTitle' + (++_idSeq);
+      box.setAttribute('aria-labelledby', title.id);
+    }
+    _linkLabels(box);
+    el._opener = el._opener || document.activeElement;
+    var field = box.querySelector('input:not([type=hidden]):not([type=checkbox]):not([type=radio]):not([type=file]),select:not(.cs-native-hidden),textarea');
+    if (field && field.getClientRects().length) field.focus();
+    else if (title) { title.setAttribute('tabindex', '-1'); title.focus(); }
     // Close on backdrop click
     el._backdropHandler = function (e) { if (e.target === el) closeModal(id); };
     el.addEventListener('click', el._backdropHandler);
-    // Close on Escape
-    el._escHandler = function (e) { if (e.key === 'Escape') closeModal(id); };
+    // Close on Escape; Tab stays inside
+    el._escHandler = function (e) {
+      if (e.key === 'Escape') closeModal(id);
+      else _trapTab(box, e);
+    };
     document.addEventListener('keydown', el._escHandler);
   }
   function closeModal(id) {
     var el = $(id);
     if (!el) return;
     el.classList.remove('show');
-    document.body.style.overflow = '';
+    if (!document.querySelector('.modal-overlay.show')) document.body.style.overflow = '';
     if (el._backdropHandler) { el.removeEventListener('click', el._backdropHandler); el._backdropHandler = null; }
     if (el._escHandler) { document.removeEventListener('keydown', el._escHandler); el._escHandler = null; }
+    if (el._opener && el._opener.focus && document.contains(el._opener)) el._opener.focus();
+    el._opener = null;
+  }
+
+  // ─── Status, priority and module labels ───
+  // One set of words and colours for every page. Colour always comes with a word.
+  var STATUS_LABELS = {
+    OPEN: ['New', 'info'], ACKNOWLEDGED: ['Seen', 'info'], ASSIGNED: ['Assigned', 'info'],
+    IN_PROGRESS: ['In progress', 'warning'], ON_HOLD: ['On hold', 'muted'],
+    RESOLVED_PENDING_VERIFY: ['Waiting for check', 'warning'], RESOLVED: ['Resolved', 'success'],
+    CLOSED: ['Closed', 'muted'], CANCELLED: ['Cancelled', 'muted']
+  };
+  var PRIORITY_CLASSES = { URGENT: 'urgent', HIGH: 'high', NORMAL: 'normal', LOW: 'low' };
+  var MODULE_LABELS = { ele: 'Electrical', civil: 'Civil', asset: 'Assets', complaints: 'Complaints' };
+
+  function statusLabel(status) {
+    return (STATUS_LABELS[status] || [String(status || '').replace(/_/g, ' ')])[0];
+  }
+  function statusBadge(status) {
+    var s = STATUS_LABELS[status];
+    return '<span class="badge badge-' + (s ? s[1] : 'muted') + '">' + esc(statusLabel(status)) + '</span>';
+  }
+  function priorityBadge(priority) {
+    var p = String(priority || 'NORMAL');
+    return '<span class="badge badge-' + (PRIORITY_CLASSES[p] || 'normal') + '">' + esc(p.charAt(0) + p.slice(1).toLowerCase()) + '</span>';
+  }
+  function moduleLabel(mod) {
+    return MODULE_LABELS[mod] || String(mod || '');
+  }
+
+  // ─── Empty and failed-load states ───
+  // emptyState(el, { title, body, actionLabel, onAction })
+  function emptyState(el, opts) {
+    if (typeof el === 'string') el = $(el);
+    if (!el) return;
+    el.innerHTML = '<div class="empty-state">' +
+      '<div class="empty-state-title">' + esc(opts.title || '') + '</div>' +
+      (opts.body ? '<div class="empty-state-body">' + esc(opts.body) + '</div>' : '') +
+      (opts.actionLabel ? '<button type="button" class="btn btn-primary">' + esc(opts.actionLabel) + '</button>' : '') +
+      '</div>';
+    if (opts.actionLabel && opts.onAction) el.querySelector('button').addEventListener('click', opts.onAction);
+  }
+
+  // The location tree as checkboxes, for an assignment modal. assignedMap: { locationId: anything }.
+  function renderLocCheckbox(loc, assignedMap, depth) {
+    var checked = assignedMap[loc.id] !== undefined;
+    var typeBadge = loc.type ? '<span class="fa-loc-type">' + esc(loc.type.replace('_', ' ')) + '</span>' : '';
+    var indent = depth > 1 ? ' style="padding-left:' + (0.7 + depth * 0.7) + 'rem"' : '';
+    return '<label class="fa-loc"' + indent + '>' +
+      '<input type="checkbox" value="' + loc.id + '"' + (checked ? ' checked' : '') + '>' +
+      '<span class="fa-loc-name">' + esc(loc.name) + '</span>' +
+      typeBadge +
+    '</label>';
+  }
+
+  function locationChecklist(tree, assignedMap) {
+    var html = '';
+    for (var j = 0; j < tree.length; j++) {
+      var root = tree[j];
+      var children = root.children || [];
+
+      if (children.length > 0) {
+        // Has children — show as group header, list children as checkboxes
+        html += '<div class="fa-group">';
+        html += '<div class="fa-group-hdr"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>' + esc(root.name) + '</div>';
+        for (var k = 0; k < children.length; k++) {
+          var child = children[k];
+          html += renderLocCheckbox(child, assignedMap, 1);
+          // Also render grandchildren (rooms under floors)
+          var grandchildren = child.children || [];
+          for (var g = 0; g < grandchildren.length; g++) {
+            html += renderLocCheckbox(grandchildren[g], assignedMap, 2);
+          }
+        }
+        html += '</div>';
+      } else {
+        // Standalone location (no children) — show as flat checkbox
+        html += renderLocCheckbox(root, assignedMap, 0);
+      }
+    }
+    return html;
+  }
+
+  // loadFailed(el, { what, onRetry }): a failed request must never look like an empty result.
+  function loadFailed(el, opts) {
+    emptyState(el, {
+      title: 'Could not load ' + (opts.what || 'this') + '.',
+      body: 'Check your signal and try again.',
+      actionLabel: opts.onRetry ? 'Try again' : '',
+      onAction: opts.onRetry
+    });
+  }
+
+  // ─── Page setup ───
+  // Ties each form label to its control, for pages that wrote them as siblings.
+  function _linkLabels(root) {
+    Array.prototype.forEach.call((root || document).querySelectorAll('label.form-label:not([for])'), function (label) {
+      var group = label.parentNode;
+      var next = label.nextElementSibling;
+      var control = next && /^(INPUT|SELECT|TEXTAREA)$/.test(next.tagName) ? next : null;
+      if (!control) {
+        var inGroup = group.querySelectorAll('input:not([type=hidden]),select,textarea');
+        if (inGroup.length === 1) control = inGroup[0];
+      }
+      if (!control) return;
+      if (!control.id) control.id = 'fld' + (++_idSeq);
+      label.htmlFor = control.id;
+    });
+  }
+
+  // A region that scrolls sideways must be reachable by keyboard, and only then.
+  function markScrollRegions(root) {
+    Array.prototype.forEach.call((root || document).querySelectorAll('.table-wrap,[data-scroll]'), function (el) {
+      if (el.scrollWidth > el.clientWidth + 1) {
+        el.setAttribute('tabindex', '0');
+        el.setAttribute('role', 'region');
+        if (!el.getAttribute('aria-label')) {
+          var head = el.closest('section, .section');
+          var title = head && head.querySelector('h2, h3, .section-title');
+          el.setAttribute('aria-label', title ? title.textContent.trim() : 'Scrollable table');
+        }
+      } else if (el.getAttribute('role') === 'region') {
+        el.removeAttribute('tabindex');
+        el.removeAttribute('role');
+      }
+    });
+  }
+
+  function _pageLandmarks() {
+    var main = document.querySelector('main, [role="main"]') || document.querySelector('.container, .sv-shell, .auth-card');
+    if (!main) return;
+    if (!main.id) main.id = 'main';
+    if (main.tagName !== 'MAIN' && !main.getAttribute('role')) main.setAttribute('role', 'main');
+    main.setAttribute('tabindex', '-1');
+    var skip = document.createElement('a');
+    skip.className = 'skip-link';
+    skip.href = '#' + main.id;
+    skip.textContent = 'Skip to main content';
+    document.body.insertBefore(skip, document.body.firstChild);
+  }
+
+  document.addEventListener('DOMContentLoaded', function () {
+    _pageLandmarks();
+    _linkLabels(document);
+    _updateOfflineBadge();
+    markScrollRegions(document);
+    var timer = null;
+    var later = function () { clearTimeout(timer); timer = setTimeout(function () { markScrollRegions(document); }, 250); };
+    window.addEventListener('resize', later);
+    if (window.MutationObserver) new MutationObserver(later).observe(document.body, { childList: true, subtree: true });
+  });
+
+  // ─── Bright screen (field pages are dark by default) ───
+  function _brightScreen() {
+    try { return localStorage.getItem('kodspot_theme') === 'light'; } catch (e) { return false; }
+  }
+  function _setBrightScreen(on) {
+    try { localStorage.setItem('kodspot_theme', on ? 'light' : 'dark'); } catch (e) { /* not stored; still applies now */ }
+    if (on) document.documentElement.removeAttribute('data-theme');
+    else document.documentElement.setAttribute('data-theme', 'dark');
   }
 
   // ─── Image URL with auth token ───
@@ -1136,6 +1538,7 @@ window.App = (function () {
   function _np(p) { return _notifPathPrefix + p; }
 
   function initNotifications(fetcher, pageContext) {
+    if ($('notifBell')) return; // initAdmin already set it up, or the page called twice
     _notifFetcher = fetcher;
     _notifPage = pageContext || null;
     _notifPathPrefix = pageContext === 'electrician' ? '/worker/notifications' : '/notifications';
@@ -1145,7 +1548,7 @@ window.App = (function () {
 
     var bellWrap = document.createElement('div');
     bellWrap.className = 'notif-bell-wrap';
-    bellWrap.innerHTML = '<button class="notif-bell" id="notifBell" aria-label="Notifications">' +
+    bellWrap.innerHTML = '<button class="notif-bell" id="notifBell" aria-label="Notifications" aria-expanded="false" aria-controls="notifPanel">' +
       '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">' +
       '<path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/>' +
       '</svg><span class="notif-badge" id="notifBadge"></span></button>';
@@ -1179,6 +1582,7 @@ window.App = (function () {
     $('notifBell').addEventListener('click', function(e) {
       e.stopPropagation();
       var isOpen = _notifPanelEl.classList.toggle('open');
+      this.setAttribute('aria-expanded', String(isOpen));
       if (isOpen) _loadNotifications();
     });
 
@@ -1186,12 +1590,18 @@ window.App = (function () {
     document.addEventListener('click', function(e) {
       if (_notifPanelEl && !e.target.closest('.notif-bell-wrap')) {
         _notifPanelEl.classList.remove('open');
+        $('notifBell').setAttribute('aria-expanded', 'false');
       }
     });
 
     // Close on Escape
     document.addEventListener('keydown', function(e) {
-      if (e.key === 'Escape' && _notifPanelEl) _notifPanelEl.classList.remove('open');
+      if (e.key === 'Escape' && _notifPanelEl && _notifPanelEl.classList.contains('open')) {
+        _notifPanelEl.classList.remove('open');
+        var bell = $('notifBell');
+        bell.setAttribute('aria-expanded', 'false');
+        bell.focus();
+      }
     });
 
     // Mark all read
@@ -1342,6 +1752,8 @@ window.App = (function () {
 
   function _updateBadge(count) {
     if (!_notifBadgeEl) return;
+    var bellBtn = $('notifBell');
+    if (bellBtn) bellBtn.setAttribute('aria-label', count > 0 ? 'Notifications, ' + count + ' unread' : 'Notifications');
     if (count > 0) {
       _notifBadgeEl.textContent = count > 99 ? '99+' : count;
       _notifBadgeEl.style.display = 'flex';
@@ -1547,7 +1959,9 @@ window.App = (function () {
     supFetch: supFetch, supFetchJson: supFetchJson,
     elecFetch: elecFetch, elecFetchJson: elecFetchJson,
     logout: logout, logoutSA: logoutSA, logoutSup: logoutSup, logoutElec: logoutElec,
-    toast: toast, toastFailure: toastFailure, confirmDialog: confirmDialog,
+    toast: toast, toastFailure: toastFailure, confirmDialog: confirmDialog, promptDialog: promptDialog,
+    statusLabel: statusLabel, statusBadge: statusBadge, priorityBadge: priorityBadge, moduleLabel: moduleLabel,
+    emptyState: emptyState, loadFailed: loadFailed, markScrollRegions: markScrollRegions, locationChecklist: locationChecklist,
     initAdmin: initAdmin, initSupervisor: initSupervisor, initElectrician: initElectrician,
     initModulePWA: initModulePWA,
     buildUserMenu: _buildUserMenu,

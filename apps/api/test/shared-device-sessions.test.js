@@ -37,7 +37,7 @@ function loadApp({ stored = TOKENS, queued = [], pathname = '/' } = {}) {
     localStorage: { getItem: (k) => (k in stored ? stored[k] : null), setItem: noop, removeItem: noop },
     document: {
       addEventListener: noop, querySelector: () => null, getElementById: () => null, body: { appendChild: noop },
-      createElement: () => ({ style: {}, classList: { add: noop, remove: noop }, appendChild: noop, remove: noop, addEventListener: noop, innerHTML: '', textContent: '' })
+      createElement: () => ({ style: {}, classList: { add: noop, remove: noop }, appendChild: noop, remove: noop, addEventListener: noop, setAttribute: noop, innerHTML: '', textContent: '' })
     },
     setTimeout: (fn) => { fn(); return 0; }, clearTimeout: noop, FormData: class FormData {},
     fetch: async (url, opts) => {

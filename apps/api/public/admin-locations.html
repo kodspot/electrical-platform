@@ -10,7 +10,7 @@
 <meta name="theme-color" content="#1E40AF">
 <title>Locations — Kodspot</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/css/design-system.css?v=10">
+<link rel="stylesheet" href="/css/design-system.css?v=11">
 <style>
 /* ── Location Tree ── */
 .loc-tree{margin-top:.25rem}
@@ -23,7 +23,7 @@
 .loc-search-bar{display:flex;align-items:center;gap:.5rem;margin-bottom:.65rem}
 .loc-search{flex:1;padding:.4rem .7rem;border:1px solid var(--border);border-radius:var(--radius);font-size:.82rem;background:var(--surface);color:var(--text);max-width:340px}
 .loc-search::placeholder{color:var(--text-light)}
-.loc-search-count{font-size:.72rem;color:var(--text-muted)}
+.loc-search-count{font-size:var(--fs-xs);color:var(--text-muted)}
 
 /* Container: BUILDING / FLOOR */
 .loc-group{margin-bottom:2px}
@@ -41,10 +41,10 @@
 .loc-group-icon.floor{background:#f5f3ff;color:#8b5cf6}
 .loc-group-title{min-width:0;overflow:hidden}
 .loc-group-name{font-weight:600;font-size:.92rem;color:var(--text);line-height:1.2;display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.loc-group-sub{font-size:.7rem;color:var(--text-muted);margin-top:1px}
+.loc-group-sub{font-size:var(--fs-xs);color:var(--text-muted);margin-top:1px}
 .loc-group-right{display:flex;align-items:center;gap:.5rem;flex-shrink:0}
 .loc-group-pills{display:flex;gap:.3rem}
-.pill{font-size:.65rem;padding:.15rem .5rem;border-radius:99px;font-weight:500;white-space:nowrap}
+.pill{font-size:var(--fs-xs);padding:.15rem .5rem;border-radius:99px;font-weight:500;white-space:nowrap}
 .pill-rooms{background:#f0fdf4;color:#16a34a}
 .pill-cleans{background:#eff6ff;color:#2563eb}
 .pill-tickets{background:#fef3c7;color:#d97706}
@@ -75,7 +75,7 @@
 .room-name{font-weight:500;font-size:.88rem;color:var(--text);line-height:1.25;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .room-meta-row{display:flex;align-items:center;gap:.35rem;margin-top:2px;flex-wrap:wrap}
 .room-type-tag{
-  font-size:.6rem;padding:.1rem .4rem;border-radius:var(--radius-sm);font-weight:600;
+  font-size:var(--fs-xs);padding:.1rem .4rem;border-radius:var(--radius-sm);font-weight:600;
   text-transform:uppercase;letter-spacing:.3px;background:#f1f5f9;color:#64748b
 }
 .sched-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0}
@@ -83,16 +83,16 @@
 .sched-dot.afternoon{background:#3b82f6}
 .sched-dot.night{background:#6366f1}
 .sched-dot.general{background:#10b981}
-.sched-label{font-size:.6rem;color:var(--text-muted);font-weight:500}
-.badge-nosched{font-size:.55rem;padding:.1rem .35rem;border-radius:99px;font-weight:600;background:#fef3c7;color:#d97706}
+.sched-label{font-size:var(--fs-xs);color:var(--text-muted);font-weight:500}
+.badge-nosched{font-size:var(--fs-xs);padding:.1rem .35rem;border-radius:99px;font-weight:600;background:#fef3c7;color:#d97706}
 .room-right{display:flex;align-items:center;gap:.3rem;flex-shrink:0}
 .room-stats{display:flex;gap:.6rem;margin-right:.4rem}
-.room-stat{font-size:.72rem;color:var(--text-muted);display:flex;align-items:center;gap:.2rem}
+.room-stat{font-size:var(--fs-xs);color:var(--text-muted);display:flex;align-items:center;gap:.2rem}
 .room-stat-val{font-weight:600;color:var(--text);min-width:10px}
 
 /* Compact stats on mobile */
 .room-stats-compact{display:none;gap:.4rem;margin-top:2px}
-.room-stats-compact .room-stat{font-size:.62rem}
+.room-stats-compact .room-stat{font-size:var(--fs-xs)}
 
 /* Action buttons */
 .act-btn{
@@ -103,7 +103,6 @@
 .act-btn:hover{transform:translateY(-1px);box-shadow:0 2px 6px rgba(0,0,0,.06)}
 .act-btn svg{width:14px;height:14px;stroke-width:1.8}
 .act-btn.act-edit:hover{border-color:#3b82f6;color:#3b82f6;background:#eff6ff}
-.act-btn.act-schedule:hover{border-color:#10b981;color:#10b981;background:#f0fdf4}
 .act-btn.act-qr:hover{border-color:#8b5cf6;color:#8b5cf6;background:#f5f3ff}
 .act-btn.act-delete:hover{border-color:#ef4444;color:#ef4444;background:#fef2f2}
 .act-btn.act-activate{border-color:#10b981;color:#10b981;background:#f0fdf4}
@@ -111,7 +110,7 @@
 
 /* Inactive / Badge */
 .loc-inactive{opacity:.55}
-.badge-inactive{font-size:.58rem;padding:.1rem .35rem;border-radius:99px;font-weight:600;background:#fee2e2;color:#dc2626;margin-left:.3rem}
+.badge-inactive{font-size:var(--fs-xs);padding:.1rem .35rem;border-radius:99px;font-weight:600;background:#fee2e2;color:#dc2626;margin-left:.3rem}
 
 /* QR Modal */
 .qr-modal-inner{text-align:center;padding:.75rem 0 0}
@@ -120,7 +119,7 @@
   font-family:'Courier New',monospace;font-size:1.4rem;font-weight:700;
   color:var(--primary);letter-spacing:2px;margin:.75rem 0 .15rem
 }
-.qr-hint{font-size:.72rem;color:var(--text-muted);margin-bottom:1.25rem}
+.qr-hint{font-size:var(--fs-xs);color:var(--text-muted);margin-bottom:1.25rem}
 .qr-actions{display:flex;gap:.5rem;justify-content:center;flex-wrap:wrap}
 
 /* Empty / Error state */
@@ -147,7 +146,7 @@
 }
 @media(max-width:480px){
   .room-card{padding:.4rem .5rem}
-  .room-icon{width:30px;height:30px;font-size:.7rem}
+  .room-icon{width:30px;height:30px;font-size:var(--fs-xs)}
   .room-name{font-size:.82rem}
   .loc-group-icon{width:28px;height:28px;font-size:.85rem}
   .loc-group-name{font-size:.85rem}
@@ -204,13 +203,13 @@
         <div class="form-group"><label class="form-label">Name</label><input class="form-input" type="text" id="locName" required maxlength="200"></div>
         <div class="form-group"><label class="form-label">Type</label>
           <select class="form-select" id="locType" required>
-            <optgroup label="Container Types">
-              <option value="BUILDING">Building</option><option value="FLOOR">Floor</option>
-              <option value="HOSTEL">Hostel</option><option value="SUBSTATION">Substation</option>
+            <optgroup label="Holds other spaces (blocks, floors)">
+              <option value="HOSTEL">Hostel</option><option value="FLOOR">Floor</option>
+              <option value="BUILDING">Building / Block</option><option value="SUBSTATION">Substation</option>
               <option value="PANEL_ROOM">Panel Room</option><option value="GENERATOR_ROOM">Generator Room</option>
               <option value="TRANSFORMER">Transformer</option><option value="UTILITY_AREA">Utility Area</option>
             </optgroup>
-            <optgroup label="Location Types">
+            <optgroup label="Single spaces (get a QR sticker)">
               <option value="ROOM">Room</option><option value="CORRIDOR">Corridor</option>
               <option value="WASHROOM">Washroom</option><option value="ICU">ICU</option>
               <option value="LOBBY">Lobby</option><option value="KITCHEN">Kitchen</option>
@@ -227,7 +226,7 @@
           </select>
         </div>
       </div>
-      <div class="form-group"><label class="form-label">Parent Location</label><select class="form-select" id="locParent"><option value="">— None (Top Level) —</option></select></div>
+      <div class="form-group"><label class="form-label">Parent Location</label><select class="form-select" id="locParent"><option value="">— None (Top Level) —</option></select><div class="form-hint" id="locPathHint" aria-live="polite"></div></div>
       <div class="form-row">
         <div class="form-group"><label class="form-label">Sort Order</label><input class="form-input" type="number" id="locSort" value="0"></div>
         <div class="form-group" id="statusGroup" style="display:none"><label class="form-label">Status</label><select class="form-select" id="locActive"><option value="true">Active</option><option value="false">Inactive</option></select></div>
@@ -235,6 +234,7 @@
       <div class="form-group"><label class="form-label">Notes</label><textarea class="form-textarea" id="locNotes" rows="2" maxlength="500"></textarea></div>
       <div class="modal-actions">
         <button type="button" class="btn btn-outline" onclick="App.closeModal('modal')">Cancel</button>
+        <button type="button" class="btn btn-outline" id="saveAddBtn" onclick="saveAndAddAnother()">Save and add another</button>
         <button type="submit" class="btn btn-primary">Save</button>
       </div>
     </form>
@@ -261,7 +261,7 @@
 
 
 <script src="/js/offline-sync.js?v=1"></script>
-<script src="/js/app.js?v=16"></script>
+<script src="/js/app.js?v=17"></script>
 <script src="/js/custom-select.js"></script>
 <script>
 if (!App.initAdmin('locations')) throw '';
@@ -323,13 +323,13 @@ async function loadTree() {
 
   if (!tree.length) {
     $('searchBar').innerHTML = '';
-    $('treeContainer').innerHTML = '<div class="loc-empty"><span class="loc-empty-icon">🏢</span><div class="loc-empty-text">No locations yet</div><div class="loc-empty-sub">Add your first building to get started</div></div>';
+    App.emptyState($('treeContainer'), { title: 'No locations yet', body: 'Start with your hostel or block, then add floors inside it, then rooms inside each floor. Each room gets its own QR sticker.', actionLabel: '+ Add your first block', onAction: openAdd });
   } else {
     var totals = {rooms:0,cleans:0,tickets:0,unscheduled:0};
     function countAll(nodes){for(var i=0;i<nodes.length;i++){var n=nodes[i];if(!isContainer(n.type)){totals.rooms++;totals.cleans+=n._count.electricalInspections;totals.tickets+=n._count.tickets}if(n.children)countAll(n.children)}}
     countAll(tree);
     var summary = '<div class="loc-summary">' +
-      '<span class="loc-summary-item"><b>' + totals.rooms + '</b> locations</span>' +
+      '<span class="loc-summary-item"><b>' + totals.rooms + '</b> location' + (totals.rooms === 1 ? '' : 's') + '</span>' +
       '<span class="loc-summary-item"><b>' + totals.cleans + '</b> total inspections</span>' +
       '<span class="loc-summary-item"><b>' + totals.tickets + '</b> open tickets</span>' +
     '</div>';
@@ -408,6 +408,7 @@ function renderNodes(nodes, depth) {
               '<span class="pill pill-cleans">' + stats.cleans + ' inspections</span>' +
               '<span class="pill pill-tickets' + ticketCls + '">' + stats.tickets + ' tickets</span>' +
             '</div>' +
+            '<button class="btn btn-sm btn-outline" title="Add a space inside ' + esc(n.name) + '" data-action="add-inside" data-id="' + n.id + '">+ Add inside</button>' +
             '<button class="act-btn act-edit" title="Edit" data-action="edit" data-id="' + n.id + '">' + ICO.edit + '</button>' +
             (inactive
               ? '<button class="act-btn act-activate" title="Activate" data-action="activate" data-id="' + n.id + '">' + ICO.activate + '</button>'
@@ -428,8 +429,6 @@ function renderNodes(nodes, depth) {
           schedHtml += '<span class="sched-dot ' + sc + '" title="' + shifts[s] + '"></span>';
         }
         schedHtml += '<span class="sched-label">' + shifts.join(' · ') + '</span>';
-      } else {
-        schedHtml = '<span class="badge-nosched">No schedule</span>';
       }
 
       var statsHtml = '<div class="room-stats">' +
@@ -493,7 +492,8 @@ function bindCollapseToggles() {
     var node = _nodeMap[id];
     if (!node) return;
     e.stopPropagation();
-    if (action === 'edit') openEdit(id, node.name, node.type, node.sortOrder, node.notes || '', node.parentId || '', node.isActive);
+    if (action === 'add-inside') openAddInside(node);
+    else if (action === 'edit') openEdit(id, node.name, node.type, node.sortOrder, node.notes || '', node.parentId || '', node.isActive);
     else if (action === 'qr') showQR(id, node.name, node.qrCode);
     else if (action === 'activate') activateLoc(id, node.name);
     else if (action === 'delete') deleteLoc(id, node.name);
@@ -560,15 +560,41 @@ function onSearch() {
   if ($('searchCount')) $('searchCount').textContent = matchCount + ' match' + (matchCount !== 1 ? 'es' : '');
 }
 
+// Only a space that can hold others is a parent, shown by its full path: two rooms called "101"
+// or two floors called "Floor 1" could not be told apart. [BUG-0067]
 function populateParentSelect() {
   var sel = $('locParent');
-  sel.innerHTML = '<option value="">— None (Top Level) —</option>' + allLocations.map(function(l) { return '<option value="' + l.id + '">' + esc(l.name) + ' (' + l.type + ')</option>'; }).join('');
+  var current = sel.value;
+  sel.innerHTML = '<option value="">— None (Top Level) —</option>' + allLocations.filter(function(l) { return isContainer(l.type); }).map(function(l) { return '<option value="' + l.id + '">' + esc(l.name) + '</option>'; }).join('');
+  sel.value = current;
+}
+
+function updatePathHint() {
+  var sel = $('locParent'), name = $('locName').value.trim();
+  var parent = sel.value ? sel.options[sel.selectedIndex].textContent : '';
+  $('locPathHint').textContent = name && !isContainer($('locType').value)
+    ? 'This room\'s sticker will read: ' + (parent ? parent + ' → ' : '') + name : '';
+}
+['input', 'change'].forEach(function(ev) {
+  $('locName').addEventListener(ev, updatePathHint);
+  $('locParent').addEventListener(ev, updatePathHint);
+  $('locType').addEventListener(ev, updatePathHint);
+});
+
+var CHILD_TYPE = { HOSTEL: 'FLOOR', BUILDING: 'FLOOR', FLOOR: 'ROOM' };
+function openAddInside(node) {
+  openAdd();
+  $('locParent').value = node.id;
+  if (CHILD_TYPE[node.type]) $('locType').value = CHILD_TYPE[node.type];
+  updatePathHint();
 }
 
 function openAdd() {
   $('modalTitle').textContent = 'Add Location';
   $('locForm').reset(); $('locId').value = '';
   $('statusGroup').style.display = 'none';
+  $('saveAddBtn').style.display = '';
+  updatePathHint();
   App.hideError('modalError');
   App.openModal('modal');
 }
@@ -578,11 +604,20 @@ function openEdit(id, name, type, sort, notes, parentId, isActive) {
   $('locId').value = id; $('locName').value = name; $('locType').value = type;
   $('locSort').value = sort; $('locNotes').value = notes;
   $('locParent').value = parentId || '';
+  // a location already under a space that is not a container stays where it is
+  if (parentId && $('locParent').value !== parentId) {
+    var old = allLocations.filter(function(l) { return l.id === parentId; })[0];
+    if (old) { $('locParent').add(new Option(old.name, old.id)); $('locParent').value = parentId; }
+  }
   $('locActive').value = isActive === false ? 'false' : 'true';
   $('statusGroup').style.display = '';
+  $('saveAddBtn').style.display = 'none';
   App.hideError('modalError');
   App.openModal('modal');
 }
+
+var addAnother = false;
+function saveAndAddAnother() { addAnother = true; $('locForm').requestSubmit(); }
 
 $('locForm').addEventListener('submit', async function(e) {
   e.preventDefault();
@@ -597,8 +632,18 @@ $('locForm').addEventListener('submit', async function(e) {
   if (id) body.isActive = $('locActive').value === 'true';
   var res = await App.apiFetch(id ? '/locations/' + id : '/locations', { method: id ? 'PATCH' : 'POST', body: JSON.stringify(body) });
   if (!res) return;
-  if (!res.ok) { var d = await res.json(); App.showError('modalError', d.error || 'Failed'); return; }
-  App.closeModal('modal'); App.toast(id ? 'Location updated' : 'Location created', 'success'); loadTree();
+  if (!res.ok) { var d = await res.json().catch(function() { return {}; }); App.showError('modalError', d.error || 'Could not save. Please try again.'); return; }
+  var again = !id && addAnother;
+  addAnother = false;
+  if (again) {
+    App.toast(body.name + ' added', 'success');
+    $('locName').value = ''; $('locNotes').value = '';
+    updatePathHint();
+    $('locName').focus();
+  } else {
+    App.closeModal('modal'); App.toast(id ? 'Location updated' : 'Location created', 'success');
+  }
+  loadTree();
 });
 
 // ── QR Modal ──

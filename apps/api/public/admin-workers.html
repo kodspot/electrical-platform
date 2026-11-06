@@ -10,7 +10,7 @@
 <meta name="theme-color" content="#1E40AF">
 <title>Electricians — Kodspot</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/css/design-system.css?v=10">
+<link rel="stylesheet" href="/css/design-system.css?v=11">
 <style>
 /* ── Summary bar ── */
 .wk-summary{display:flex;gap:1rem;flex-wrap:wrap;padding:.6rem 0 .5rem;border-bottom:1px solid var(--border-light);margin-bottom:.75rem}
@@ -27,14 +27,14 @@
 
 /* ── Table enhancements ── */
 .wk-tbl{width:100%;border-collapse:collapse;font-size:.84rem}
-.wk-tbl thead th{text-align:left;padding:.55rem .65rem;color:var(--text-muted);border-bottom:2px solid var(--border);font-weight:600;font-size:.72rem;text-transform:uppercase;letter-spacing:.04em;white-space:nowrap;position:sticky;top:0;background:var(--surface);z-index:1}
+.wk-tbl thead th{text-align:left;padding:.55rem .65rem;color:var(--text-muted);border-bottom:2px solid var(--border);font-weight:600;font-size:var(--fs-xs);text-transform:uppercase;letter-spacing:.04em;white-space:nowrap;position:sticky;top:0;background:var(--surface);z-index:1}
 .wk-tbl tbody td{padding:.55rem .65rem;border-bottom:1px solid var(--border-light);vertical-align:middle}
 .wk-tbl tbody tr:nth-child(even) td{background:rgba(248,250,252,.5)}
 .wk-tbl tbody tr:hover td{background:rgba(30,64,175,.04)}
 .wk-tbl td:last-child{white-space:nowrap}
 .wk-row-inactive td{opacity:.55}
 .wk-name-cell{font-weight:600}
-.wk-desig-sub{font-size:.7rem;color:var(--text-muted);font-weight:400;display:block;margin-top:1px}
+.wk-desig-sub{font-size:var(--fs-xs);color:var(--text-muted);font-weight:400;display:block;margin-top:1px}
 .wk-doj{font-size:.75rem;color:var(--text-muted)}
 .wk-cleans{font-weight:700;color:var(--primary)}
 .wk-actions{display:flex;gap:4px;flex-wrap:wrap}
@@ -44,9 +44,9 @@
 .wk-stat-card{text-align:center;padding:.6rem .5rem;border-radius:var(--radius-lg);background:var(--bg);transition:box-shadow .15s}
 .wk-stat-card:hover{box-shadow:var(--shadow-sm)}
 .wk-stat-val{font-size:1.4rem;font-weight:700;color:var(--primary)}
-.wk-stat-label{font-size:.68rem;color:var(--text-muted);margin-top:2px}
+.wk-stat-label{font-size:var(--fs-xs);color:var(--text-muted);margin-top:2px}
 .wk-stat-section{margin-top:.75rem;padding-top:.6rem;border-top:1px solid var(--border-light)}
-.wk-stat-section-title{font-size:.72rem;font-weight:600;text-transform:uppercase;letter-spacing:.04em;color:var(--text-muted);margin-bottom:.4rem}
+.wk-stat-section-title{font-size:var(--fs-xs);font-weight:600;text-transform:uppercase;letter-spacing:.04em;color:var(--text-muted);margin-bottom:.4rem}
 .wk-stat-row{display:flex;justify-content:space-between;align-items:center;padding:.2rem 0;font-size:.82rem}
 .wk-stat-row-val{font-weight:600}
 .wk-stat-footer{margin-top:.75rem;font-size:.75rem;color:var(--text-muted);text-align:center}
@@ -54,20 +54,11 @@
 /* ── Detail modal ── */
 .wk-detail-grid{display:grid;grid-template-columns:1fr 1fr;gap:.5rem .75rem}
 .wk-detail-item{padding:.35rem 0}
-.wk-detail-label{font-size:.7rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.03em;margin-bottom:1px}
+.wk-detail-label{font-size:var(--fs-xs);color:var(--text-muted);text-transform:uppercase;letter-spacing:.03em;margin-bottom:1px}
 .wk-detail-val{font-size:.88rem;font-weight:500;word-break:break-word}
 
 /* ── Floor assignment modal ── */
-.fa-loc-list{display:flex;flex-direction:column;gap:.25rem;max-height:380px;overflow-y:auto}
-.fa-group{margin-bottom:.35rem}
-.fa-group-hdr{font-size:.72rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.04em;padding:.4rem .5rem .2rem;display:flex;align-items:center;gap:.35rem}
-.fa-group-hdr svg{opacity:.5}
-.fa-loc{display:flex;align-items:center;gap:.55rem;background:var(--bg);padding:.5rem .7rem .5rem 1.4rem;border-radius:var(--radius);cursor:pointer;font-size:.85rem;border:1px solid transparent;transition:border-color .1s}
-.fa-loc:hover{border-color:var(--border)}
-.fa-loc input[type=checkbox]{width:20px;height:20px;accent-color:var(--primary);flex-shrink:0}
-.fa-loc-name{flex:1}
-.fa-loc-type{font-size:.62rem;color:var(--text-muted);background:var(--surface);padding:.1rem .35rem;border-radius:var(--radius-sm);text-transform:uppercase;letter-spacing:.03em}
-.fa-primary{font-size:.68rem;color:var(--primary);font-weight:600;cursor:pointer;white-space:nowrap}
+.fa-primary{font-size:var(--fs-xs);color:var(--primary);font-weight:600;cursor:pointer;white-space:nowrap}
 
 /* ── Pagination ── */
 .wk-pager{display:flex;gap:.35rem;justify-content:center;align-items:center;padding:.75rem 0}
@@ -93,7 +84,7 @@
   .wk-tbl tbody tr{display:block;padding:.75rem;margin-bottom:.5rem;border:1px solid var(--border-light);border-radius:var(--radius);background:var(--surface)}
   .wk-tbl tbody tr:nth-child(even){background:var(--surface)}
   .wk-tbl tbody td{display:flex;justify-content:space-between;align-items:center;padding:.25rem 0;border:none;font-size:.82rem}
-  .wk-tbl tbody td::before{content:attr(data-label);font-weight:600;font-size:.7rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.03em;flex-shrink:0;margin-right:.5rem}
+  .wk-tbl tbody td::before{content:attr(data-label);font-weight:600;font-size:var(--fs-xs);color:var(--text-muted);text-transform:uppercase;letter-spacing:.03em;flex-shrink:0;margin-right:.5rem}
   .wk-tbl tbody td:first-child{padding-top:0}
   .wk-tbl tbody td:last-child{padding-top:.35rem;justify-content:flex-start}
   .wk-tbl tbody td:last-child::before{display:none}
@@ -112,7 +103,7 @@
 @media(min-width:769px) and (max-width:960px){
   .wk-tbl{font-size:.78rem}
   .wk-tbl thead th,.wk-tbl tbody td{padding:.4rem .45rem}
-  .wk-actions .btn-sm{font-size:.7rem;padding:.15rem .3rem}
+  .wk-actions .btn-sm{font-size:var(--fs-xs);padding:.15rem .3rem}
   .wk-search{max-width:180px}
 }
 
@@ -124,7 +115,7 @@
 /* ── Small phones ≤380px ── */
 @media(max-width:380px){
   .wk-summary{flex-direction:column;gap:.25rem}
-  .wk-pager button{padding:.2rem .4rem;font-size:.72rem;min-height:28px}
+  .wk-pager button{padding:.2rem .4rem;font-size:var(--fs-xs);min-height:28px}
   .wk-stat-val{font-size:1.15rem}
 }
 
@@ -213,7 +204,7 @@
       <div class="wk-form-section active" id="tab-basic">
         <div class="form-row">
           <div class="form-group"><label class="form-label">Name *</label><input class="form-input" type="text" id="wName" required maxlength="100"></div>
-          <div class="form-group"><label class="form-label" for="wEmpId">Employee ID *</label><input class="form-input" type="text" id="wEmpId" maxlength="50" placeholder="e.g. EMP-001" required title="Required — the electrician signs in with this Employee ID and their PIN"></div>
+          <div class="form-group"><label class="form-label" for="wEmpId">Employee ID *</label><input class="form-input" type="text" id="wEmpId" maxlength="50" placeholder="e.g. EMP-001" required title="Required — the electrician signs in with this Employee ID and their PIN"><div class="form-hint">Used with a PIN to sign in.</div></div>
         </div>
         <div class="form-row">
           <div class="form-group"><label class="form-label">Phone</label><input class="form-input" type="tel" id="wPhone" maxlength="20"></div>
@@ -303,14 +294,14 @@
     <div><label class="form-label">New PIN (6 digits) *</label><input class="form-input" id="pinInput" type="password" inputmode="numeric" pattern="\d{6}" minlength="6" maxlength="6" required placeholder="Enter 6-digit PIN"></div>
     <div style="margin-top:.5rem"><label class="form-label">Confirm PIN *</label><input class="form-input" id="pinConfirm" type="password" inputmode="numeric" pattern="\d{6}" minlength="6" maxlength="6" required placeholder="Confirm PIN"></div>
     <div class="modal-actions">
-      <button type="button" class="btn btn-outline" onclick="App.closeModal('pinModal')">Cancel</button>
+      <button type="button" class="btn btn-outline" id="pinCancelBtn" onclick="App.closeModal('pinModal')">Cancel</button>
       <button type="button" class="btn btn-primary" id="pinSaveBtn" onclick="saveWorkerPin()">Set PIN</button>
     </div>
   </div>
 </div>
 
 <script src="/js/offline-sync.js?v=1"></script>
-<script src="/js/app.js?v=16"></script>
+<script src="/js/app.js?v=17"></script>
 <script src="/js/custom-select.js"></script>
 <script>
 if (!App.initAdmin('workers')) throw '';
@@ -375,7 +366,9 @@ async function loadWorkers(page) {
   '</div>';
 
   if (!workers.length) {
-    $('workerBody').innerHTML = '<tr><td colspan="9" class="empty">' + (search ? 'No electricians match "' + esc(search) + '"' : 'No electricians found') + '</td></tr>';
+    $('workerBody').innerHTML = '<tr><td colspan="9" class="empty" id="workerEmpty"></td></tr>';
+    if (search) $('workerEmpty').textContent = 'No electricians match "' + search + '"';
+    else App.emptyState($('workerEmpty'), { title: 'No electricians yet', body: 'Add your first electrician, then set their PIN and choose their locations.', actionLabel: '+ Add Electrician', onAction: openAdd });
     $('pager').innerHTML = '';
     return;
   }
@@ -524,8 +517,16 @@ $('workerForm').addEventListener('submit', async function(e) {
       return;
     }
     App.closeModal('modal');
-    App.toast(id ? 'Electrician updated' : 'Electrician created', 'success');
     loadWorkers(currentPage);
+    if (id) {
+      App.toast('Electrician updated', 'success');
+    } else {
+      // Without a PIN the new electrician cannot sign in, and nothing said so. [BUG-0064]
+      var created = await res.json();
+      var worker = created.worker || created;
+      App.toast('Electrician added. Set a PIN so they can sign in.', 'success');
+      openSetPin(worker.id, worker.name, true);
+    }
   } catch (err) {
     App.showError('modalError', 'Network error');
   }
@@ -654,17 +655,6 @@ async function loadLocationTree() {
   return locationTree;
 }
 
-function renderLocCheckbox(loc, assignedMap, depth) {
-  var checked = assignedMap[loc.id] !== undefined;
-  var typeBadge = loc.type ? '<span class="fa-loc-type">' + esc(loc.type.replace('_', ' ')) + '</span>' : '';
-  var indent = depth > 1 ? ' style="padding-left:' + (0.7 + depth * 0.7) + 'rem"' : '';
-  return '<label class="fa-loc"' + indent + '>' +
-    '<input type="checkbox" value="' + loc.id + '"' + (checked ? ' checked' : '') + '>' +
-    '<span class="fa-loc-name">' + esc(loc.name) + '</span>' +
-    typeBadge +
-  '</label>';
-}
-
 async function openFloors(workerId, name) {
   $('floorTitle').textContent = 'Assign Floors — ' + name;
   $('faWorkerId').value = workerId;
@@ -689,31 +679,7 @@ async function openFloors(workerId, name) {
     return;
   }
 
-  var html = '';
-  for (var j = 0; j < tree.length; j++) {
-    var root = tree[j];
-    var children = root.children || [];
-
-    if (children.length > 0) {
-      // Has children — show as group header, list children as checkboxes
-      html += '<div class="fa-group">';
-      html += '<div class="fa-group-hdr"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>' + esc(root.name) + '</div>';
-      for (var k = 0; k < children.length; k++) {
-        var child = children[k];
-        html += renderLocCheckbox(child, assignedMap, 1);
-        // Also render grandchildren (rooms under floors)
-        var grandchildren = child.children || [];
-        for (var g = 0; g < grandchildren.length; g++) {
-          html += renderLocCheckbox(grandchildren[g], assignedMap, 2);
-        }
-      }
-      html += '</div>';
-    } else {
-      // Standalone location (no children) — show as flat checkbox
-      html += renderLocCheckbox(root, assignedMap, 0);
-    }
-  }
-  $('floorList').innerHTML = html;
+  $('floorList').innerHTML = App.locationChecklist(tree, assignedMap);
 }
 
 async function saveFloorAssignments() {
@@ -742,7 +708,7 @@ async function saveFloorAssignments() {
       return;
     }
     App.closeModal('floorModal');
-    App.toast('Floor assignments updated (' + locationIds.length + ' floor' + (locationIds.length !== 1 ? 's' : '') + ')', 'success');
+    App.toast('Locations updated (' + locationIds.length + ')', 'success');
   } catch (err) {
     App.showError('floorError', 'Network error');
   }
@@ -751,10 +717,11 @@ async function saveFloorAssignments() {
 }
 
 /* ── Set PIN ── */
-var _pinWorkerId = null;
-function openSetPin(id, name) {
-  _pinWorkerId = id;
-  $('pinModalTitle').textContent = 'Set PIN — ' + name;
+var _pinWorkerId = null, _pinWorkerName = '', _pinIsSetup = false;
+function openSetPin(id, name, isSetup) {
+  _pinWorkerId = id; _pinWorkerName = name; _pinIsSetup = !!isSetup;
+  $('pinModalTitle').textContent = isSetup ? 'Last step: set a PIN so ' + name + ' can sign in' : 'Set PIN — ' + name;
+  $('pinCancelBtn').textContent = isSetup ? 'Later' : 'Cancel';
   $('pinInput').value = '';
   $('pinConfirm').value = '';
   App.hideError('pinError');
@@ -777,6 +744,7 @@ async function saveWorkerPin() {
   if (!res.ok) { var d = await res.json(); App.showError('pinError', d.error || 'Failed'); return; }
   App.closeModal('pinModal');
   App.toast('PIN set successfully', 'success');
+  if (_pinIsSetup) openFloors(_pinWorkerId, _pinWorkerName);
 }
 
 loadWorkers(1);

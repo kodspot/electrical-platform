@@ -61,7 +61,7 @@ describe('BUG-0047: the client retries a lost request only when repeating it is 
       localStorage: { getItem: () => 'tkn', setItem: noop, removeItem: noop },
       document: {
         addEventListener: noop, querySelector: () => null, getElementById: () => null, body: { appendChild: noop },
-        createElement: () => ({ style: {}, classList: { add: noop, remove: noop }, appendChild: noop, remove: noop, addEventListener: noop, innerHTML: '', textContent: '' })
+        createElement: () => ({ style: {}, classList: { add: noop, remove: noop }, appendChild: noop, remove: noop, addEventListener: noop, setAttribute: noop, innerHTML: '', textContent: '' })
       },
       setTimeout: (fn) => { fn(); return 0; }, clearTimeout: noop, FormData: class FormData {},
       fetch: async (url, opts) => {
@@ -78,9 +78,19 @@ describe('BUG-0047: the client retries a lost request only when repeating it is 
   it('a POST, PATCH or DELETE that fails on the network is sent once, not repeated', async () => {
     for (const method of ['POST', 'PATCH', 'DELETE']) {
       const { App, calls } = appWithFlakyFetch(1);
-      await assert.rejects(App.apiFetch('/tickets', { method, body: '{}' }), /Failed to fetch/, method);
+      assert.strictEqual(await App.apiFetch('/tickets', { method, body: '{}' }), null, method);
       assert.deepStrictEqual(calls, [method], `${method} was sent ${calls.length} time(s)`);
     }
+  });
+
+  // A page without its own handling used to be left on "Saving…" by the rejected promise. A
+  // lost connection now answers null, as a 401 does; a caller with offline handling opts in
+  // to the error. [BUG-0061]
+  it('a lost connection answers null, unless the caller asks for the error', async () => {
+    const { App } = appWithFlakyFetch(3);
+    assert.strictEqual(await App.apiFetch('/tickets'), null);
+    const opted = appWithFlakyFetch(1);
+    await assert.rejects(opted.App.apiFetch('/tickets', { method: 'POST', body: '{}', throwOnNetwork: true }), /Failed to fetch/);
   });
 
   it('a GET is still retried after a network error', async () => {

@@ -39,6 +39,30 @@ After a network error it retries GET and HEAD only (up to three attempts). A sub
 fails with "Network error" (BUG-0047). A `503` is retried for every method, because the
 server's circuit breaker refused it before doing any work.
 
+## Shared interface primitives
+
+Use these instead of writing a page's own version. All live in `public/js/app.js` unless noted;
+ten public and reset pages do not load it, and use `public/js/kit.js` and the stylesheet.
+
+| Need | Use |
+|---|---|
+| Ask before acting | `App.confirmDialog(msg, { yes, danger })`, `App.promptDialog({ title, label, yes })`, which answers null on Cancel. Never `confirm()` or `prompt()` |
+| Nothing to show | `App.emptyState(el, { title, body, actionLabel, onAction })` |
+| A request failed | `App.loadFailed(el, { what, onRetry })`. A failure must never read as an empty list |
+| Status and priority | `App.statusBadge`, `App.priorityBadge`, `App.statusLabel`, so all roles see one name for a state |
+| Form errors | `App.showError(id, msg, details, field)`: `role=alert`, scrolls into view, marks the field |
+| Lost connection | `apiFetch` and friends toast and answer null. Pass `throwOnNetwork` only when the caller has somewhere to put the work |
+| Choosing locations | `App.locationChecklist(tree, assignedMap)` |
+| Photos | `Kit.shrinkPhoto(file)` before upload. It returns the original on any failure |
+| Password or PIN field | `Kit.revealToggle(input)` |
+| Sign-in errors | `Kit.signInError(status, kind, serverError)`, `Kit.friendlyError(err)` |
+| A file control | `<input class="sr-only" type="file">` before a visible `<label for>`. File inputs are hidden globally, so an input with no label cannot be reached (BUG-0062) |
+| Bottom navigation | The `#sv-nav` markup on each field page: the same links everywhere. `data-mod` hides those of modules that are off |
+
+Touch targets are at least 44px (48px for field actions), text at least `--fs-xs` (.75rem).
+Colours come from tokens: use `--text-muted`, `--danger-text` and the like for text, because
+fill tokens such as `--danger` do not reach 4.5:1 as text.
+
 ## Escaping text into markup
 
 Pages build HTML strings from data that org admins and guests type (names, notes, titles),

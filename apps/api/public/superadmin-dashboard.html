@@ -10,11 +10,11 @@
 <meta name="theme-color" content="#1E40AF">
 <title>Super Admin — Kodspot</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/css/design-system.css?v=10">
+<link rel="stylesheet" href="/css/design-system.css?v=11">
 <style>
 :root { --sa: #4338CA; --sa-hover: #3730A3; --sa-light: #EEF2FF; --sa-border: #C7D2FE; }
 .topbar-sa { background: var(--sa); }
-.sa-badge { display: inline-block; font-size: .65rem; font-weight: 600; background: rgba(255,255,255,.15); color: rgba(255,255,255,.9); padding: .15rem .5rem; border-radius: 50px; letter-spacing: .03em; white-space: nowrap; }
+.sa-badge { display: inline-block; font-size:var(--fs-xs); font-weight: 600; background: rgba(255,255,255,.15); color: rgba(255,255,255,.9); padding: .15rem .5rem; border-radius: 50px; letter-spacing: .03em; white-space: nowrap; }
 .btn-sa { background: var(--sa); color: #fff; border-color: var(--sa); }
 .btn-sa:hover:not(:disabled) { background: var(--sa-hover); }
 
@@ -26,7 +26,7 @@
 .sa-stat-icon { font-size: 1.4rem; margin-bottom: .25rem; }
 .sa-stat-value { font-size: 1.5rem; font-weight: 700; color: var(--text); line-height: 1.1; }
 .sa-stat-label { font-size: .75rem; color: var(--text-muted); margin-top: .15rem; }
-.sa-stat-sub { font-size: .68rem; color: var(--text-light); margin-top: .3rem; }
+.sa-stat-sub { font-size:var(--fs-xs); color: var(--text-light); margin-top: .3rem; }
 .sa-stat.warn::before { background: var(--status-progress); }
 .sa-stat.success::before { background: var(--status-clean); }
 
@@ -52,10 +52,10 @@
 .sa-table tbody tr:hover { background: var(--sa-light); }
 .sa-table .name-cell b { font-weight: 600; }
 .sa-table .actions-cell { white-space: nowrap; }
-.sa-table .actions-cell .btn { font-size: .72rem; padding: .2rem .5rem; margin-right: .25rem; }
+.sa-table .actions-cell .btn { font-size:var(--fs-xs); padding: .2rem .5rem; margin-right: .25rem; }
 
 /* Status badges */
-.status-badge { display: inline-block; padding: .15rem .5rem; border-radius: 10px; font-size: .72rem; font-weight: 600; }
+.status-badge { display: inline-block; padding: .15rem .5rem; border-radius: 10px; font-size:var(--fs-xs); font-weight: 600; }
 .status-active { background: #DCFCE7; color: #15803D; }
 .status-suspended { background: #FEF3C7; color: #92400E; }
 .status-deleted { background: #FEE2E2; color: #B91C1C; }
@@ -67,7 +67,7 @@
 .org-card:hover { box-shadow: var(--shadow); }
 .org-card h4 { font-size: .9rem; margin-bottom: .5rem; color: var(--text); }
 .org-card-stats { display: flex; flex-wrap: wrap; gap: .4rem; }
-.org-card-stats span { background: var(--sa-light); color: var(--sa); padding: .2rem .5rem; border-radius: var(--radius-sm); font-size: .72rem; font-weight: 500; }
+.org-card-stats span { background: var(--sa-light); color: var(--sa); padding: .2rem .5rem; border-radius: var(--radius-sm); font-size:var(--fs-xs); font-weight: 500; }
 
 /* Audit log */
 .audit-item { display: flex; gap: .75rem; padding: .65rem 0; border-bottom: 1px solid var(--border); font-size: .82rem; align-items: flex-start; }
@@ -77,8 +77,8 @@
 .audit-dot.worker { background: #D97706; }
 .audit-body { flex: 1; min-width: 0; }
 .audit-action { font-weight: 600; color: var(--text); }
-.audit-meta { font-size: .72rem; color: var(--text-muted); margin-top: .15rem; }
-.audit-details { font-size: .72rem; color: var(--text-light); margin-top: .2rem; background: var(--bg); padding: .3rem .5rem; border-radius: var(--radius-sm); word-break: break-all; }
+.audit-meta { font-size:var(--fs-xs); color: var(--text-muted); margin-top: .15rem; }
+.audit-details { font-size:var(--fs-xs); color: var(--text-light); margin-top: .2rem; background: var(--bg); padding: .3rem .5rem; border-radius: var(--radius-sm); word-break: break-all; }
 .audit-pagination { display: flex; align-items: center; gap: .5rem; margin-top: .75rem; justify-content: center; }
 .audit-pagination .btn { font-size: .75rem; }
 
@@ -87,7 +87,7 @@
 .cc-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: .9rem; }
 .cc-card-title { font-size: .88rem; font-weight: 700; color: var(--text); margin-bottom: .6rem; }
 .cc-kv { display: flex; flex-wrap: wrap; gap: .45rem; }
-.cc-chip { display: inline-flex; align-items: center; gap: .25rem; padding: .2rem .5rem; border-radius: 999px; font-size: .72rem; background: var(--sa-light); color: var(--sa); }
+.cc-chip { display: inline-flex; align-items: center; gap: .25rem; padding: .2rem .5rem; border-radius: 999px; font-size:var(--fs-xs); background: var(--sa-light); color: var(--sa); }
 .cc-chip.core { background: #dcfce7; color: #15803d; }
 .cc-chip.dependency { background: #fef3c7; color: #92400e; }
 .cc-chip.blocker { background: #fee2e2; color: #b91c1c; }
@@ -105,7 +105,7 @@
 .metric-card:hover { box-shadow: var(--shadow-sm); }
 .metric-card .metric-icon { font-size: 1.5rem; margin-bottom: .25rem; }
 .metric-card .metric-val { font-size: 1.3rem; font-weight: 700; color: var(--text); }
-.metric-card .metric-label { font-size: .7rem; color: var(--text-muted); margin-top: .1rem; }
+.metric-card .metric-label { font-size:var(--fs-xs); color: var(--text-muted); margin-top: .1rem; }
 
 /* Empty state */
 .empty-state { text-align: center; padding: 2rem; color: var(--text-muted); font-size: .85rem; }
@@ -115,13 +115,13 @@
 .qr-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: .75rem; }
 .qr-card { background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: .75rem; text-align: center; }
 .qr-card-title { font-size: .78rem; font-weight: 600; color: var(--text); margin-bottom: .15rem; }
-.qr-card-sub { font-size: .68rem; color: var(--text-muted); margin-bottom: .5rem; }
+.qr-card-sub { font-size:var(--fs-xs); color: var(--text-muted); margin-bottom: .5rem; }
 .qr-card svg { width: 100%; max-width: 160px; height: auto; display: block; margin: 0 auto .5rem; }
-.qr-card-url { font-size: .62rem; color: var(--text-light); word-break: break-all; font-family: monospace; background: var(--surface); padding: .25rem .4rem; border-radius: var(--radius-sm); }
+.qr-card-url { font-size:var(--fs-xs); color: var(--text-light); word-break: break-all; font-family: monospace; background: var(--surface); padding: .25rem .4rem; border-radius: var(--radius-sm); }
 .qr-mod-section { margin-bottom: 1.25rem; }
 .qr-mod-label { font-size: .85rem; font-weight: 600; color: var(--sa); margin-bottom: .6rem; display: flex; align-items: center; gap: .4rem; }
 .qr-print-bar { display: flex; justify-content: flex-end; gap: .5rem; margin-bottom: .75rem; }
-@media (max-width: 480px) { .qr-card { padding: .5rem; } .qr-card-title { font-size: .72rem; } .qr-card-sub { font-size: .62rem; margin-bottom: .35rem; } }
+@media (max-width: 480px) { .qr-card { padding: .5rem; } .qr-card-title { font-size:var(--fs-xs); } .qr-card-sub { font-size:var(--fs-xs); margin-bottom: .35rem; } }
 @media print {
   body > *:not(#loginQrModal) { display: none !important; }
   #loginQrModal { position: static; background: #fff; }
@@ -148,7 +148,7 @@
   .sa-stats { grid-template-columns: 1fr 1fr; gap: .5rem; }
   .sa-stat { padding: .75rem; }
   .sa-stat-value { font-size: 1.2rem; }
-  .sa-tab { padding: .45rem .5rem; font-size: .7rem; }
+  .sa-tab { padding: .45rem .5rem; font-size:var(--fs-xs); }
   .sa-table tbody td { padding: .4rem .5rem; font-size: .75rem; }
   .metrics-grid { grid-template-columns: 1fr 1fr; gap: .5rem; }
   .metric-card .metric-val { font-size: 1.1rem; }
@@ -178,8 +178,8 @@
 .ai-cfg-input::placeholder{color:#9ca3af}
 .ai-cfg-select{width:100%;padding:.5rem .65rem;border:1.5px solid var(--border);border-radius:var(--radius);font-size:.82rem;background:var(--surface);color:var(--text);cursor:pointer;transition:border-color .15s}
 .ai-cfg-select:focus{border-color:var(--sa);outline:none}
-.ai-cfg-hint{font-size:.7rem;color:#6b7280;margin-top:.25rem;line-height:1.35}
-.ai-cfg-hint code{font-size:.68rem;background:var(--bg);padding:.1rem .3rem;border-radius:3px;color:var(--sa)}
+.ai-cfg-hint{font-size:var(--fs-xs);color:#6b7280;margin-top:.25rem;line-height:1.35}
+.ai-cfg-hint code{font-size:var(--fs-xs);background:var(--bg);padding:.1rem .3rem;border-radius:3px;color:var(--sa)}
 .ai-cfg-hint b{color:var(--text);font-weight:600}
 .ai-cfg-pw-wrap{position:relative;display:flex;align-items:center}
 .ai-cfg-pw-wrap .ai-cfg-input{padding-right:2.5rem}
@@ -656,7 +656,7 @@
 </div>
 
 <script src="/js/offline-sync.js?v=1"></script>
-<script src="/js/app.js?v=16"></script>
+<script src="/js/app.js?v=17"></script>
 <script src="/js/custom-select.js"></script>
 <script>
 var esc = App.esc, $ = App.$, fmtDate = App.fmtDate;
@@ -1000,9 +1000,9 @@ async function loadOrgs() {
     var aiLabel = '';
     if (o.aiEnabled && o.aiProvider) {
       var pName = o.aiProvider === 'azure-openai' ? 'Azure' : o.aiProvider === 'gemini' ? 'Gemini' : o.aiProvider;
-      aiLabel = '<span style="display:inline-flex;align-items:center;gap:3px;background:#e8f5e9;color:#2e7d32;padding:2px 8px;border-radius:10px;font-size:.7rem;font-weight:600;white-space:nowrap" title="' + esc(pName + (o.aiModel ? ' · ' + o.aiModel : '')) + '">🤖 ' + esc(pName) + (o.aiModel ? '<span style="color:#666;font-weight:400"> · ' + esc(o.aiModel) + '</span>' : '') + '</span>';
+      aiLabel = '<span style="display:inline-flex;align-items:center;gap:3px;background:#e8f5e9;color:#2e7d32;padding:2px 8px;border-radius:10px;font-size:var(--fs-xs);font-weight:600;white-space:nowrap" title="' + esc(pName + (o.aiModel ? ' · ' + o.aiModel : '')) + '">🤖 ' + esc(pName) + (o.aiModel ? '<span style="color:#666;font-weight:400"> · ' + esc(o.aiModel) + '</span>' : '') + '</span>';
     } else {
-      aiLabel = '<span style="color:var(--text-muted);font-size:.7rem">—</span>';
+      aiLabel = '<span style="color:var(--text-muted);font-size:var(--fs-xs)">—</span>';
     }
     return '<tr>' +
       '<td class="name-cell"><b>' + esc(o.name) + '</b></td>' +
@@ -1366,7 +1366,7 @@ async function loadAnalyticsTab() {
   if (orgsData && orgsData.length) {
     $('orgBreakdown').innerHTML = orgsData.map(function(o) {
       var c = o._count || {};
-      return '<div class="org-card"><h4>' + esc(o.name) + ' <span class="status-badge status-' + o.status.toLowerCase() + '" style="font-size:.65rem">' + o.status + '</span></h4><div class="org-card-stats">' +
+      return '<div class="org-card"><h4>' + esc(o.name) + ' <span class="status-badge status-' + o.status.toLowerCase() + '" style="font-size:var(--fs-xs)">' + o.status + '</span></h4><div class="org-card-stats">' +
         '<span>Users: ' + (c.users || 0) + '</span>' +
         '<span>Workers: ' + (c.workers || 0) + '</span>' +
         '<span>Locations: ' + (c.locations || 0) + '</span>' +

@@ -10,17 +10,17 @@
 <meta name="theme-color" content="#1E40AF">
 <title>Privacy Policy — Kodspot</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/css/design-system.css?v=10">
+<link rel="stylesheet" href="/css/design-system.css?v=11">
 <style>
-.legal{max-width:800px;margin:0 auto;padding:2rem 1.5rem 4rem}
+.legal{max-width:68ch;margin:0 auto;padding:2rem 1rem 4rem}
 .legal h1{font-size:1.6rem;margin-bottom:.5rem}
 .legal .updated{color:var(--text-muted);font-size:.82rem;margin-bottom:2rem}
 .legal h2{font-size:1.15rem;margin:1.8rem 0 .6rem;padding-top:.8rem;border-top:1px solid var(--border)}
 .legal h2:first-of-type{border-top:none}
-.legal p,.legal li{font-size:.92rem;line-height:1.7;color:var(--text-secondary)}
+.legal p,.legal li{font-size:.95rem;line-height:1.7;color:var(--text-secondary)}
 .legal ul{padding-left:1.5rem;margin:.5rem 0}
-.legal a{color:var(--primary)}
-.legal .back{display:inline-block;margin-bottom:1.5rem;font-size:.85rem;color:var(--primary);text-decoration:none}
+.legal a{color:var(--primary-text);text-decoration:underline}
+.legal .back{display:inline-flex;align-items:center;min-height:44px;margin-bottom:1rem;font-size:.875rem;color:var(--primary-text);text-decoration:none}
 .legal strong{color:var(--text)}
 </style>
 </head>
@@ -28,7 +28,7 @@
 <div class="legal">
 <a href="/" class="back">← Back to Home</a>
 <h1>Privacy Policy</h1>
-<p class="updated">Last updated: 7 April 2026</p>
+<p class="updated">Last updated: 6 November 2026</p>
 
 <p>Kodspot ("we", "us", "our") operates the Kodspot Electrical platform at <strong>electrical.kodspot.in</strong>. This Privacy Policy explains how we collect, use, store, and protect your personal data in compliance with the <strong>Information Technology Act, 2000</strong>, the <strong>Information Technology (Reasonable Security Practices and Procedures and Sensitive Personal Data or Information) Rules, 2011</strong>, and the <strong>Digital Personal Data Protection Act, 2023 (DPDP Act)</strong> of India.</p>
 
@@ -71,7 +71,7 @@
 <li>Data is encrypted in transit using <strong>TLS 1.2+</strong> (HTTPS enforced via HSTS).</li>
 <li><strong>Sensitive personal data</strong> (Aadhar number, blood group) is <strong>encrypted at rest</strong> using AES-256-GCM with a server-side encryption key.</li>
 <li>Passwords are hashed using <strong>bcrypt</strong> with a cost factor of 12. Passwords must contain at least 8 characters, including uppercase, lowercase, and a digit.</li>
-<li>Photographs are stored in <strong>Cloudflare R2</strong> (encrypted at rest) and automatically deleted after <strong>7 days</strong>.</li>
+<li>Photographs are stored in <strong>Cloudflare R2</strong> (encrypted at rest) and automatically deleted after <strong>30 days</strong>.</li>
 <li>Database access is restricted to the application server only; no public database access is permitted.</li>
 <li>All authentication tokens expire after <strong>24 hours</strong>. Changing your password immediately invalidates all existing sessions.</li>
 <li>We implement rate limiting, input validation, and output encoding to prevent common attacks.</li>
@@ -79,7 +79,7 @@
 
 <h2>5. Data Retention</h2>
 <ul>
-<li><strong>Inspection photographs:</strong> Automatically deleted after 7 days.</li>
+<li><strong>Inspection and ticket photographs:</strong> Automatically deleted after 30 days.</li>
 <li><strong>Inspection records and audit logs:</strong> Retained for the duration of the organization's subscription, plus 90 days after termination.</li>
 <li><strong>User accounts:</strong> Retained until the organization administrator deactivates or deletes them, or the organization subscription ends.</li>
 <li><strong>Guest complaint data:</strong> Retained for 180 days, then <strong>automatically anonymized</strong> — guest name and phone number are permanently deleted from the database. The complaint record (issue type, description, resolution) is retained without identifying information.</li>
@@ -107,7 +107,7 @@
 <p>As a Data Principal, you have the right to:</p>
 <ul>
 <li><strong>Access:</strong> Request a summary of the personal data we hold about you.</li>
-<li><strong>Data Portability:</strong> Export your personal data in a machine-readable format (JSON) via the platform's data export feature.</li>
+<li><strong>Data Portability:</strong> Export your personal data in a machine-readable format (JSON) with "Download my data" in the account menu.</li>
 <li><strong>Correction:</strong> Request correction of inaccurate or incomplete data.</li>
 <li><strong>Erasure:</strong> Request deletion of your personal data (subject to legal and contractual retention requirements).</li>
 <li><strong>Grievance Redressal:</strong> File a complaint with our Grievance Officer (see Section 11).</li>

@@ -10,7 +10,7 @@
 <meta name="theme-color" content="#1E40AF">
 <title>Reset PIN — Kodspot</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/css/design-system.css?v=10">
+<link rel="stylesheet" href="/css/design-system.css?v=11">
 <style>
 .reset-done { display: none; background: var(--success-bg); color: var(--success-text); border-radius: var(--radius-sm); padding: .85rem 1rem; font-size: .88rem; margin-bottom: var(--sp-md); }
 .reset-done.show { display: block; }
@@ -26,11 +26,12 @@
 
   <!-- Opened without a link (from "Forgot PIN?" on the sign-in page): ask for the link. -->
   <form id="requestForm" novalidate style="display:none">
-    <p class="form-hint" style="margin-bottom:var(--sp-md)">Enter your Employee ID. We'll send a link to choose a new PIN to the email your administrator has on file for you. If they have none, ask them to set a new PIN.</p>
+    <p style="background:var(--info-bg);color:var(--info-text);border-radius:var(--radius-sm);padding:.65rem .8rem;font-size:.9rem;margin-bottom:var(--sp-sm)">Forgot your PIN? The quickest way is to ask your admin to set a new one.</p>
+    <p class="form-hint" style="margin-bottom:var(--sp-md)">Have an email saved with your admin? We can send a reset link.</p>
     <div class="form-group" id="orgGroup">
       <label class="form-label" for="orgCode">Organization code</label>
       <input class="form-input" type="text" id="orgCode" maxlength="100" autocapitalize="none" autocomplete="organization">
-      <div class="form-hint">The first part of your sign-in address: …/<strong>code</strong>/ele/electrician-login</div>
+      <div class="form-hint">Ask your supervisor if you don't know this code.</div>
     </div>
     <div class="form-group">
       <label class="form-label" for="employeeId">Employee ID</label>
@@ -52,10 +53,10 @@
   </form>
 
   <p style="margin-top:var(--sp-lg);font-size:.8rem;color:var(--text-light);text-align:center">
-    <a href="/" style="color:var(--primary)">&larr; Back to Home</a>
+    <a id="backLink" href="/" style="color:var(--primary-text);display:inline-flex;align-items:center;min-height:44px">&larr; Back to sign in</a>
   </p>
 </div>
 
-<script src="/js/worker-reset-pin.js?v=2"></script>
+<script src="/js/worker-reset-pin.js?v=3"></script>
 </body>
 </html>

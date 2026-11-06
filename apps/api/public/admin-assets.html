@@ -10,7 +10,7 @@
 <meta name="theme-color" content="#0891b2">
 <title>Asset Management — Kodspot</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/css/design-system.css?v=10">
+<link rel="stylesheet" href="/css/design-system.css?v=11">
 <style>
 .page-title{display:flex;align-items:center;gap:.5rem;margin-bottom:1.25rem;flex-wrap:wrap;justify-content:space-between}
 .page-title h1{font-size:1.25rem;font-weight:700;margin:0}
@@ -20,7 +20,7 @@
 .a-stats{display:flex;gap:.75rem;margin-bottom:1rem;flex-wrap:wrap}
 .a-stat{flex:1;min-width:100px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:.85rem .75rem;text-align:center}
 .a-stat-val{font-size:1.4rem;font-weight:700;line-height:1.1}
-.a-stat-label{font-size:.68rem;color:var(--text-muted);margin-top:.15rem}
+.a-stat-label{font-size:var(--fs-xs);color:var(--text-muted);margin-top:.15rem}
 .a-stat.stat-faulty .a-stat-val{color:var(--danger)}
 .a-stat.stat-maint .a-stat-val{color:var(--warning-text)}
 .a-stat.stat-overdue .a-stat-val{color:var(--danger)}
@@ -32,10 +32,10 @@
 
 /* Table */
 .a-tbl{width:100%;border-collapse:collapse;font-size:.82rem}
-.a-tbl th{text-align:left;padding:.5rem .4rem;font-size:.7rem;font-weight:600;color:var(--text-muted);border-bottom:1px solid var(--border);white-space:nowrap}
+.a-tbl th{text-align:left;padding:.5rem .4rem;font-size:var(--fs-xs);font-weight:600;color:var(--text-muted);border-bottom:1px solid var(--border);white-space:nowrap}
 .a-tbl td{padding:.55rem .4rem;border-bottom:1px solid var(--border-light,var(--border));vertical-align:middle}
 .a-tbl tr:hover{background:var(--hover-bg,rgba(8,145,178,.03))}
-.a-code{font-family:var(--font-mono,monospace);font-size:.72rem;color:var(--primary);font-weight:600}
+.a-code{font-family:var(--font-mono,monospace);font-size:var(--fs-xs);color:var(--primary);font-weight:600}
 .a-name{font-weight:600;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .empty{text-align:center;padding:2rem;color:var(--text-muted)}
 
@@ -59,13 +59,13 @@
 
 /* Detail modal */
 .detail-grid{display:grid;grid-template-columns:1fr 1fr;gap:.4rem .75rem;font-size:.82rem;margin-bottom:.75rem}
-.detail-label{font-weight:600;color:var(--text-muted);font-size:.72rem}
+.detail-label{font-weight:600;color:var(--text-muted);font-size:var(--fs-xs)}
 .detail-val{margin-bottom:.3rem}
 
 .timeline-item{display:flex;gap:.6rem;padding:.5rem 0;border-bottom:1px solid var(--border-light,var(--border));font-size:.78rem}
 .timeline-dot{width:10px;height:10px;border-radius:50%;margin-top:4px;flex-shrink:0}
 .timeline-content{flex:1}
-.timeline-date{font-size:.68rem;color:var(--text-muted)}
+.timeline-date{font-size:var(--fs-xs);color:var(--text-muted)}
 
 .img-grid{display:flex;gap:.4rem;flex-wrap:wrap;margin:.5rem 0}
 .img-grid img{width:64px;height:64px;object-fit:cover;border-radius:var(--radius-sm);cursor:pointer;border:1px solid var(--border)}
@@ -209,7 +209,7 @@
 </div>
 
 <script src="/js/offline-sync.js?v=1"></script>
-<script src="/js/app.js?v=16"></script>
+<script src="/js/app.js?v=17"></script>
 <script>
 if (!App.initAdmin('assets')) throw '';
 App.initNotifications(App.apiFetch);
@@ -266,10 +266,10 @@ async function loadAssets(page) {
       '<td class="a-name">'+esc(a.name)+'</td>'+
       '<td><span class="badge badge-muted">'+esc(a.category)+'</span></td>'+
       '<td>'+esc(a.location?a.location.name:'—')+'</td>'+
-      '<td class="hide-mobile" style="font-size:.72rem">'+esc(makeModel)+'</td>'+
+      '<td class="hide-mobile" style="font-size:var(--fs-xs)">'+esc(makeModel)+'</td>'+
       '<td><span class="badge '+stCls+'">'+(STATUS_LABELS[a.status]||a.status)+'</span></td>'+
       '<td><span class="'+condCls+'">'+a.condition+'</span></td>'+
-      '<td class="hide-mobile" style="font-size:.72rem'+(isOverdue?';color:var(--danger);font-weight:600':'')+'">'+nextMaint+(isOverdue?' ⚠':'')+'</td>'+
+      '<td class="hide-mobile" style="font-size:var(--fs-xs)'+(isOverdue?';color:var(--danger);font-weight:600':'')+'">'+nextMaint+(isOverdue?' ⚠':'')+'</td>'+
       '<td><button class="btn btn-sm btn-outline" onclick="viewDetail(\''+a.id+'\')">View</button></td>'+
     '</tr>';
   }).join('');
@@ -348,8 +348,8 @@ async function loadTimeline(assetId){
     var dot = item.kind==='failure' ? DOT_COLORS.failure : (DOT_COLORS.event[item.type]||'#94a3b8');
     var title = item.kind==='failure' ? '🔴 '+esc(item.title) : esc(item.summary);
     var sub = '';
-    if(item.kind==='failure') sub = '<span class="badge badge-danger" style="font-size:.58rem">'+item.severity+' — '+item.status+'</span>';
-    if(item.statusAfter) sub += ' <span style="font-size:.68rem">→ '+item.statusAfter+'</span>';
+    if(item.kind==='failure') sub = '<span class="badge badge-danger" style="font-size:var(--fs-xs)">'+item.severity+' — '+item.status+'</span>';
+    if(item.statusAfter) sub += ' <span style="font-size:var(--fs-xs)">→ '+item.statusAfter+'</span>';
     if(item.cost) sub += ' · ₹'+Number(item.cost).toLocaleString('en-IN');
     var by = item.loggedBy ? item.loggedBy.name : '';
     return '<div class="timeline-item">'+
@@ -440,7 +440,7 @@ $('assetForm').addEventListener('submit', async function(e){
 
 // ── Delete ──
 async function deleteAsset(id, name){
-  if(!confirm('Delete/decommission "'+name+'"?')) return;
+  if(!(await App.confirmDialog('Delete or decommission "'+name+'"?',{yes:'Delete',danger:true}))) return;
   var res = await App.apiFetch('/assets/'+id, {method:'DELETE'});
   if(res && res.ok){ var d=await res.json(); App.toast(d.message,'success'); loadAssets(currentPage); }
   else if(res) App.toastFailure(res, 'Could not delete the asset');

@@ -10,13 +10,13 @@
 <meta name="theme-color" content="#1E40AF">
 <title>Electrical Inspection — Kodspot</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/css/design-system.css?v=10">
+<link rel="stylesheet" href="/css/design-system.css?v=11">
 <style>
 .sv-shell{max-width:540px;margin:0 auto;padding:1.25rem .75rem;min-height:calc(100dvh - 56px)}
 .loc-header{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:1rem;margin-bottom:1.15rem;display:flex;align-items:center;gap:.6rem}
 .loc-icon{font-size:1.3rem;flex-shrink:0}
 .loc-info h2{font-size:1rem;font-weight:700;line-height:1.25;margin:0}
-.loc-info p{font-size:.72rem;color:var(--text-muted);margin:.1rem 0 0}
+.loc-info p{font-size:var(--fs-xs);color:var(--text-muted);margin:.1rem 0 0}
 .form-section{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:1rem;margin-bottom:.85rem}
 .form-section-title{display:flex;align-items:center;gap:.35rem;font-size:.82rem;font-weight:700;margin-bottom:.65rem;color:var(--text)}
 
@@ -25,15 +25,19 @@
 .check-row{display:flex;align-items:center;gap:.5rem;background:var(--bg);padding:.55rem .7rem;border-radius:var(--radius);border:1px solid transparent;transition:border-color .1s}
 .check-row.faulty{border-color:var(--danger);background:rgba(239,68,68,.04)}
 .check-row .check-icon{font-size:1.1rem;flex-shrink:0;width:24px;text-align:center}
-.check-row .check-label{flex:1;font-size:.82rem;font-weight:500}
+.check-row .check-label{flex:1;font-size:.9rem;font-weight:500}
 .check-row .check-btns{display:flex;gap:.25rem}
-.check-btn{border:1px solid var(--border);background:var(--surface);border-radius:var(--radius-sm);padding:.25rem .55rem;font-size:.68rem;font-weight:600;cursor:pointer;transition:all .12s;min-height:var(--touch-min,36px);min-width:36px;display:flex;align-items:center;justify-content:center}
+.check-btn{border:1px solid var(--border-control);background:var(--surface);color:var(--text);border-radius:var(--radius-sm);padding:.25rem .6rem;font-size:.9rem;font-weight:600;cursor:pointer;min-height:48px;min-width:56px;display:flex;align-items:center;justify-content:center}
 .check-btn:hover{border-color:var(--primary)}
-.check-btn.sel-ok{border-color:var(--success);background:rgba(16,185,129,.1);color:var(--success)}
-.check-btn.sel-faulty{border-color:var(--danger);background:rgba(239,68,68,.1);color:var(--danger)}
-.check-btn.sel-na{border-color:var(--text-muted);background:rgba(120,120,120,.08);color:var(--text-muted)}
+.check-btn.sel-ok{border-color:var(--success);background:var(--success);color:#fff}
+.check-btn.sel-faulty{border-color:var(--danger);background:var(--danger);color:#fff}
+.check-btn.sel-na{border-color:var(--text-muted);background:var(--text-muted);color:var(--surface)}
+.check-btn[aria-pressed="true"]::before{content:'✓ ';content:'✓ ' / ''}
+.check-row.missing{border-left:4px solid var(--danger)}
+.check-missing{width:100%;font-size:.8rem;font-weight:600;color:var(--danger-text)}
+.add-photo-btn:focus-within{outline:3px solid var(--focus);outline-offset:2px}
 .check-remarks{width:100%;margin-top:.35rem;padding:.35rem .5rem;font-size:.75rem;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--bg);color:var(--text);resize:none}
-.check-summary{font-size:.68rem;color:var(--text-muted);margin-top:.4rem}
+.check-summary{font-size:var(--fs-xs);color:var(--text-muted);margin-top:.4rem}
 .check-summary .fault-count{color:var(--danger);font-weight:600}
 
 /* Photo area */
@@ -42,10 +46,10 @@
 .photo-grid{display:flex;gap:.4rem;flex-wrap:wrap;margin-bottom:.6rem}
 .photo-thumb{position:relative;width:58px;height:58px;border-radius:var(--radius-sm);overflow:hidden}
 .photo-thumb img{width:100%;height:100%;object-fit:cover}
-.photo-thumb button{position:absolute;top:2px;right:2px;background:rgba(0,0,0,.6);color:#fff;border:none;border-radius:50%;width:18px;height:18px;font-size:10px;cursor:pointer;display:flex;align-items:center;justify-content:center;line-height:1}
+.photo-thumb button{position:absolute;top:0;right:0;background:rgba(0,0,0,.7);color:#fff;border:none;border-radius:50%;width:32px;height:32px;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;line-height:1}
 .add-photo-btn{display:inline-flex;align-items:center;gap:.3rem;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);padding:.45rem .85rem;font-size:.82rem;cursor:pointer;color:var(--text);transition:border-color .15s;min-height:var(--touch-min)}
 .add-photo-btn:hover{border-color:var(--primary)}
-.photo-count{font-size:.68rem;color:var(--text-muted);margin-top:.35rem}
+.photo-count{font-size:var(--fs-xs);color:var(--text-muted);margin-top:.35rem}
 
 /* Worker list */
 .worker-list{display:flex;flex-direction:column;gap:.35rem;max-height:260px;overflow-y:auto}
@@ -53,8 +57,8 @@
 .worker-item:hover{border-color:var(--border)}
 .worker-item input[type=checkbox]{width:20px;height:20px;accent-color:var(--primary);flex-shrink:0}
 .worker-item-name{flex:1}
-.worker-item-id{font-size:.68rem;color:var(--text-muted)}
-.worker-count{font-size:.68rem;color:var(--text-muted);margin-top:.35rem}
+.worker-item-id{font-size:var(--fs-xs);color:var(--text-muted)}
+.worker-count{font-size:var(--fs-xs);color:var(--text-muted);margin-top:.35rem}
 
 .submit-section{position:sticky;bottom:0;background:var(--bg);padding:.75rem 0 .25rem;z-index:5}
 .success-screen{text-align:center;padding:3rem 1rem;display:none}
@@ -67,19 +71,23 @@
   .form-section{padding:.85rem}
   .loc-header{padding:.85rem}
   .photo-thumb{width:52px;height:52px}
-  .check-btn{padding:.2rem .4rem;font-size:.62rem;min-width:30px}
+  .check-row{flex-wrap:wrap}
+  .check-row .check-btns{width:100%;display:grid;grid-template-columns:repeat(3,1fr);gap:.5rem}
+  .check-row .check-btns:has(input){display:flex}
 }
 </style>
+<script>try{if(localStorage.getItem('kodspot_theme')==='light')document.documentElement.removeAttribute('data-theme')}catch(e){}</script>
 </head>
 <body>
 <nav class="topbar">
   <div class="topbar-left">
     <span class="topbar-brand">⚡ Kodspot Electrical</span>
     <div class="sv-nav" id="sv-nav">
-      <a href="/supervisor-scan" class="sv-nav-link">Scan</a>
-      <a href="/supervisor-electrical" class="sv-nav-link active" data-mod="ele">Electrical</a>
-      <a href="/supervisor-tickets" class="sv-nav-link">Tickets</a>
-      <a href="/supervisor-attendance" class="sv-nav-link">Attendance</a>
+      <a href="/supervisor-scan" class="sv-nav-link"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 7V5a2 2 0 012-2h2"/><path d="M17 3h2a2 2 0 012 2v2"/><path d="M21 17v2a2 2 0 01-2 2h-2"/><path d="M7 21H5a2 2 0 01-2-2v-2"/><rect x="7" y="7" width="10" height="10" rx="1"/></svg>Scan</a>
+      <a href="/supervisor-electrical" class="sv-nav-link active" aria-current="page" data-mod="ele"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>Electrical</a>
+      <a href="/supervisor-assets" class="sv-nav-link" data-mod="asset"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/><polyline points="3.3 7 12 12 20.7 7"/><line x1="12" y1="22" x2="12" y2="12"/></svg>Assets</a>
+      <a href="/supervisor-tickets" class="sv-nav-link"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M15 5H9a2 2 0 00-2 2v10a2 2 0 002 2h6a2 2 0 002-2V7a2 2 0 00-2-2z"/><path d="M12 11h.01"/><path d="M12 15h.01"/></svg>Tickets</a>
+      <a href="/supervisor-attendance" class="sv-nav-link"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M16 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="8.5" cy="7" r="4"/><polyline points="17 11 19 13 23 9"/></svg>Attendance</a>
     </div>
   </div>
   <div class="topbar-right">
@@ -100,7 +108,7 @@
   <form id="inspectionForm">
     <!-- Shift -->
     <div class="form-section">
-      <div class="form-section-title">🕐 Shift</div>
+      <div class="form-section-title">Shift</div>
       <select class="form-select" id="shift" required onchange="checkShiftMismatch()">
         <option value="">Loading shifts…</option>
       </select>
@@ -115,19 +123,20 @@
 
     <!-- Electrical Checklist -->
     <div class="form-section">
-      <div class="form-section-title">⚡ Inspection Checklist</div>
+      <div id="templateNotice" class="error-msg" style="margin-bottom:.6rem"></div>
+      <div class="form-section-title">Inspection checklist</div>
       <div class="checklist" id="checklist"></div>
       <div class="check-summary"><span id="checkSummary">0 checked</span></div>
     </div>
 
     <!-- Photos (optional — of faults) -->
     <div class="form-section">
-      <div class="form-section-title">📷 Photos <span style="font-weight:400;color:var(--text-muted);font-size:.72rem">(optional — capture faults)</span></div>
+      <div class="form-section-title">Photos <span style="font-weight:400;color:var(--text-muted);font-size:var(--fs-xs)">(optional: show any faults)</span></div>
       <div class="photo-area" id="photoArea">
         <div class="photo-grid" id="photoThumbs"></div>
         <label class="add-photo-btn" id="addPhotoBtn">
-          📷 Add Photo
-          <input type="file" accept="image/*" capture="environment" multiple hidden id="photoInput">
+          Add photo
+          <input class="sr-only" type="file" accept="image/*" capture="environment" multiple id="photoInput">
         </label>
         <div class="photo-count"><span id="photoCount">0</span>/5 photos</div>
       </div>
@@ -135,21 +144,21 @@
 
     <!-- Workers -->
     <div class="form-section">
-      <div class="form-section-title">👷 Workers Present</div>
+      <div class="form-section-title">Electricians present (required)</div>
       <div class="worker-list" id="workerList"><div style="text-align:center;padding:1rem;color:var(--text-muted);font-size:.82rem">Loading workers…</div></div>
       <div class="worker-count"><span id="workerCount">0</span> selected</div>
     </div>
 
     <!-- Notes -->
     <div class="form-section">
-      <div class="form-section-title">📝 Notes</div>
+      <div class="form-section-title"><label for="notes">Notes</label></div>
       <textarea class="form-textarea" id="notes" rows="2" placeholder="Any additional observations…" maxlength="500" style="font-size:.82rem"></textarea>
     </div>
 
     <div id="formError" class="error-msg"></div>
 
     <div class="submit-section">
-      <button type="submit" class="btn btn-success btn-block" id="submitBtn" style="font-size:.92rem">⚡ Submit Electrical Inspection</button>
+      <button type="submit" class="btn btn-success btn-block" id="submitBtn" style="font-size:.95rem;min-height:48px">Submit inspection</button>
     </div>
   </form>
 </div>
@@ -162,7 +171,8 @@
 </div>
 
 <script src="/js/offline-sync.js?v=1"></script>
-<script src="/js/app.js?v=16"></script>
+<script src="/js/kit.js?v=1"></script>
+<script src="/js/app.js?v=17"></script>
 <script src="/js/custom-select.js"></script>
 <script>
 if (!App.initSupervisor()) throw '';
@@ -170,7 +180,7 @@ App.initNotifications(App.supFetch, 'supervisor');
 var esc = App.esc, $ = App.$;
 $('scanNextLink').href = App.orgPath('supervisor-scan');
 var locationId = null, photos = [];
-var _submitLabel = $('submitBtn').innerHTML;
+var showMissing = false; // set once a submit has found unanswered checks
 
 // Default CHECK_TYPES (fallback when no template)
 var CHECK_TYPES = [
@@ -213,9 +223,17 @@ if (!locationId) { location.href = App.orgPath('supervisor-scan'); throw ''; }
 $('locName').textContent = decodeURIComponent(locName);
 
 // ── Resolve inspection template for this location ──
+function templateFailed() {
+  var n = $('templateNotice');
+  n.innerHTML = 'Could not load this room\'s checklist, so this is the standard list. <button type="button" class="btn btn-sm btn-outline" onclick="resolveTemplate()">Try again</button>';
+  n.classList.add('show');
+}
+window.resolveTemplate = resolveTemplate;
 async function resolveTemplate() {
+  $('templateNotice').classList.remove('show');
   try {
     var res = await App.supFetch('/inspection-templates/resolve?locationId=' + encodeURIComponent(locationId));
+    if (!res || res.status >= 500) templateFailed();
     if (res && res.ok) {
       var tpl = await res.json();
       activeTemplateId = tpl.id;
@@ -240,7 +258,7 @@ async function resolveTemplate() {
       var locSub = document.querySelector('.loc-info p');
       if (locSub) locSub.textContent = 'Template: ' + tpl.name + (tpl.version > 1 ? ' (v' + tpl.version + ')' : '');
     }
-  } catch(e) { /* Use default CHECK_TYPES */ }
+  } catch(e) { templateFailed(); } // the standard list stays, so a room can be inspected offline
   renderChecklist();
 }
 resolveTemplate();
@@ -312,28 +330,37 @@ function renderChecklist() {
   $('checklist').innerHTML = CHECK_TYPES.map(function(c) {
     var st = checkState[c.key];
     var rowCls = st.status === 'FAULTY' ? ' faulty' : '';
+    var missing = showMissing && isUnanswered(c);
+    if (missing) rowCls += ' missing';
+    var press = function(v) { return ' aria-pressed="' + (st.status === v) + '"'; };
     var btns = '';
     if (c.responseType === 'YES_NO') {
-      btns = '<button type="button" class="check-btn' + (st.status === 'YES' ? ' sel-ok' : '') + '" onclick="setCheck(\'' + c.key + '\',\'YES\')">Yes</button>' +
-        '<button type="button" class="check-btn' + (st.status === 'NO' ? ' sel-faulty' : '') + '" onclick="setCheck(\'' + c.key + '\',\'NO\')">No</button>' +
-        '<button type="button" class="check-btn' + (st.status === 'NA' ? ' sel-na' : '') + '" onclick="setCheck(\'' + c.key + '\',\'NA\')">N/A</button>';
+      btns = '<button type="button" class="check-btn' + (st.status === 'YES' ? ' sel-ok' : '') + '"' + press('YES') + ' onclick="setCheck(\'' + c.key + '\',\'YES\')">Yes</button>' +
+        '<button type="button" class="check-btn' + (st.status === 'NO' ? ' sel-faulty' : '') + '"' + press('NO') + ' onclick="setCheck(\'' + c.key + '\',\'NO\')">No</button>' +
+        '<button type="button" class="check-btn' + (st.status === 'NA' ? ' sel-na' : '') + '"' + press('NA') + ' onclick="setCheck(\'' + c.key + '\',\'NA\')">N/A</button>';
     } else if (c.responseType === 'READING') {
-      btns = '<input type="number" step="any" class="form-input" style="width:90px;height:32px;font-size:.78rem;padding:.2rem .4rem" placeholder="' + (c.unit || 'Value') + '" id="rdg_' + c.key + '" oninput="setReading(\'' + c.key + '\',this.value)" value="' + (st.reading != null ? st.reading : '') + '">';
-      if (c.unit) btns += '<span style="font-size:.68rem;color:var(--text-muted);margin-left:2px">' + esc(c.unit) + '</span>';
+      btns = '<input type="number" step="any" class="form-input" style="width:110px;height:48px;font-size:1rem;padding:.2rem .5rem" placeholder="' + (c.unit || 'Value') + '" id="rdg_' + c.key + '" oninput="setReading(\'' + c.key + '\',this.value)" value="' + (st.reading != null ? st.reading : '') + '">';
+      if (c.unit) btns += '<span style="font-size:var(--fs-xs);color:var(--text-muted);margin-left:2px">' + esc(c.unit) + '</span>';
     } else {
-      btns = '<button type="button" class="check-btn' + (st.status === 'OK' ? ' sel-ok' : '') + '" onclick="setCheck(\'' + c.key + '\',\'OK\')">OK</button>' +
-        '<button type="button" class="check-btn' + (st.status === 'FAULTY' ? ' sel-faulty' : '') + '" onclick="setCheck(\'' + c.key + '\',\'FAULTY\')">Fault</button>' +
-        '<button type="button" class="check-btn' + (st.status === 'NA' ? ' sel-na' : '') + '" onclick="setCheck(\'' + c.key + '\',\'NA\')">N/A</button>';
+      btns = '<button type="button" class="check-btn' + (st.status === 'OK' ? ' sel-ok' : '') + '"' + press('OK') + ' onclick="setCheck(\'' + c.key + '\',\'OK\')">OK</button>' +
+        '<button type="button" class="check-btn' + (st.status === 'FAULTY' ? ' sel-faulty' : '') + '"' + press('FAULTY') + ' onclick="setCheck(\'' + c.key + '\',\'FAULTY\')">Fault</button>' +
+        '<button type="button" class="check-btn' + (st.status === 'NA' ? ' sel-na' : '') + '"' + press('NA') + ' onclick="setCheck(\'' + c.key + '\',\'NA\')">N/A</button>';
     }
-    var reqBadge = c.isRequired ? '' : '<span style="font-size:.6rem;color:var(--text-light);margin-left:4px">(opt)</span>';
+    var reqBadge = c.isRequired ? '' : '<span style="font-size:var(--fs-xs);color:var(--text-light);margin-left:4px">(opt)</span>';
     return '<div class="check-row' + rowCls + '" id="row_' + c.key + '">' +
-      '<span class="check-icon">' + c.icon + '</span>' +
+      '<span class="check-icon" aria-hidden="true">' + c.icon + '</span>' +
       '<span class="check-label">' + esc(c.label) + reqBadge + '</span>' +
-      '<div class="check-btns">' + btns + '</div>' +
+      '<div class="check-btns" role="group" aria-label="' + esc(c.label) + '">' + btns + '</div>' +
+      (missing ? '<div class="check-missing">Choose an answer</div>' : '') +
     '</div>' +
     (st.status === 'FAULTY' ? '<textarea class="check-remarks" id="rem_' + c.key + '" placeholder="Describe the fault…" maxlength="500" oninput="setRemarks(\'' + c.key + '\',this.value)">' + esc(st.remarks) + '</textarea>' : '');
   }).join('');
   updateCheckSummary();
+}
+
+function isUnanswered(c) {
+  if (!c.isRequired) return false;
+  return c.responseType === 'READING' ? checkState[c.key].reading == null : !checkState[c.key].status;
 }
 
 window.setCheck = function(key, status) {
@@ -370,6 +397,13 @@ function updateCheckSummary() {
   if (faulty > 0) txt += ' · <span class="fault-count">' + faulty + ' fault(s)</span>';
   if (ok > 0) txt += ' · ' + ok + ' OK';
   $('checkSummary').innerHTML = txt;
+  $('submitBtn').textContent = submitLabel();
+}
+
+function submitLabel() {
+  var required = CHECK_TYPES.filter(function(c) { return c.isRequired; });
+  var answered = required.filter(function(c) { return !isUnanswered(c); }).length;
+  return 'Submit inspection (' + answered + ' of ' + required.length + ' answered)';
 }
 renderChecklist();
 
@@ -377,10 +411,10 @@ renderChecklist();
 async function loadWorkers() {
   $('workerList').innerHTML = '<div style="padding:.75rem;text-align:center;color:var(--text-muted);font-size:.82rem">Loading…</div>';
   var res = await App.supFetch('/workers?limit=100&active=true');
-  if (!res) { $('workerList').innerHTML = '<div style="padding:.75rem;text-align:center;color:var(--text-muted)">Failed to load</div>'; return; }
+  if (!res || !res.ok) { App.loadFailed($('workerList'), { what: 'the electricians', onRetry: loadWorkers }); return; }
   var data = await res.json();
   var workers = data.workers || [];
-  if (!workers.length) { $('workerList').innerHTML = '<div style="text-align:center;padding:1rem;color:var(--text-muted)">No workers</div>'; return; }
+  if (!workers.length) { $('workerList').innerHTML = '<div style="text-align:center;padding:1rem;color:var(--text-muted)">No electricians yet. Ask your admin to add them.</div>'; return; }
   $('workerList').innerHTML = workers.filter(function(w) { return w.isActive !== false; }).map(function(w) {
     return '<label class="worker-item"><input type="checkbox" name="workers" value="' + w.id + '" onchange="updateWorkerCount()"><span class="worker-item-name">' + esc(w.name) + '</span>' + (w.employeeId ? '<span class="worker-item-id">' + esc(w.employeeId) + '</span>' : '') + '</label>';
   }).join('');
@@ -393,14 +427,15 @@ function updateWorkerCount() {
 
 // ── Photos ──
 var _allowedTypes = ['image/jpeg', 'image/png', 'image/webp'];
-$('photoInput').addEventListener('change', function(e) {
-  var files = Array.from(e.target.files);
+$('photoInput').addEventListener('change', async function(e) {
+  var input = e.target, files = Array.from(input.files);
   for (var i = 0; i < files.length && photos.length < 5; i++) {
-    if (_allowedTypes.indexOf(files[i].type) === -1) { App.toast('Only JPEG, PNG, WebP allowed', 'error'); continue; }
-    if (files[i].size > 5*1024*1024) { App.toast('Photo too large (max 5MB)', 'error'); continue; }
-    photos.push(files[i]);
+    if (_allowedTypes.indexOf(files[i].type) === -1) { App.toast('Use a JPEG, PNG or WebP photo.', 'error'); continue; }
+    var file = await Kit.shrinkPhoto(files[i]);
+    if (file.size > 5*1024*1024) { App.toast('This photo is too big. Take it again.', 'error'); continue; }
+    photos.push(file);
   }
-  renderPhotos(); e.target.value = '';
+  renderPhotos(); input.value = '';
 });
 
 function renderPhotos() {
@@ -408,7 +443,7 @@ function renderPhotos() {
   $('addPhotoBtn').style.display = photos.length >= 5 ? 'none' : '';
   $('photoArea').classList.toggle('has-photos', photos.length > 0);
   $('photoThumbs').innerHTML = photos.map(function(f, i) {
-    return '<div class="photo-thumb"><img src="' + URL.createObjectURL(f) + '"><button type="button" onclick="removePhoto(' + i + ')">×</button></div>';
+    return '<div class="photo-thumb"><img src="' + URL.createObjectURL(f) + '" alt="Photo ' + (i + 1) + '"><button type="button" aria-label="Remove photo ' + (i + 1) + '" onclick="removePhoto(' + i + ')">×</button></div>';
   }).join('');
 }
 window.removePhoto = function(idx) { photos.splice(idx, 1); renderPhotos(); };
@@ -419,13 +454,12 @@ $('inspectionForm').addEventListener('submit', async function(e) {
   App.hideError('formError');
 
   // Validate checklist — required items must be checked
-  var unchecked = CHECK_TYPES.filter(function(c) {
-    if (!c.isRequired) return false;
-    if (c.responseType === 'READING') return checkState[c.key].reading == null;
-    return !checkState[c.key].status;
-  });
-  if (unchecked.length > 0) {
+  var unchecked = CHECK_TYPES.filter(isUnanswered);
+  showMissing = unchecked.length > 0;
+  if (showMissing) {
+    renderChecklist();
     App.showError('formError', 'Please complete all required items: ' + unchecked.map(function(c) { return c.label; }).join(', '));
+    $('row_' + unchecked[0].key).scrollIntoView({ block: 'center' });
     return;
   }
 
@@ -440,7 +474,7 @@ $('inspectionForm').addEventListener('submit', async function(e) {
 
   var workerIds = Array.from(document.querySelectorAll('input[name=workers]:checked')).map(function(el) { return el.value; });
   if (workerIds.length === 0) {
-    App.showError('formError', 'Please select at least one worker.');
+    App.showError('formError', 'Tick at least one electrician who was present.');
     return;
   }
 
@@ -470,13 +504,13 @@ $('inspectionForm').addEventListener('submit', async function(e) {
   $('submitBtn').disabled = true;
   $('submitBtn').textContent = 'Submitting…';
   try {
-    var res = await App.supFetch('/electrical-inspections', { method: 'POST', body: fd });
-    if (!res) { $('submitBtn').disabled = false; $('submitBtn').innerHTML = _submitLabel; return; }
+    var res = await App.supFetch('/electrical-inspections', { method: 'POST', body: fd, throwOnNetwork: true }); // the catch below saves it offline
+    if (!res) { $('submitBtn').disabled = false; $('submitBtn').textContent = submitLabel(); return; }
     if (!res.ok) {
       var d = await res.json().catch(function() { return {}; });
-      App.showError('formError', d.error || 'Failed to submit');
+      App.showError('formError', d.error || 'Could not submit. Your answers are safe on this page. Try again.');
       $('submitBtn').disabled = false;
-      $('submitBtn').innerHTML = _submitLabel;
+      $('submitBtn').textContent = submitLabel();
       return;
     }
     var result = await res.json();
@@ -514,9 +548,9 @@ $('inspectionForm').addEventListener('submit', async function(e) {
       $('successSub').textContent = 'Inspection saved offline. It will be submitted automatically when you are back online.' + (photos.length > 0 ? ' Note: photos will not be included in the offline submission.' : '');
       return;
     }
-    App.showError('formError', 'Network error. Please try again.');
+    App.showError('formError', 'No connection. Your answers are safe on this page. Tap Submit again when you have signal.');
     $('submitBtn').disabled = false;
-    $('submitBtn').innerHTML = _submitLabel;
+    $('submitBtn').textContent = submitLabel();
   }
 });
 </script>

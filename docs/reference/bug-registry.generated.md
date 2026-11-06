@@ -76,8 +76,24 @@ Commands: `npm run bug:list` · `npm run bug:run -- <ID>` · `npm run bug:valida
 | BUG-0058 | MEDIUM | FIXED | ele | Sign-ins, password and PIN changes, templates, rosters, attendance edits, alert actions and ticket creation left no audit row | `test/integration/audit-coverage.test.js` |
 | BUG-0059 | MEDIUM | FIXED | complaints | After 180 days a guest's name was removed from the complaint but kept in its audit row | `test/integration/guest-anonymisation.test.js` |
 | BUG-0060 | MEDIUM | FIXED | complaints | A guest's name and phone were accepted without their consent; consent was never recorded | `test/integration/public-complaint-consent.test.js` |
+| BUG-0061 | MEDIUM | FIXED | ele | A lost connection left the page stuck on its loading state | `test/public-escaping.test.js` |
+| BUG-0062 | CRITICAL | FIXED | ele | An electrician could not attach the proof photo, so could not resolve a ticket | `e2e/tests/forms.spec.js › "BUG-0062"` |
+| BUG-0063 | HIGH | FIXED | ele | The home page never showed an error for a wrong organization code | `e2e/tests/forms.spec.js › "BUG-0063"` |
+| BUG-0064 | HIGH | FIXED | ele | Adding an electrician left them unable to sign in, with nothing to say so | `e2e/tests/journeys.spec.js › J3` |
+| BUG-0065 | HIGH | FIXED | ele | No screen could assign locations to a supervisor, so resident complaints went unassigned | `e2e/tests/forms.spec.js › "BUG-0065"` |
+| BUG-0066 | MEDIUM | FIXED | ele | The resident complaint form could not be used without a touch screen or mouse | `e2e/tests/forms.spec.js › "BUG-0066"` |
+| BUG-0067 | MEDIUM | FIXED | ele | Choosing a parent location was ambiguous and offered rooms as parents | `apps/api/scenarios/bugs/bug-0067-location-parent-ambiguous.js` |
+| BUG-0068 | MEDIUM | FIXED | ele | Print All could be pressed while the QR stickers were still loading | `e2e/tests/forms.spec.js › "BUG-0068"` |
+| BUG-0069 | MEDIUM | FIXED | ele | Tapping a ticket count tile showed every ticket instead of that group | `e2e/tests/forms.spec.js › "BUG-0069"` |
+| BUG-0070 | MEDIUM | FIXED | ele | Cancelling the flag reason still flagged the inspection | `e2e/tests/forms.spec.js › "the submission can be flagged"` |
+| BUG-0071 | MEDIUM | FIXED | ele | Complaint category labels went unescaped into the public complaint form | `apps/api/scenarios/bugs/bug-0071-category-label-unescaped-on-public-page.js` |
+| BUG-0072 | HIGH | FIXED | ele | The inspection answer buttons were unreadable in the dark field theme | `apps/api/scenarios/bugs/bug-0072-inspection-answers-unreadable.js` |
+| BUG-0073 | HIGH | FIXED | ele | A failed load read as "no tickets", so staff could think there was no work | `e2e/tests/forms.spec.js › "BUG-0073"` |
+| BUG-0074 | MEDIUM | FIXED | ele | The AI assistant sent supervisors' and electricians' names to the outside AI provider | `apps/api/scenarios/bugs/bug-0074-ai-prompt-names-staff.js` |
+| BUG-0075 | HIGH | FIXED | ele | The privacy notice said photos are deleted after 7 days; they are kept 30 | `apps/api/scenarios/bugs/bug-0075-privacy-notice-wrong-photo-retention.js` |
+| BUG-0076 | MEDIUM | FIXED | ele | Electricians had no way to get a copy of their own data, and the staff export had no button | `apps/api/scenarios/bugs/bug-0076-electrician-cannot-export-own-data.js` |
 
-Count: 60 bug scenario(s).
+Count: 76 bug scenario(s).
 
 ## BUG-0001 — Admin could set a ticket to RESOLVED_PENDING_VERIFY directly
 
@@ -1154,4 +1170,284 @@ Count: 60 bug scenario(s).
 1. POST /api/public/complaint with guestName and no consent.
 2. Broken: 200. Fixed: 400 "Please check the consent box…".
 3. Regression: test/integration/public-complaint-consent.test.js.
+
+## BUG-0061 — A lost connection left the page stuck on its loading state
+
+- **Severity:** MEDIUM · **Status:** FIXED · **Module:** ele · **Category:** resilience
+- **Origin:** UX pass 2026-11
+- **Introduced:** pre-audit · **Fixed:** 2026-11-06
+- **Description:** public/js/app.js _doFetch rethrew a network failure, and most pages only checked for a null response, so an uncaught rejection left the button disabled or the skeleton on screen.
+- **Root cause:** The fetch wrapper had two failure shapes (null and a throw) and the pages handled one.
+- **Expected behavior:** A lost connection shows "No connection. Check your signal and try again." and answers null, unless the caller passes throwOnNetwork (the inspection page, which queues offline).
+- **Broken behavior:** An unhandled rejection; the page sat on "Saving…" or a skeleton.
+- **Scenario dependencies:** —
+- **Regression test:** `test/public-escaping.test.js`
+
+**Reproduction steps:**
+
+1. Load app.js with a fetch that rejects.
+2. App.apiFetch("/x").
+3. Broken: the call rejects. Fixed: it answers null, and a toast says why.
+
+## BUG-0062 — An electrician could not attach the proof photo, so could not resolve a ticket
+
+- **Severity:** CRITICAL · **Status:** FIXED · **Module:** ele · **Category:** workflow
+- **Origin:** UX pass 2026-11
+- **Introduced:** pre-audit · **Fixed:** 2026-11-06
+- **Description:** public/css/design-system.css hides every file input, and the required #rPhoto on electrician-tickets.html had no label tied to it, so the page showed "Proof Photo *" with nothing to tap. The journeys set the file directly, which works on a hidden input, so no test noticed.
+- **Root cause:** A global display:none on file inputs, with a required input that had no visible control.
+- **Expected behavior:** A visible "Take proof photo" control opens the camera or file chooser; Mark Resolved stays disabled until a photo is attached.
+- **Broken behavior:** Nothing to tap. The electrician could not resolve any ticket from the app.
+- **Scenario dependencies:** —
+- **Regression test:** `e2e/tests/forms.spec.js › "BUG-0062"`
+
+**Reproduction steps:**
+
+1. Sign in as an electrician and open a job in My jobs.
+2. Tap Resolve With Photo.
+3. Broken: no control for the photo. Fixed: the label opens the file chooser.
+
+## BUG-0063 — The home page never showed an error for a wrong organization code
+
+- **Severity:** HIGH · **Status:** FIXED · **Module:** ele · **Category:** ux
+- **Origin:** UX pass 2026-11
+- **Introduced:** pre-audit · **Fixed:** 2026-11-06
+- **Description:** public/index.html set style.display on #orgError, but .error-msg only shows with the .show class, so a wrong code, an empty field or a lost connection did nothing visible.
+- **Root cause:** The error element was toggled in a way its stylesheet ignores.
+- **Expected behavior:** An empty field, a wrong code and a lost connection each show a message; Go reads "Checking…" while it works.
+- **Broken behavior:** Tapping Go on a wrong code appeared to do nothing.
+- **Scenario dependencies:** —
+- **Regression test:** `e2e/tests/forms.spec.js › "BUG-0063"`
+
+**Reproduction steps:**
+
+1. Open / with no saved organization.
+2. Type a code that does not exist and tap Go.
+3. Broken: nothing visible. Fixed: "We can't find that code."
+
+## BUG-0064 — Adding an electrician left them unable to sign in, with nothing to say so
+
+- **Severity:** HIGH · **Status:** FIXED · **Module:** ele · **Category:** workflow
+- **Origin:** UX pass 2026-11
+- **Introduced:** pre-audit · **Fixed:** 2026-11-06
+- **Description:** admin-workers.html closed the form after a create with no PIN set and no mention of one. The electrician could not sign in until the admin found the PIN button on the row.
+- **Root cause:** The PIN was treated as a separate action, not as part of adding the person.
+- **Expected behavior:** A successful add goes straight to "Last step: set a PIN"; after the PIN, the location assignment opens.
+- **Broken behavior:** The form closed with "Electrician created"; the electrician's first sign-in failed.
+- **Scenario dependencies:** —
+- **Regression test:** `e2e/tests/journeys.spec.js › J3`
+
+**Reproduction steps:**
+
+1. Add an electrician as an admin.
+2. Broken: back on the list. Fixed: the PIN screen opens for them.
+
+## BUG-0065 — No screen could assign locations to a supervisor, so resident complaints went unassigned
+
+- **Severity:** HIGH · **Status:** FIXED · **Module:** ele · **Category:** workflow
+- **Origin:** UX pass 2026-11
+- **Introduced:** pre-audit · **Fixed:** 2026-11-06
+- **Description:** GET and PUT /supervisors/:id/assignments existed and resident routing depends on them, but no page called them, so a new organization could not route complaints to a supervisor without the API.
+- **Root cause:** The capability shipped without its admin screen.
+- **Expected behavior:** Each supervisor row has a Locations button opening the same checklist electricians use; adding a supervisor opens it.
+- **Broken behavior:** No way to set them from the app.
+- **Scenario dependencies:** —
+- **Regression test:** `e2e/tests/forms.spec.js › "BUG-0065"`
+
+**Reproduction steps:**
+
+1. Open admin-supervisors.
+2. Broken: no Locations action. Fixed: the checklist saves through PUT /supervisors/:id/assignments.
+
+## BUG-0066 — The resident complaint form could not be used without a touch screen or mouse
+
+- **Severity:** MEDIUM · **Status:** FIXED · **Module:** ele · **Category:** accessibility
+- **Origin:** UX pass 2026-11
+- **Introduced:** pre-audit · **Fixed:** 2026-11-06
+- **Description:** public/scan.html built the service and issue choices from clickable divs: no keyboard focus, no role, nothing for a screen reader. The issue choice is required, so the form could not be sent.
+- **Root cause:** Clickable divs in place of buttons and radio inputs.
+- **Expected behavior:** Service choices are buttons; issue choices are a radio group in a fieldset, operable by keyboard.
+- **Broken behavior:** A keyboard or screen-reader user could not choose a problem, so could not report it.
+- **Scenario dependencies:** —
+- **Regression test:** `e2e/tests/forms.spec.js › "BUG-0066"`
+
+**Reproduction steps:**
+
+1. Open a QR link with the keyboard only.
+2. Broken: Tab never reaches the choices. Fixed: arrows choose, and Send report is enabled.
+
+## BUG-0067 — Choosing a parent location was ambiguous and offered rooms as parents
+
+- **Severity:** MEDIUM · **Status:** FIXED · **Module:** ele · **Category:** data-integrity
+- **Origin:** UX pass 2026-11
+- **Introduced:** pre-audit · **Fixed:** 2026-11-06
+- **Description:** admin-locations.html listed every location by name and raw type, including rooms, so a room could be filed under the wrong "Floor 1", or under another room, and its printed sticker named the wrong place.
+- **Root cause:** The select listed all nodes with no path filter.
+- **Expected behavior:** Only spaces that can hold others are listed, by full path, with a live line showing what the sticker will read.
+- **Broken behavior:** Two "Floor 1" entries; rooms offered as parents.
+- **Scenario dependencies:** —
+- **Regression test:** `apps/api/scenarios/bugs/bug-0067-location-parent-ambiguous.js`
+
+**Reproduction steps:**
+
+1. Add a second block with a Floor 1.
+2. Add a room and open Parent.
+3. Broken: two identical entries. Fixed: "Block A → Floor 1" and "Block B → Floor 1".
+
+## BUG-0068 — Print All could be pressed while the QR stickers were still loading
+
+- **Severity:** MEDIUM · **Status:** FIXED · **Module:** ele · **Category:** workflow
+- **Origin:** UX pass 2026-11
+- **Introduced:** pre-audit · **Fixed:** 2026-11-06
+- **Description:** admin-qr-print.html fetches QR images in batches and left Print All enabled, so a large hostel could print a partial set; a failed image printed as a grey box with no warning.
+- **Root cause:** The button was not tied to the loading state.
+- **Expected behavior:** Print All stays disabled until every sticker is on the page; failures are counted, can be retried, and need a confirmation to print without.
+- **Broken behavior:** A partial or gapped print with nothing to say so.
+- **Scenario dependencies:** —
+- **Regression test:** `e2e/tests/forms.spec.js › "BUG-0068"`
+
+**Reproduction steps:**
+
+1. Open admin-qr-print on a slow connection and press Print All.
+2. Broken: a partial set. Fixed: the button stays disabled until "Ready: N stickers".
+
+## BUG-0069 — Tapping a ticket count tile showed every ticket instead of that group
+
+- **Severity:** MEDIUM · **Status:** FIXED · **Module:** ele · **Category:** data-accuracy
+- **Origin:** UX pass 2026-11
+- **Introduced:** pre-audit · **Fixed:** 2026-11-06
+- **Description:** admin-tickets.html set the status select to a comma list (OPEN,ACKNOWLEDGED,ASSIGNED). No option has that value, so the select fell back to empty and the list showed everything.
+- **Root cause:** A multi-status filter stored in a single-value select.
+- **Expected behavior:** A tile filters to its group, shows as pressed, and a second tap or Clear filters removes it.
+- **Broken behavior:** The Open tile showed all tickets.
+- **Scenario dependencies:** —
+- **Regression test:** `e2e/tests/forms.spec.js › "BUG-0069"`
+
+**Reproduction steps:**
+
+1. Open admin-tickets with tickets in several states.
+2. Tap Open.
+3. Broken: all tickets. Fixed: only the open group.
+
+## BUG-0070 — Cancelling the flag reason still flagged the inspection
+
+- **Severity:** MEDIUM · **Status:** FIXED · **Module:** ele · **Category:** data-integrity
+- **Origin:** UX pass 2026-11
+- **Introduced:** pre-audit · **Fixed:** 2026-11-06
+- **Description:** admin-electrical.html read prompt() || '', so Cancel and an empty answer looked the same and the inspection was flagged either way.
+- **Root cause:** A cancelled prompt was treated as an empty reason.
+- **Expected behavior:** Cancel leaves the inspection unchanged.
+- **Broken behavior:** Cancel flagged it, with no reason.
+- **Scenario dependencies:** —
+- **Regression test:** `e2e/tests/forms.spec.js › "the submission can be flagged"`
+
+**Reproduction steps:**
+
+1. Open an inspection and tap Flag.
+2. Cancel.
+3. Broken: it is flagged. Fixed: unchanged.
+
+## BUG-0071 — Complaint category labels went unescaped into the public complaint form
+
+- **Severity:** MEDIUM · **Status:** FIXED · **Module:** ele · **Category:** security
+- **Origin:** UX pass 2026-11
+- **Introduced:** pre-audit · **Fixed:** 2026-11-06
+- **Description:** public/scan.html wrote each category key and label into innerHTML without escaping. Labels come from an admin, and the page is open to every resident who scans a sticker, so markup in a label ran there. esc() also left double quotes alone, which matters in attributes.
+- **Root cause:** Only some interpolations were escaped, and the escape helper did not cover attributes.
+- **Expected behavior:** Labels and keys are escaped, quotes included.
+- **Broken behavior:** A category label containing markup rendered as markup for residents.
+- **Scenario dependencies:** —
+- **Regression test:** `apps/api/scenarios/bugs/bug-0071-category-label-unescaped-on-public-page.js`
+
+**Reproduction steps:**
+
+1. Create a category labelled with an img tag and an onerror handler.
+2. Open a QR link.
+3. Broken: it runs. Fixed: it shows as text.
+
+## BUG-0072 — The inspection answer buttons were unreadable in the dark field theme
+
+- **Severity:** HIGH · **Status:** FIXED · **Module:** ele · **Category:** ux
+- **Origin:** UX pass 2026-11
+- **Introduced:** pre-audit · **Fixed:** 2026-11-06
+- **Description:** supervisor-electrical.html set no text colour on .check-btn, so the browser default black sat on a dark surface, at 10px, for the Yes/No/OK/Fault buttons that make up an inspection.
+- **Root cause:** A button style with a background and no colour.
+- **Expected behavior:** Answers use the text colour, at .9rem and 48px tall, with a solid fill and a tick when chosen, and aria-pressed.
+- **Broken behavior:** Black on near-black, in small type, on a phone in a dim plant room.
+- **Scenario dependencies:** —
+- **Regression test:** `apps/api/scenarios/bugs/bug-0072-inspection-answers-unreadable.js`
+
+**Reproduction steps:**
+
+1. Open an inspection as a supervisor.
+2. Broken: the answers cannot be read. Fixed: readable, large, and marked when chosen.
+
+## BUG-0073 — A failed load read as "no tickets", so staff could think there was no work
+
+- **Severity:** HIGH · **Status:** FIXED · **Module:** ele · **Category:** resilience
+- **Origin:** UX pass 2026-11
+- **Introduced:** pre-audit · **Fixed:** 2026-11-06
+- **Description:** admin-tickets.html and supervisor-tickets.html returned quietly on a failed request and showed an empty list or a stuck skeleton; other pages said "No workers" for a refused request.
+- **Root cause:** No distinction between "the request failed" and "nothing matched".
+- **Expected behavior:** App.loadFailed says it could not load and offers Try again; "no tickets" appears only for a real empty answer.
+- **Broken behavior:** On a weak signal a supervisor saw an empty queue.
+- **Scenario dependencies:** —
+- **Regression test:** `e2e/tests/forms.spec.js › "BUG-0073"`
+
+**Reproduction steps:**
+
+1. Open admin-tickets with the request failing.
+2. Broken: empty. Fixed: "Could not load the tickets." with Try again.
+
+## BUG-0074 — The AI assistant sent supervisors' and electricians' names to the outside AI provider
+
+- **Severity:** MEDIUM · **Status:** FIXED · **Module:** ele · **Category:** privacy
+- **Origin:** Security and DPDP audit 2026-11
+- **Introduced:** pre-audit · **Fixed:** 2026-11-06
+- **Description:** src/routes/ai.js built the prompt with each inspection's supervisor and electrician names. The privacy notice says aggregated summaries are sent, and the assistant does not need names to summarise the day.
+- **Root cause:** The prompt was written for usefulness, with no minimisation step.
+- **Expected behavior:** The prompt holds counts: "Morning shift, 2 electrician(s)". No person's name is sent.
+- **Broken behavior:** Named staff in each request to Google or Microsoft.
+- **Scenario dependencies:** —
+- **Regression test:** `apps/api/scenarios/bugs/bug-0074-ai-prompt-names-staff.js`
+
+**Reproduction steps:**
+
+1. Enable AI for an organization and ask the assistant about today.
+2. Broken: the provider receives the names. Fixed: counts only.
+
+## BUG-0075 — The privacy notice said photos are deleted after 7 days; they are kept 30
+
+- **Severity:** HIGH · **Status:** FIXED · **Module:** ele · **Category:** privacy
+- **Origin:** Security and DPDP audit 2026-11
+- **Introduced:** pre-audit · **Fixed:** 2026-11-06
+- **Description:** public/privacy.html stated 7 days while src/services/cleanup.js has RETENTION_DAYS = 30. A notice under DPDP s.5 must describe what is actually done.
+- **Root cause:** The retention period changed and the notice did not.
+- **Expected behavior:** The notice states 30 days, and a check ties it to the constant.
+- **Broken behavior:** Residents and staff were told their photos go after a week.
+- **Scenario dependencies:** —
+- **Regression test:** `apps/api/scenarios/bugs/bug-0075-privacy-notice-wrong-photo-retention.js`
+
+**Reproduction steps:**
+
+1. Read section 5 of /privacy.
+2. Compare RETENTION_DAYS in cleanup.js.
+
+## BUG-0076 — Electricians had no way to get a copy of their own data, and the staff export had no button
+
+- **Severity:** MEDIUM · **Status:** FIXED · **Module:** ele · **Category:** privacy
+- **Origin:** Security and DPDP audit 2026-11
+- **Introduced:** pre-audit · **Fixed:** 2026-11-06
+- **Description:** GET /auth/export served staff tokens only, no page called it, and the privacy notice promised a data export feature. Electricians are a separate account type, and they alone have Aadhaar and blood group stored.
+- **Root cause:** The export was built for one account type and never wired to a screen.
+- **Expected behavior:** GET /auth/worker-export gives an electrician their own record, attendance, inspections and tickets, decrypted, and no one else's; "Download my data" is in the account menu.
+- **Broken behavior:** No access to their own data without asking the admin.
+- **Scenario dependencies:** —
+- **Regression test:** `apps/api/scenarios/bugs/bug-0076-electrician-cannot-export-own-data.js`
+
+**Reproduction steps:**
+
+1. Sign in as an electrician.
+2. Call GET /api/auth/worker-export.
+3. Broken: 404. Fixed: their own data.
 

@@ -10,48 +10,55 @@
 <meta name="referrer" content="no-referrer">
 <title>Review Resolution — Kodspot</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/css/design-system.css?v=10">
+<link rel="stylesheet" href="/css/design-system.css?v=11">
+<script>try{if(window.matchMedia('(prefers-color-scheme: dark)').matches)document.documentElement.setAttribute('data-theme','dark')}catch(e){}</script>
 <style>
 body{background:var(--bg);min-height:100dvh}
 .rv-wrap{max-width:480px;margin:0 auto;padding:1.5rem 1rem}
 .rv-header{text-align:center;margin-bottom:1.5rem}
-.rv-logo{font-size:1.3rem;font-weight:700;color:var(--primary);letter-spacing:-.02em}
+.rv-logo{font-size:1.15rem;font-weight:700;color:var(--primary);letter-spacing:-.02em}
 .rv-org{font-size:.78rem;color:var(--text-muted);margin-top:.25rem}
 .rv-loading,.rv-error,.rv-done{text-align:center;padding:3rem 1rem}
-.rv-error{color:var(--danger)}
+.rv-error{color:var(--danger-text)}
 
 .rv-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:1.25rem;margin-bottom:1rem}
-.rv-card h3{font-size:.9rem;font-weight:700;color:var(--text);margin-bottom:.75rem;display:flex;align-items:center;gap:.4rem}
-.rv-label{font-size:.72rem;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.03em;margin-bottom:.25rem}
+.rv-card-title{font-size:.95rem;font-weight:700;color:var(--text);margin-bottom:.75rem;display:flex;align-items:center;gap:.4rem}
+.rv-label{font-size:var(--fs-xs);font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.03em;margin-bottom:.25rem}
 .rv-value{font-size:.85rem;color:var(--text);margin-bottom:.75rem}
 .rv-value:last-child{margin-bottom:0}
 
 .rv-proof-img{width:100%;max-height:300px;object-fit:cover;border-radius:var(--radius);margin-top:.5rem;cursor:pointer}
 .rv-proof-img:hover{opacity:.9}
 
-.rv-time{font-size:.72rem;color:var(--text-light);margin-top:.5rem}
+.rv-time{font-size:var(--fs-xs);color:var(--text-light);margin-top:.5rem}
 
-.rv-actions{text-align:center;margin-top:1.5rem}
-.rv-actions .btn{width:100%;margin-bottom:.5rem;min-height:var(--touch-min);font-size:.9rem}
-.rv-actions .btn-confirm{background:var(--success);color:#fff;border:none;border-radius:var(--radius);padding:.75rem 1.5rem;font-weight:600;cursor:pointer}
-.rv-actions .btn-confirm:hover{opacity:.9}
-.rv-actions .btn-reject{background:#fff;color:var(--danger);border:2px solid var(--danger);border-radius:var(--radius);padding:.75rem 1.5rem;font-weight:600;cursor:pointer}
-.rv-actions .btn-reject:hover{background:rgba(220,38,38,.04)}
+.rv-actions{display:grid;gap:.75rem;margin-top:1rem}
+.rv-actions .btn-confirm,.rv-actions .btn-reject,.rv-actions .btn-cancel{width:100%;min-height:48px;padding:.6rem 1rem;font:inherit;font-size:1rem;font-weight:600;border-radius:var(--radius);cursor:pointer}
+.rv-actions .btn-confirm{background:var(--success);color:#fff;border:none}
+.rv-actions .btn-reject{background:var(--surface);color:var(--danger-text);border:2px solid var(--danger)}
+.rv-actions .btn-cancel{background:none;color:var(--text-muted);border:1px solid var(--border-control)}
+.rv-actions button:disabled{opacity:.5;cursor:default}
+.rv-send-error{color:var(--danger-text);font-size:.875rem;margin-top:.75rem;display:none}
+.rv-proof-btn{display:block;width:100%;padding:0;border:none;background:none;cursor:zoom-in}
+.rv-proof-hint{font-size:.8rem;color:var(--text-muted);margin-top:.3rem}
+.rv-title{font-size:1.125rem;font-weight:700;margin:0 0 .75rem;color:var(--text);outline:none}
+.fs-close{position:absolute;top:1rem;right:1rem;min-width:48px;min-height:48px;padding:0 1rem;background:#fff;color:#111;border:none;border-radius:var(--radius);font:inherit;font-weight:600;cursor:pointer}
+.rv-foot{text-align:center;font-size:var(--fs-xs);color:var(--text-muted);padding:.5rem 1rem 1.25rem}
 
 .rv-note-box{margin-top:.75rem;display:none}
 .rv-note-box.show{display:block}
-.rv-note-box textarea{width:100%;min-height:80px;border:1px solid var(--border);border-radius:var(--radius);padding:.6rem;font-size:.82rem;resize:vertical;font-family:inherit}
+.rv-note-box textarea{width:100%;min-height:80px;background:var(--surface);color:var(--text);font-size:1rem;border:1px solid var(--border);border-radius:var(--radius);padding:.6rem;font-size:.82rem;resize:vertical;font-family:inherit}
 
-.rv-timer{font-size:.72rem;color:var(--warning);text-align:center;margin-bottom:1rem;font-weight:500}
+.rv-timer{font-size:.85rem;color:var(--warning-text);background:var(--warning-bg);border-radius:var(--radius);padding:.45rem .75rem;text-align:center;margin-bottom:1rem;font-weight:600}
 
 .rv-result{text-align:center;padding:2rem 1rem}
 .rv-result-icon{display:inline-flex;align-items:center;justify-content:center;width:56px;height:56px;border-radius:50%;margin-bottom:.75rem}
-.rv-result-icon.success{background:#f0fdf4}
-.rv-result-icon.success svg{width:28px;height:28px;stroke:#16a34a;stroke-width:2.5;fill:none}
-.rv-result-icon.info{background:#eff6ff}
-.rv-result-icon.info svg{width:28px;height:28px;stroke:#3b82f6;stroke-width:2.5;fill:none}
-.rv-result-title{font-size:1.1rem;font-weight:700;color:var(--text)}
-.rv-result-sub{font-size:.82rem;color:var(--text-muted);margin-top:.35rem}
+.rv-result-icon.success{background:var(--success-bg)}
+.rv-result-icon.success svg{width:28px;height:28px;stroke:var(--success-text);stroke-width:2.5;fill:none}
+.rv-result-icon.info{background:var(--info-bg)}
+.rv-result-icon.info svg{width:28px;height:28px;stroke:var(--info-text);stroke-width:2.5;fill:none}
+.rv-result-title{font-size:1.25rem;font-weight:700;color:var(--text);outline:none}
+.rv-result-sub{font-size:.9rem;color:var(--text-muted);margin-top:.35rem}
 
 .fullscreen-overlay{display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.9);z-index:9999;align-items:center;justify-content:center;cursor:pointer}
 .fullscreen-overlay.show{display:flex}
@@ -59,15 +66,18 @@ body{background:var(--bg);min-height:100dvh}
 </style>
 </head>
 <body>
-<div class="rv-wrap" id="root">
+<main class="rv-wrap" id="root">
   <div class="rv-loading">
     <div class="spinner" style="margin:0 auto 1rem"></div>
     <p style="color:var(--text-muted);font-size:.85rem">Loading review...</p>
   </div>
+</main>
+<p class="rv-foot">Kodspot · <a href="/privacy">Privacy</a> · <a href="/terms">Terms</a></p>
+<div class="fullscreen-overlay" id="fsOverlay" role="dialog" aria-modal="true" aria-label="Full size photo" onclick="closePhoto()">
+  <button type="button" class="fs-close" id="fsClose">Close</button>
+  <img id="fsImg" src="" alt="Photo of the completed repair">
 </div>
-<div class="fullscreen-overlay" id="fsOverlay" onclick="this.classList.remove('show')">
-  <img id="fsImg" src="" alt="Full size image">
-</div>
+<script src="/js/kit.js?v=1"></script>
 <script>
 (function() {
   var root = document.getElementById('root');
@@ -78,10 +88,18 @@ body{background:var(--bg);min-height:100dvh}
     return;
   }
 
+  function render(html, title) {
+    root.innerHTML = html;
+    document.title = title + ' · Kodspot';
+    var h = root.querySelector('h1');
+    if (h) { h.tabIndex = -1; h.focus({ preventScroll: true }); }
+    window.scrollTo(0, 0);
+  }
+
   // Fetch review data
   fetch('/api/public/review/' + encodeURIComponent(token))
     .then(function(r) {
-      if (!r.ok) return r.json().then(function(d) { throw new Error(d.error || 'Not found'); });
+      if (!r.ok) return r.json().catch(function() { return {}; }).then(function(d) { throw new Error(d.error || 'This review link is invalid or has expired.'); });
       return r.json();
     })
     .then(function(data) {
@@ -94,7 +112,7 @@ body{background:var(--bg);min-height:100dvh}
       }
     })
     .catch(function(err) {
-      showError(err.message || 'This review link is invalid or has expired.');
+      showError(Kit.friendlyError(err));
     });
 
   function esc(s) {
@@ -112,44 +130,44 @@ body{background:var(--bg);min-height:100dvh}
   }
 
   function showError(msg) {
-    root.innerHTML =
-      '<div class="rv-header"><div class="rv-logo">🏥 Kodspot</div></div>' +
+    render(
+      '<div class="rv-header"><div class="rv-logo">Kodspot</div></div>' +
       '<div class="rv-error">' +
-        '<p style="font-size:1.2rem;margin-bottom:.5rem">😕</p>' +
-        '<p style="font-weight:600">' + esc(msg) + '</p>' +
-      '</div>';
+        '<p style="font-size:1.2rem;margin-bottom:.5rem" aria-hidden="true">😕</p>' +
+        '<h1 class="rv-title">' + esc(msg) + '</h1>' +
+      '</div>', 'Review');
   }
 
   function showAlreadyReviewed(data) {
     var isConfirm = data.reviewStatus === 'CONFIRMED';
-    root.innerHTML =
-      '<div class="rv-header"><div class="rv-logo">🏥 Kodspot</div></div>' +
-      '<div class="rv-result">' +
-        '<div class="rv-result-icon info"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg></div>' +
-        '<div class="rv-result-title">Already Reviewed</div>' +
-        '<div class="rv-result-sub">You\'ve already submitted your review' +
+    render(
+      '<div class="rv-header"><div class="rv-logo">Kodspot</div></div>' +
+      '<div class="rv-result" role="status">' +
+        '<div class="rv-result-icon info"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg></div>' +
+        '<h1 class="rv-result-title">Already answered</h1>' +
+        '<div class="rv-result-sub">You\'ve already sent your answer' +
           (data.reviewedAt ? ' (' + timeAgo(data.reviewedAt) + ')' : '') +
-          '.<br>Status: <strong>' + (isConfirm ? '✅ Confirmed' : '❌ Rejected') + '</strong></div>' +
-        '<div style="margin-top:1rem;font-size:.75rem;color:var(--text-light)">Thank you for your feedback!</div>' +
-      '</div>';
+          '.<br>You said: <strong>' + (isConfirm ? 'it\'s fixed' : 'still a problem') + '</strong></div>' +
+        '<div style="margin-top:1rem;font-size:.85rem;color:var(--text)">Thank you for your feedback!</div>' +
+      '</div>', 'Already answered');
   }
 
   function showExpired(data) {
-    root.innerHTML =
-      '<div class="rv-header"><div class="rv-logo">🏥 Kodspot</div></div>' +
-      '<div class="rv-result">' +
-        '<div class="rv-result-icon info"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></div>' +
-        '<div class="rv-result-title">Review Window Expired</div>' +
+    render(
+      '<div class="rv-header"><div class="rv-logo">Kodspot</div></div>' +
+      '<div class="rv-result" role="status">' +
+        '<div class="rv-result-icon info"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></div>' +
+        '<h1 class="rv-result-title">Time to answer has ended</h1>' +
         '<div class="rv-result-sub">' + esc(data.message || 'This review link has expired. The resolution has been automatically accepted.') + '</div>' +
-        '<div style="margin-top:1rem;font-size:.75rem;color:var(--text-light)">If you still have concerns, please scan the QR code again to submit a new complaint.</div>' +
-      '</div>';
+        '<div style="margin-top:1rem;font-size:.85rem;color:var(--text)">If you still have concerns, please scan the QR code again to submit a new complaint.</div>' +
+      '</div>', 'Time to answer has ended');
   }
 
   function showReviewForm(data) {
     var t = data.ticket;
     var imgHtml = '';
     if (t.photoUrl) { // served through the review link itself (BUG-0041)
-      imgHtml = '<img class="rv-proof-img" src="' + esc(t.photoUrl) + '" alt="Resolution proof" onclick="document.getElementById(\'fsImg\').src=this.src;document.getElementById(\'fsOverlay\').classList.add(\'show\')">';
+      imgHtml = '<button type="button" class="rv-proof-btn" id="proofBtn" aria-label="Open full size photo"><img class="rv-proof-img" src="' + esc(t.photoUrl).replace(/"/g, '&quot;') + '" alt="Photo of the completed repair"></button><div class="rv-proof-hint">Tap photo to enlarge</div>';
     }
 
     var timerHtml = '';
@@ -157,14 +175,14 @@ body{background:var(--bg);min-height:100dvh}
       timerHtml = '<div class="rv-timer" id="rvTimer"></div>';
     }
 
-    root.innerHTML =
+    render(
       '<div class="rv-header">' +
-        '<div class="rv-logo">🏥 Kodspot</div>' +
-        '<div class="rv-org">' + esc(t.orgName) + '</div>' +
+        '<div class="rv-logo">' + esc(t.orgName) + '</div>' +
       '</div>' +
+      '<h1 class="rv-title" style="text-align:center">Is the problem fixed?</h1>' +
       timerHtml +
       '<div class="rv-card">' +
-        '<h3>📋 Your Complaint</h3>' +
+        '<h2 class="rv-card-title">Your complaint</h2>' +
         '<div class="rv-label">Issue</div>' +
         '<div class="rv-value">' + esc(t.title) + '</div>' +
         '<div class="rv-label">Location</div>' +
@@ -172,26 +190,40 @@ body{background:var(--bg);min-height:100dvh}
         '<div class="rv-time">Filed ' + timeAgo(t.createdAt) + '</div>' +
       '</div>' +
       '<div class="rv-card">' +
-        '<h3>✅ Resolution</h3>' +
+        '<h2 class="rv-card-title">What the team did</h2>' +
         (t.resolvedNote ? '<div class="rv-label">Note from team</div><div class="rv-value">"' + esc(t.resolvedNote) + '"</div>' : '') +
         (imgHtml ? '<div class="rv-label">Proof photo</div>' + imgHtml : '') +
         '<div class="rv-time">Resolved ' + timeAgo(t.resolvedAt) + '</div>' +
       '</div>' +
       '<div class="rv-card">' +
-        '<h3>🤔 Was this resolved to your satisfaction?</h3>' +
         '<div class="rv-note-box" id="noteBox">' +
-          '<textarea id="reviewNote" placeholder="Optional: Tell us more..." maxlength="500"></textarea>' +
+          '<label class="form-label" for="reviewNote">What is still wrong? (optional)</label>' +
+          '<textarea id="reviewNote" maxlength="500"></textarea>' +
         '</div>' +
         '<div class="rv-actions">' +
-          '<button class="btn-confirm" id="btnConfirm" onclick="submitReview(\'CONFIRM\')">✅ Yes, Looks Good</button>' +
-          '<button class="btn-reject" id="btnReject" onclick="showRejectNote()">❌ Not Resolved</button>' +
+          '<button class="btn-confirm" id="btnConfirm" onclick="submitReview(\'CONFIRM\')">Yes, it\'s fixed</button>' +
+          '<button class="btn-reject" id="btnReject" onclick="showRejectNote()">No, still a problem</button>' +
+          '<button class="btn-cancel" id="btnCancel" hidden onclick="cancelReject()">Cancel</button>' +
         '</div>' +
-      '</div>';
+        '<div class="rv-send-error" id="sendError" role="alert">Could not send your answer. Check your signal and try again.</div>' +
+      '</div>', 'Is the problem fixed?');
+
+    var proofBtn = document.getElementById('proofBtn');
+    if (proofBtn) proofBtn.addEventListener('click', function() { openPhoto(proofBtn); });
 
     // Countdown timer
     if (data.expiresAt) {
       startTimer(new Date(data.expiresAt));
     }
+  }
+
+  function timeLeft(ms) {
+    var mins = Math.ceil(ms / 60000);
+    if (mins < 60) return mins + (mins === 1 ? ' minute' : ' minutes');
+    var hours = Math.floor(mins / 60);
+    if (hours < 24) return hours + (hours === 1 ? ' hour' : ' hours');
+    var days = Math.floor(hours / 24), rest = hours % 24;
+    return days + (days === 1 ? ' day' : ' days') + (rest ? ' ' + rest + (rest === 1 ? ' hour' : ' hours') : '');
   }
 
   function startTimer(expiresAt) {
@@ -200,30 +232,51 @@ body{background:var(--bg);min-height:100dvh}
     function update() {
       var diff = expiresAt.getTime() - Date.now();
       if (diff <= 0) {
-        el.textContent = 'Review window has expired';
+        el.textContent = 'Time to answer has ended';
         return;
       }
-      var m = Math.floor(diff / 60000);
-      var s = Math.floor((diff % 60000) / 1000);
-      el.textContent = '⏱ Review window: ' + m + ':' + (s < 10 ? '0' : '') + s + ' remaining';
-      setTimeout(update, 1000);
+      el.textContent = 'You have ' + timeLeft(diff) + ' left to answer. If you do not answer, it will be marked as accepted.';
+      setTimeout(update, 60000);
     }
     update();
   }
 
+  // The full-size photo: keyboard users can open it, close it and land back where they were
+  var photoOpener = null;
+  function openPhoto(opener) {
+    photoOpener = opener;
+    document.getElementById('fsImg').src = opener.querySelector('img').src;
+    document.getElementById('fsOverlay').classList.add('show');
+    document.getElementById('fsClose').focus();
+  }
+  window.closePhoto = function() {
+    document.getElementById('fsOverlay').classList.remove('show');
+    if (photoOpener) photoOpener.focus();
+  };
+  document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape' && document.getElementById('fsOverlay').classList.contains('show')) window.closePhoto();
+  });
+
   // Global functions for button handlers
   window.showRejectNote = function() {
-    var box = document.getElementById('noteBox');
-    if (box) {
-      box.classList.add('show');
-      document.getElementById('reviewNote').focus();
-    }
+    document.getElementById('noteBox').classList.add('show');
+    document.getElementById('reviewNote').focus();
+    document.getElementById('btnConfirm').hidden = true;
+    document.getElementById('btnCancel').hidden = false;
     // Switch reject button to actual submit
     var btn = document.getElementById('btnReject');
-    if (btn) {
-      btn.textContent = '❌ Submit: Not Resolved';
-      btn.onclick = function() { submitReview('REJECT'); };
-    }
+    btn.textContent = 'Send: still a problem';
+    btn.onclick = function() { submitReview('REJECT'); };
+  };
+
+  window.cancelReject = function() {
+    document.getElementById('noteBox').classList.remove('show');
+    document.getElementById('btnConfirm').hidden = false;
+    document.getElementById('btnCancel').hidden = true;
+    var btn = document.getElementById('btnReject');
+    btn.textContent = 'No, still a problem';
+    btn.onclick = window.showRejectNote;
+    btn.focus();
   };
 
   window.submitReview = function(action) {
@@ -233,8 +286,9 @@ body{background:var(--bg);min-height:100dvh}
     var note = noteEl ? noteEl.value.trim() : '';
 
     // Disable buttons
-    if (btnConfirm) { btnConfirm.disabled = true; btnConfirm.style.opacity = '.5'; }
-    if (btnReject) { btnReject.disabled = true; btnReject.style.opacity = '.5'; }
+    if (btnConfirm) btnConfirm.disabled = true;
+    if (btnReject) btnReject.disabled = true;
+    document.getElementById('sendError').style.display = 'none';
 
     var body = { action: action };
     if (note) body.note = note;
@@ -245,32 +299,26 @@ body{background:var(--bg);min-height:100dvh}
       body: JSON.stringify(body)
     })
     .then(function(r) {
-      if (!r.ok) return r.json().then(function(d) { throw new Error(d.error || 'Failed'); });
+      if (!r.ok) return r.json().catch(function() { return {}; }).then(function(d) { throw new Error(d.error || 'Failed'); });
       return r.json();
     })
     .then(function(result) {
-      if (action === 'CONFIRM') {
-        root.innerHTML =
-          '<div class="rv-header"><div class="rv-logo">🏥 Kodspot</div></div>' +
-          '<div class="rv-result">' +
-            '<div class="rv-result-icon success"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></div>' +
-            '<div class="rv-result-title">Thank You!</div>' +
-            '<div class="rv-result-sub">' + esc(result.message) + '</div>' +
-          '</div>';
-      } else {
-        root.innerHTML =
-          '<div class="rv-header"><div class="rv-logo">🏥 Kodspot</div></div>' +
-          '<div class="rv-result">' +
-            '<div class="rv-result-icon info"><svg viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></div>' +
-            '<div class="rv-result-title">Feedback Received</div>' +
-            '<div class="rv-result-sub">' + esc(result.message) + '</div>' +
-          '</div>';
-      }
+      var isConfirm = action === 'CONFIRM';
+      var title = isConfirm ? 'Thank you' : 'We have your answer';
+      render(
+        '<div class="rv-header"><div class="rv-logo">Kodspot</div></div>' +
+        '<div class="rv-result" role="status">' +
+          (isConfirm
+            ? '<div class="rv-result-icon success"><svg viewBox="0 0 24 24" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg></div>'
+            : '<div class="rv-result-icon info"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg></div>') +
+          '<h1 class="rv-result-title">' + title + '</h1>' +
+          '<div class="rv-result-sub">' + esc(result.message) + '</div>' +
+        '</div>', title);
     })
-    .catch(function(err) {
-      if (btnConfirm) { btnConfirm.disabled = false; btnConfirm.style.opacity = '1'; }
-      if (btnReject) { btnReject.disabled = false; btnReject.style.opacity = '1'; }
-      alert(err.message || 'Something went wrong. Please try again.');
+    .catch(function() {
+      if (btnConfirm) btnConfirm.disabled = false;
+      if (btnReject) btnReject.disabled = false;
+      document.getElementById('sendError').style.display = 'block';
     });
   };
 })();

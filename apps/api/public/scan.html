@@ -10,79 +10,109 @@
 <meta name="theme-color" content="#1E40AF">
 <title>Report Issue — Kodspot</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/css/design-system.css?v=10">
+<link rel="stylesheet" href="/css/design-system.css?v=11">
+<script>try{if(window.matchMedia('(prefers-color-scheme: dark)').matches)document.documentElement.setAttribute('data-theme','dark')}catch(e){}</script>
 <style>
 body{background:var(--bg);min-height:100dvh}
 .scan-wrap{max-width:480px;margin:0 auto;padding:1.5rem 1rem}
 .scan-header{text-align:center;margin-bottom:1.5rem}
-.scan-logo{font-size:1.3rem;font-weight:700;color:var(--primary);letter-spacing:-.02em}
+.scan-logo{font-size:1.15rem;font-weight:700;color:var(--primary);letter-spacing:-.02em}
 .scan-loc{margin-top:.75rem;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:1rem}
 .scan-loc-name{font-size:1.1rem;font-weight:700;color:var(--text)}
-.scan-loc-meta{font-size:.78rem;color:var(--text-muted);margin-top:.15rem}
-.scan-loc-org{font-size:.72rem;color:var(--text-light);margin-top:.35rem}
 .scan-divider{display:flex;align-items:center;gap:.75rem;margin:1.5rem 0;color:var(--text-muted);font-size:.75rem}
 .scan-divider::before,.scan-divider::after{content:'';flex:1;height:1px;background:var(--border)}
 .role-cards{display:grid;grid-template-columns:1fr 1fr;gap:.75rem;margin-bottom:1.5rem}
-.role-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:1.25rem 1rem;text-align:center;cursor:pointer;transition:all .15s}
-.role-card:hover{border-color:var(--primary);box-shadow:0 2px 8px rgba(30,64,175,.1)}
-.role-card.active{border-color:var(--primary);background:rgba(30,64,175,.04)}
+.role-card{display:block;width:100%;font:inherit;color:var(--text);background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:1rem 2.25rem 1rem 1.15rem;text-align:left;cursor:pointer;position:relative}
+.role-card::after{content:'›';position:absolute;right:1rem;top:50%;transform:translateY(-50%);font-size:1.4rem;color:var(--text-muted)}
+.role-card:hover{border-color:var(--primary)}
+.role-card[aria-busy="true"]{opacity:.6;cursor:progress}
 .role-icon{font-size:1.6rem;margin-bottom:.35rem;display:block}
-.role-label{font-size:.85rem;font-weight:600;color:var(--text)}
-.role-desc{font-size:.68rem;color:var(--text-muted);margin-top:.15rem}
+.role-label{font-size:1rem;font-weight:600;color:var(--text)}
+.role-desc{font-size:.875rem;color:var(--text-muted);margin-top:.15rem}
 .loc-picker-grid{display:grid;grid-template-columns:1fr;gap:.5rem;margin-bottom:1rem}
 .loc-picker-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:.75rem .85rem;text-align:left;cursor:pointer;transition:all .15s}
 .loc-picker-card:hover{border-color:var(--primary);box-shadow:0 2px 8px rgba(30,64,175,.08)}
 .loc-picker-name{font-size:.86rem;font-weight:600;color:var(--text);display:flex;align-items:center;gap:.45rem}
-.loc-picker-meta{font-size:.72rem;color:var(--text-muted);margin-top:.2rem}
+.loc-picker-meta{font-size:var(--fs-xs);color:var(--text-muted);margin-top:.2rem}
 .loc-picker-actions{display:flex;justify-content:flex-end;margin-top:.5rem}
 
 /* Complaint form */
 .complaint-form{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:1.25rem}
-.complaint-form h3{font-size:1rem;font-weight:600;margin-bottom:.75rem;color:var(--text)}
+.scan-title{font-size:1.125rem;font-weight:700;margin:0 0 .25rem;color:var(--text);outline:none}
 .issue-grid{display:grid;grid-template-columns:1fr 1fr;gap:.4rem}
-.issue-opt{border:1px solid var(--border);border-radius:var(--radius);padding:.5rem .6rem;cursor:pointer;text-align:center;transition:all .15s;font-size:.78rem;font-weight:500;color:var(--text);background:var(--bg);min-height:var(--touch-min)}
-.issue-opt:hover{border-color:var(--primary)}
-.issue-opt.selected{border-color:var(--primary);background:rgba(30,64,175,.06);color:var(--primary);font-weight:600}
-.issue-opt .io-icon{display:block;font-size:1.1rem;margin-bottom:.15rem}
+.issue-fieldset{border:none;margin:0;padding:0;min-width:0}
+.issue-opt{display:block;position:relative;cursor:pointer}
+.issue-opt > span{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.15rem;min-height:64px;padding:.5rem .6rem;font-size:.875rem;text-align:center;color:var(--text);border:1px solid var(--border-control);border-radius:var(--radius)}
+.issue-opt:hover > span{border-color:var(--primary)}
+.issue-opt input:checked + span{border-color:var(--primary);border-width:2px;background:var(--primary-light);color:var(--primary-text);font-weight:600}
+.issue-opt input:checked + span::after{content:'✓';content:'✓' / ''}
+.issue-opt input:focus-visible + span{outline:3px solid var(--focus);outline-offset:2px}
+.issue-opt .io-icon{font-size:1.1rem}
+.scan-back{display:inline-flex;align-items:center;min-height:44px;padding:0;margin-bottom:.25rem;background:none;border:none;font:inherit;font-size:.875rem;font-weight:600;color:var(--primary-text);cursor:pointer}
+.scan-send{margin-top:.75rem}
+.scan-send.ready{position:sticky;bottom:0;background:var(--surface);padding:.5rem 0 calc(.75rem + env(safe-area-inset-bottom,0px));z-index:5}
+.scan-send .btn{width:100%;min-height:48px}
+.form-error{color:var(--danger-text);font-size:.875rem;text-align:center;margin-bottom:.5rem;display:none}
+.scan-ref{margin:1rem auto 0;max-width:320px;border:1px solid var(--border-control);border-radius:var(--radius);padding:.75rem}
+.scan-ref-id{font-size:1.1rem;font-weight:700;color:var(--text);font-family:monospace}
+.scan-ref-lbl{font-size:.8rem;color:var(--text-muted);margin-top:.25rem}
+.scan-foot{text-align:center;font-size:var(--fs-xs);color:var(--text-muted);padding:.5rem 1rem 1.25rem}
 .photo-upload{display:flex;align-items:center;gap:.6rem;flex-wrap:wrap}
-.photo-upload label{display:flex;align-items:center;gap:.4rem;padding:.45rem .75rem;border:1px dashed var(--border);border-radius:var(--radius);cursor:pointer;font-size:.78rem;color:var(--text-muted);transition:border-color .15s;min-height:var(--touch-min)}
+.photo-upload input:focus-visible + label{outline:3px solid var(--focus);outline-offset:2px}
+.photo-upload label{min-height:44px;display:flex;align-items:center;gap:.4rem;padding:.45rem .75rem;border:1px dashed var(--border);border-radius:var(--radius);cursor:pointer;font-size:.78rem;color:var(--text-muted);transition:border-color .15s;min-height:var(--touch-min)}
 .photo-upload label:hover{border-color:var(--primary);color:var(--primary)}
 .photo-preview{width:48px;height:48px;border-radius:var(--radius-sm);object-fit:cover;border:1px solid var(--border);display:none}
 
 /* States */
 .scan-loading,.scan-error,.scan-success{text-align:center;padding:3rem 1rem}
 .scan-loading{color:var(--text-muted);font-size:.9rem}
-.scan-error{color:var(--danger)}
+.scan-error{color:var(--danger-text)}
 .scan-error-icon{font-size:2rem;margin-bottom:.5rem;display:block}
-.scan-error-text{font-size:.95rem;font-weight:600}
-.scan-error-sub{font-size:.82rem;color:var(--text-muted);margin-top:.3rem}
+.scan-error-text{font-size:1.125rem;font-weight:700;margin:0;outline:none}
+.scan-error-sub{font-size:.9rem;color:var(--text-muted);margin-top:.3rem}
 .scan-success{color:var(--success)}
-.success-icon{display:inline-flex;align-items:center;justify-content:center;width:56px;height:56px;border-radius:50%;background:#f0fdf4;margin-bottom:.75rem}
-.success-icon svg{width:28px;height:28px;stroke:#16a34a;stroke-width:2.5;fill:none}
-.success-title{font-size:1.1rem;font-weight:700;color:var(--text)}
-.success-sub{font-size:.82rem;color:var(--text-muted);margin-top:.3rem}
-.success-id{font-size:.72rem;color:var(--text-light);margin-top:.5rem;font-family:monospace}
+.success-icon{display:inline-flex;align-items:center;justify-content:center;width:56px;height:56px;border-radius:50%;background:var(--success-bg);margin-bottom:.75rem}
+.success-icon svg{width:28px;height:28px;stroke:var(--success-text);stroke-width:2.5;fill:none}
+.success-title{font-size:1.25rem;font-weight:700;color:var(--text);outline:none}
+.success-sub{font-size:.9rem;color:var(--text-muted);margin-top:.3rem}
 
 @media(max-width:480px){
   .scan-wrap{padding:1rem .75rem}
   .complaint-form{padding:1rem}
   .issue-grid{gap:.3rem}
-  .issue-opt{padding:.4rem .5rem;font-size:.72rem}
 }
 </style>
 </head>
 <body>
-<div class="scan-wrap" id="root">
+<main class="scan-wrap" id="root">
   <div class="scan-loading" id="loadingState">
     <div class="skeleton" style="width:80%;height:1.2rem;margin:0 auto .5rem"></div>
     <div class="skeleton" style="width:60%;height:.9rem;margin:0 auto"></div>
-    <div style="margin-top:.3rem;font-size:.82rem;color:var(--text-light)">Looking up location…</div>
+    <div style="margin-top:.3rem;font-size:.875rem;color:var(--text-muted)">Looking up location…</div>
   </div>
-</div>
+</main>
+<p class="scan-foot">Kodspot · <a href="/privacy">Privacy</a> · <a href="/terms">Terms</a></p>
+<script src="/js/kit.js?v=1"></script>
 
 <script>
 (function() {
   var root = document.getElementById('root');
+
+  // Each step replaces the page: move focus to its heading and say where the person is.
+  function render(html, title) {
+    root.innerHTML = html;
+    document.title = title + ' · Kodspot';
+    var h = root.querySelector('h1');
+    if (h) { h.tabIndex = -1; h.focus({ preventScroll: true }); }
+    window.scrollTo(0, 0);
+  }
+
+  // A weak signal must end in a message, not a skeleton that never leaves.
+  function timedFetch(url) {
+    var ctl = new AbortController();
+    var timer = setTimeout(function() { ctl.abort(); }, 15000);
+    return fetch(url, { signal: ctl.signal }).finally(function() { clearTimeout(timer); });
+  }
 
   // Extract QR code from URL: /s/ABC123 or /scan/ABC123
   var pathParts = location.pathname.split('/');
@@ -114,9 +144,9 @@ body{background:var(--bg);min-height:100dvh}
   }
 
   var MODULE_META = {
-    ele: { label: 'Electrical', icon: '⚡', desc: 'Report electrical problems' },
+    ele: { label: 'Electrical', icon: '⚡', desc: 'Lights, fans, sockets, switches, AC' },
     civil: { label: 'Civil', icon: '🏗️', desc: 'Report civil or structural issues' },
-    asset: { label: 'Assets', icon: '📦', desc: 'Report asset-related issues' },
+    asset: { label: 'Assets', icon: '📦', desc: 'Furniture and other items in your room' },
     complaints: { label: 'Complaints', icon: '📝', desc: 'General facility complaints' }
   };
 
@@ -143,8 +173,8 @@ body{background:var(--bg);min-height:100dvh}
       { key: 'OTHER', icon: '📋', label: 'Other' }
     ],
     asset: [
-      { key: 'ASSET_DAMAGED', icon: '🔨', label: 'Asset Damaged' },
-      { key: 'ASSET_MISSING', icon: '❓', label: 'Asset Missing' },
+      { key: 'ASSET_DAMAGED', icon: '🔨', label: 'Item Damaged' },
+      { key: 'ASSET_MISSING', icon: '❓', label: 'Item Missing' },
       { key: 'ASSET_MALFUNCTION', icon: '⚙️', label: 'Malfunction' },
       { key: 'OTHER', icon: '📋', label: 'Other' }
     ],
@@ -162,7 +192,7 @@ body{background:var(--bg);min-height:100dvh}
 
   async function loadLocation(code) {
     try {
-      var res = await fetch('/api/public/location/' + encodeURIComponent(code));
+      var res = await timedFetch('/api/public/location/' + encodeURIComponent(code));
       if (!res.ok) {
         var err = await res.json().catch(function() { return {}; });
         if (res.status === 404) {
@@ -170,7 +200,7 @@ body{background:var(--bg);min-height:100dvh}
         } else if (res.status === 410) {
           showError('Unavailable', err.error || 'This facility is not currently accepting feedback.');
         } else {
-          showError('Error', err.error || 'Something went wrong. Please try again.');
+          showError('Something went wrong', err.error || 'Please try again.', true);
         }
         return;
       }
@@ -179,55 +209,67 @@ body{background:var(--bg);min-height:100dvh}
       if (modules.length > 1) {
         showModulePicker(loc, code, modules);
       } else {
+        // a single service: nothing to go back to
         localStorage.setItem('activeModule', modules[0]);
         await startComplaintFlow(loc, code, modules[0]);
       }
     } catch(e) {
-      showError('Connection Error', 'Could not connect to the server. Please check your internet and try again.');
+      showError('Connection Error', e && e.name === 'AbortError' ? 'This is taking too long. Check your signal.' : 'Could not connect to the server. Please check your internet and try again.', true);
     }
   }
 
-  function esc(s) { var d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+  function esc(s) { var d = document.createElement('div'); d.textContent = s; return d.innerHTML.replace(/"/g, '&quot;'); }
+
+  function header(loc, place) {
+    return '<div class="scan-header">' +
+      '<div class="scan-logo">' + esc(loc ? loc.orgName : 'Kodspot') + '</div>' +
+      (place ? '<div class="scan-loc"><div class="scan-loc-name">' + place + '</div></div>' : '') +
+    '</div>';
+  }
+
+  function setBusy(btn) {
+    if (!btn) return;
+    btn.setAttribute('aria-busy', 'true');
+    btn.disabled = true;
+    var label = btn.querySelector('.role-label, .loc-picker-name');
+    if (label) label.textContent = 'Loading…';
+  }
 
   function showModulePicker(loc, code, modules) {
     var parentInfo = loc.parentName ? esc(loc.parentName) + ' → ' + esc(loc.name) : esc(loc.name);
-    var typeLabel = loc.type.replace(/_/g, ' ');
-    root.innerHTML =
-      '<div class="scan-header">' +
-        '<div class="scan-logo">🏥 Kodspot</div>' +
-        '<div class="scan-loc">' +
-          '<div class="scan-loc-name">' + parentInfo + '</div>' +
-          '<div class="scan-loc-meta">' + typeLabel + '</div>' +
-          '<div class="scan-loc-org">' + esc(loc.orgName) + '</div>' +
-        '</div>' +
-      '</div>' +
-      '<div style="text-align:center;margin-bottom:1rem"><p style="font-size:.85rem;font-weight:600;color:var(--text)">What type of issue?</p>' +
-      '<p style="font-size:.78rem;color:var(--text-muted)">Select the service category for your report</p></div>' +
+    render(
+      header(loc, parentInfo) +
+      '<div style="text-align:center;margin-bottom:1rem"><h1 class="scan-title">What do you need fixed?</h1></div>' +
       '<div class="role-cards" style="grid-template-columns:1fr">' +
       modules.map(function(m) {
         var meta = MODULE_META[m] || { label: m, icon: '📋', desc: 'Report an issue' };
-        return '<div class="role-card" onclick="window._pickModule(\'' + m + '\')" style="text-align:left;padding:1rem 1.15rem">' +
-          '<span class="role-icon" style="font-size:1.3rem;display:inline;margin-right:.4rem">' + meta.icon + '</span>' +
-          '<span class="role-label">' + meta.label + '</span>' +
-          '<div class="role-desc" style="margin-top:.15rem">' + meta.desc + '</div>' +
-        '</div>';
+        return '<button type="button" class="role-card" data-mod="' + esc(m) + '" onclick="window._pickModule(this)">' +
+          '<span class="role-icon" aria-hidden="true" style="font-size:1.3rem;display:inline;margin-right:.4rem">' + meta.icon + '</span>' +
+          '<span class="role-label">' + esc(meta.label) + '</span>' +
+          '<div class="role-desc" style="margin-top:.15rem">' + esc(meta.desc) + '</div>' +
+        '</button>';
       }).join('') +
-      '</div>';
+      '</div>', 'What do you need fixed?');
 
-    window._pickModule = function(mod) {
+    window._pickModule = function(btn) {
+      var mod = btn.dataset.mod;
+      setBusy(btn);
       localStorage.setItem('activeModule', mod);
-      startComplaintFlow(loc, code, mod).catch(function() {
-        showError('Error', 'Unable to load complaint form. Please try again.');
+      var back = { label: 'Change service', run: function() { showModulePicker(loc, code, modules); } };
+      startComplaintFlow(loc, code, mod, back).catch(function() {
+        showError('Something went wrong', 'Unable to load the form. Please try again.', true);
       });
     };
   }
 
-  function showError(title, sub) {
-    root.innerHTML =
-      '<div class="scan-header"><div class="scan-logo">🏥 Kodspot</div></div>' +
-      '<div class="scan-error"><span class="scan-error-icon">⚠️</span>' +
-      '<div class="scan-error-text">' + esc(title) + '</div>' +
-      '<div class="scan-error-sub">' + esc(sub) + '</div></div>';
+  function showError(title, sub, canRetry) {
+    render(
+      header(null) +
+      '<div class="scan-error"><span class="scan-error-icon" aria-hidden="true">⚠️</span>' +
+      '<h1 class="scan-error-text">' + esc(title) + '</h1>' +
+      '<div class="scan-error-sub">' + esc(sub) + '</div>' +
+      (canRetry ? '<div style="margin-top:1rem"><button type="button" class="btn btn-outline" onclick="location.reload()">Try again</button></div>' : '') +
+      '</div>', title);
   }
 
   function needsChildSelection(loc) {
@@ -236,7 +278,7 @@ body{background:var(--bg);min-height:100dvh}
 
   async function loadChildLocations(parentLocationId) {
     try {
-      var res = await fetch('/api/public/location-children/' + encodeURIComponent(parentLocationId));
+      var res = await timedFetch('/api/public/location-children/' + encodeURIComponent(parentLocationId));
       if (!res.ok) return [];
       var data = await res.json();
       if (!data || !Array.isArray(data.children)) return [];
@@ -254,35 +296,27 @@ body{background:var(--bg);min-height:100dvh}
     return '📍';
   }
 
-  function showChildLocationPicker(parentLoc, code, mod, children) {
+  function showChildLocationPicker(parentLoc, code, mod, children, back) {
     var parentInfo = parentLoc.parentName ? esc(parentLoc.parentName) + ' → ' + esc(parentLoc.name) : esc(parentLoc.name);
-    var modMeta = MODULE_META[mod] || MODULE_META.ele;
 
-    root.innerHTML =
-      '<div class="scan-header">' +
-        '<div class="scan-logo">🏥 Kodspot</div>' +
-        '<div class="scan-loc">' +
-          '<div class="scan-loc-name">' + parentInfo + '</div>' +
-          '<div class="scan-loc-meta">' + esc(parentLoc.type.replace(/_/g, ' ')) + '</div>' +
-          '<div class="scan-loc-org">' + esc(parentLoc.orgName) + '</div>' +
-        '</div>' +
-      '</div>' +
+    render(
+      header(parentLoc, parentInfo) +
+      backButton(back) +
       '<div style="text-align:center;margin-bottom:.8rem">' +
-        '<p style="font-size:.86rem;font-weight:600;color:var(--text)">' + modMeta.icon + ' Select Room / Area</p>' +
-        '<p style="font-size:.78rem;color:var(--text-muted)">Choose where the issue is located for accurate routing.</p>' +
+        '<h1 class="scan-title">Which room or area?</h1>' +
       '</div>' +
       '<div class="loc-picker-grid">' +
         children.map(function(child) {
           var typeLabel = String(child.type || '').replace(/_/g, ' ');
-          return '<button type="button" class="loc-picker-card" onclick="window._pickChildLocation(\'' + child.id + '\')">' +
-            '<div class="loc-picker-name"><span>' + getLocationIcon(child.type) + '</span><span>' + esc(child.name) + '</span></div>' +
+          return '<button type="button" class="loc-picker-card" data-id="' + esc(child.id) + '" onclick="window._pickChildLocation(this.dataset.id)">' +
+            '<div class="loc-picker-name"><span aria-hidden="true">' + getLocationIcon(child.type) + '</span><span>' + esc(child.name) + '</span></div>' +
             '<div class="loc-picker-meta">' + esc(typeLabel) + '</div>' +
           '</button>';
         }).join('') +
       '</div>' +
-      '<div class="loc-picker-actions">' +
-        '<button class="btn btn-sm btn-outline" onclick="window._reportParentLocation()">Report for Entire Floor</button>' +
-      '</div>';
+      '<button type="button" class="btn btn-outline" style="width:100%;min-height:48px" onclick="window._reportParentLocation()">Report for Entire Floor</button>', 'Which room or area?');
+    wireBack(back);
+    var toPicker = { label: 'Change room', run: function() { showChildLocationPicker(parentLoc, code, mod, children, back); } };
 
     window._pickChildLocation = function(childId) {
       var child = null;
@@ -302,31 +336,40 @@ body{background:var(--bg);min-height:100dvh}
         orgName: parentLoc.orgName,
         orgSlug: parentLoc.orgSlug,
         enabledModules: parentLoc.enabledModules
-      }, code, mod).catch(function() {
-        showError('Error', 'Unable to load complaint form. Please try again.');
+      }, code, mod, toPicker).catch(function() {
+        showError('Something went wrong', 'Unable to load the form. Please try again.', true);
       });
     };
 
     window._reportParentLocation = function() {
-      showComplaintForm(parentLoc, code, mod).catch(function() {
-        showError('Error', 'Unable to load complaint form. Please try again.');
+      showComplaintForm(parentLoc, code, mod, toPicker).catch(function() {
+        showError('Something went wrong', 'Unable to load the form. Please try again.', true);
       });
     };
   }
 
-  async function startComplaintFlow(loc, code, mod) {
+  function backButton(back) {
+    return back ? '<button type="button" class="scan-back" id="backBtn">← ' + esc(back.label) + '</button>' : '';
+  }
+
+  function wireBack(back) {
+    var btn = document.getElementById('backBtn');
+    if (btn) btn.addEventListener('click', back.run);
+  }
+
+  async function startComplaintFlow(loc, code, mod, back) {
     if (!needsChildSelection(loc)) {
-      await showComplaintForm(loc, code, mod);
+      await showComplaintForm(loc, code, mod, back);
       return;
     }
 
     var children = await loadChildLocations(loc.id);
     if (!children.length) {
-      await showComplaintForm(loc, code, mod);
+      await showComplaintForm(loc, code, mod, back);
       return;
     }
 
-    showChildLocationPicker(loc, code, mod, children);
+    showChildLocationPicker(loc, code, mod, children, back);
   }
 
   function getIssueIcon(moduleCode, issueKey) {
@@ -339,7 +382,7 @@ body{background:var(--bg);min-height:100dvh}
 
   async function loadDynamicIssues(loc, mod) {
     try {
-      var res = await fetch('/api/public/complaint-categories/' + encodeURIComponent(loc.id) + '?module=' + encodeURIComponent(mod));
+      var res = await timedFetch('/api/public/complaint-categories/' + encodeURIComponent(loc.id) + '?module=' + encodeURIComponent(mod));
       if (!res.ok) return null;
       var data = await res.json();
       if (!data || !Array.isArray(data.categories) || data.categories.length === 0) return null;
@@ -356,99 +399,116 @@ body{background:var(--bg);min-height:100dvh}
     }
   }
 
-  async function showComplaintForm(loc, code, mod) {
+  async function showComplaintForm(loc, code, mod, back) {
     mod = mod || 'ele';
     var parentInfo = loc.parentName ? esc(loc.parentName) + ' \u2192 ' + esc(loc.name) : esc(loc.name);
-    var typeLabel = loc.type.replace(/_/g, ' ');
-    var modMeta = MODULE_META[mod] || MODULE_META.ele;
 
     var ISSUES = await loadDynamicIssues(loc, mod) || (MODULE_ISSUES[mod] || MODULE_ISSUES.ele);
 
-    root.innerHTML =
-      '<div class="scan-header">' +
-        '<div class="scan-logo">🏥 Kodspot</div>' +
-        '<div class="scan-loc">' +
-          '<div class="scan-loc-name">' + parentInfo + '</div>' +
-          '<div class="scan-loc-meta">' + typeLabel + '</div>' +
-          '<div class="scan-loc-org">' + esc(loc.orgName) + '</div>' +
-        '</div>' +
-      '</div>' +
+    render(
+      header(loc, parentInfo) +
       '<div class="complaint-form">' +
-        '<h3>' + modMeta.icon + ' Report ' + modMeta.label + ' Issue</h3>' +
-        '<p style="font-size:.8rem;color:var(--text-muted);margin-bottom:1rem">Select the type of issue you want to report. Our team will be notified immediately.</p>' +
-        '<div class="form-group">' +
-          '<div class="form-label">What\'s the problem? <span style="color:var(--danger)">*</span></div>' +
+        backButton(back) +
+        '<h1 class="scan-title">What\'s the problem?</h1>' +
+        '<p style="font-size:.875rem;color:var(--text-muted);margin-bottom:1rem">Choose one. Everything else is optional.</p>' +
+        '<fieldset class="form-group issue-fieldset">' +
+          '<legend class="sr-only">What\'s the problem?</legend>' +
           '<div class="issue-grid" id="issueGrid">' +
             ISSUES.map(function(i) {
-              return '<div class="issue-opt" data-issue="' + i.key + '"><span class="io-icon">' + i.icon + '</span>' + i.label + '</div>';
+              return '<label class="issue-opt" data-issue="' + esc(i.key) + '">' +
+                '<input class="sr-only" type="radio" name="issue" value="' + esc(i.key) + '">' +
+                '<span><span class="io-icon" aria-hidden="true">' + i.icon + '</span>' + esc(i.label) + '</span>' +
+              '</label>';
             }).join('') +
           '</div>' +
+        '</fieldset>' +
+        '<div class="form-group">' +
+          '<label class="form-label" for="descField">Description <span class="optional">(optional)</span></label>' +
+          '<textarea class="form-textarea" id="descField" name="description" placeholder="Any additional details…" maxlength="500"></textarea>' +
         '</div>' +
         '<div class="form-group">' +
-          '<label class="form-label">Description <span class="optional">(optional)</span></label>' +
-          '<textarea class="form-textarea" id="descField" placeholder="Any additional details…" maxlength="500"></textarea>' +
-        '</div>' +
-        '<div class="form-group">' +
-          '<label class="form-label">Photo <span class="optional">(optional)</span></label>' +
+          '<div class="form-label">Photo <span class="optional">(optional)</span></div>' +
           '<div class="photo-upload">' +
+            '<input class="sr-only" type="file" id="photoInput" accept="image/jpeg,image/png,image/webp">' +
             '<label for="photoInput">📷 Attach photo</label>' +
-            '<input type="file" id="photoInput" accept="image/jpeg,image/png,image/webp" style="display:none">' +
-            '<img id="photoPreview" class="photo-preview">' +
-            '<span id="photoName" style="font-size:.72rem;color:var(--text-muted)"></span>' +
+            '<img id="photoPreview" class="photo-preview" alt="Your photo">' +
+            '<button type="button" class="scan-back" id="photoRemove" hidden>Remove photo</button>' +
+            '<span id="photoName" style="font-size:var(--fs-xs);color:var(--text-muted)"></span>' +
           '</div>' +
         '</div>' +
         '<div class="scan-divider">Your info (optional)</div>' +
         '<div class="form-group">' +
-          '<label class="form-label">Name <span class="optional">(optional)</span></label>' +
-          '<input type="text" class="form-input" id="nameField" placeholder="Your name" maxlength="100">' +
+          '<label class="form-label" for="nameField">Name <span class="optional">(optional)</span></label>' +
+          '<input type="text" class="form-input" id="nameField" name="name" autocomplete="name" placeholder="Your name" maxlength="100">' +
         '</div>' +
         '<div class="form-group">' +
-          '<label class="form-label">Phone <span class="optional">(optional)</span></label>' +
-          '<input type="tel" class="form-input" id="phoneField" placeholder="Phone number" maxlength="20">' +
-          '<div class="form-hint">So we can follow up if needed</div>' +
+          '<label class="form-label" for="phoneField">Phone <span class="optional">(optional)</span></label>' +
+          '<input type="tel" class="form-input" id="phoneField" name="phone" autocomplete="tel" inputmode="tel" placeholder="Phone number" maxlength="20">' +
+          '<div class="form-hint">Give your number so the team can contact you about this fix.</div>' +
         '</div>' +
-        '<div class="form-group" style="margin-top:.5rem">' +
-          '<label style="display:flex;align-items:flex-start;gap:.5rem;font-size:.78rem;color:var(--text-secondary);cursor:pointer">' +
+        '<div class="form-group" id="consentGroup" hidden style="margin-top:.5rem">' +
+          '<label style="display:flex;align-items:flex-start;gap:.5rem;font-size:.875rem;color:var(--text-secondary);cursor:pointer">' +
             '<input type="checkbox" id="consentCheck" style="margin-top:2px;flex-shrink:0">' +
-            '<span>I consent to my name and phone being collected to process this complaint, per the <a href="/privacy" target="_blank" style="color:var(--primary)">Privacy Policy</a>.</span>' +
+            '<span>I consent to my name and phone being collected to process this complaint, per the <a href="/privacy" target="_blank" style="color:var(--primary-text)">Privacy Policy</a>.</span>' +
           '</label>' +
         '</div>' +
-        '<button class="btn btn-primary" id="submitBtn" style="width:100%" disabled>Select an issue to submit</button>' +
-        '<div id="formError" style="color:var(--danger);font-size:.78rem;text-align:center;margin-top:.5rem;display:none"></div>' +
-      '</div>';
+        '<div class="scan-send" id="sendBar">' +
+          '<div id="formError" class="form-error" role="alert"></div>' +
+          '<button class="btn btn-primary" id="submitBtn" disabled>Choose a problem first</button>' +
+        '</div>' +
+      '</div>', 'What\'s the problem?');
+    wireBack(back);
 
     // Wire up issue selection
     var selectedIssue = null;
     var grid = document.getElementById('issueGrid');
     var submitBtn = document.getElementById('submitBtn');
-    grid.addEventListener('click', function(e) {
-      var opt = e.target.closest('.issue-opt');
-      if (!opt) return;
-      var prev = grid.querySelector('.selected');
-      if (prev) prev.classList.remove('selected');
-      opt.classList.add('selected');
-      selectedIssue = opt.dataset.issue;
+    grid.addEventListener('change', function(e) {
+      selectedIssue = e.target.value;
       submitBtn.disabled = false;
-      submitBtn.textContent = 'Submit Complaint';
+      submitBtn.textContent = 'Send report';
+      document.getElementById('sendBar').classList.add('ready');
     });
 
+    // Consent is only asked when there is something to consent to; the check and the server rule stand
+    var nameField = document.getElementById('nameField');
+    var phoneField = document.getElementById('phoneField');
+    var consentGroup = document.getElementById('consentGroup');
+    function showConsent() { consentGroup.hidden = !(nameField.value.trim() || phoneField.value.trim()); }
+    nameField.addEventListener('input', showConsent);
+    phoneField.addEventListener('input', showConsent);
+
     // Photo preview
+    var chosenPhoto = null;
     var photoInput = document.getElementById('photoInput');
     var photoPreview = document.getElementById('photoPreview');
     var photoName = document.getElementById('photoName');
-    photoInput.addEventListener('change', function() {
+    var photoRemove = document.getElementById('photoRemove');
+    function clearPhoto(message) {
+      chosenPhoto = null;
+      photoInput.value = '';
+      photoPreview.style.display = 'none';
+      photoPreview.removeAttribute('src');
+      photoRemove.hidden = true;
+      photoName.textContent = message || '';
+      photoName.style.color = 'var(--danger-text)';
+      if (message) photoName.setAttribute('role', 'alert'); else photoName.removeAttribute('role');
+    }
+    photoRemove.addEventListener('click', function() { clearPhoto(); });
+    photoInput.addEventListener('change', async function() {
       if (photoInput.files && photoInput.files[0]) {
-        var file = photoInput.files[0];
+        var file = await Kit.shrinkPhoto(photoInput.files[0]);
         if (file.size > 5 * 1024 * 1024) {
-          photoName.textContent = 'Too large (max 5MB)';
-          photoName.style.color = 'var(--danger)';
-          photoInput.value = '';
+          clearPhoto('This photo is too big (over 5 MB). Choose another, or send without a photo.');
           return;
         }
+        chosenPhoto = file;
         photoPreview.src = URL.createObjectURL(file);
         photoPreview.style.display = 'block';
+        photoRemove.hidden = false;
         photoName.textContent = file.name;
         photoName.style.color = 'var(--text-muted)';
+        photoName.removeAttribute('role');
       }
     });
 
@@ -456,9 +516,18 @@ body{background:var(--bg);min-height:100dvh}
     submitBtn.addEventListener('click', async function() {
       if (!selectedIssue) return;
       var errEl = document.getElementById('formError');
+      var fail = function(message) { errEl.textContent = message; errEl.style.display = 'block'; };
       errEl.style.display = 'none';
+      var name = nameField.value.trim();
+      var phone = phoneField.value.trim();
+      var consent = document.getElementById('consentCheck');
+      if ((name || phone) && !consent.checked) {
+        fail('Please check the consent box to submit your contact info.');
+        consent.focus();
+        return;
+      }
       submitBtn.disabled = true;
-      submitBtn.textContent = 'Submitting…';
+      submitBtn.textContent = 'Sending your report… please keep this page open';
 
       try {
         var form = new FormData();
@@ -467,45 +536,44 @@ body{background:var(--bg);min-height:100dvh}
         form.append('module', mod);
         var desc = document.getElementById('descField').value.trim();
         if (desc) form.append('description', desc);
-        var name = document.getElementById('nameField').value.trim();
-        var phone = document.getElementById('phoneField').value.trim();
-        if ((name || phone) && !document.getElementById('consentCheck').checked) {
-          throw new Error('Please check the consent box to submit your contact info.');
-        }
         if (name || phone) form.append('consent', 'true'); // checked by the server too (BUG-0060)
         if (name) form.append('guestName', name);
         if (phone) form.append('guestPhone', phone);
-        if (photoInput.files && photoInput.files[0]) {
-          form.append('image', photoInput.files[0]);
-        }
+        if (chosenPhoto) form.append('image', chosenPhoto);
 
         var res = await fetch('/api/public/complaint', { method: 'POST', body: form });
-        var result = await res.json();
+        var result = await res.json().catch(function() { return {}; });
 
         if (!res.ok) {
-          throw new Error(result.error || 'Failed to submit');
+          fail(result.error || 'Your report was not sent. Press Send again. What you typed is still here.');
+          submitBtn.disabled = false;
+          submitBtn.textContent = 'Send report';
+          return;
         }
 
-        showSuccess(result.ticket);
+        showSuccess(result.ticket, loc);
       } catch(e) {
-        errEl.textContent = e.message || 'Something went wrong. Please try again.';
-        errEl.style.display = 'block';
+        fail('Your report was not sent. Check your signal and press Send again. What you typed is still here.');
         submitBtn.disabled = false;
-        submitBtn.textContent = 'Submit Complaint';
+        submitBtn.textContent = 'Send report';
       }
     });
   }
 
-  function showSuccess(ticket) {
-    root.innerHTML =
-      '<div class="scan-header"><div class="scan-logo">🏥 Kodspot</div></div>' +
-      '<div class="scan-success">' +
-        '<div class="success-icon"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></div>' +
-        '<div class="success-title">Complaint Submitted!</div>' +
-        '<div class="success-sub">Thank you for reporting. Our team has been notified and will address this as soon as possible.</div>' +
-        '<div class="success-id">Reference: ' + esc(ticket.id.substring(0, 8).toUpperCase()) + '</div>' +
+  function showSuccess(ticket, loc) {
+    render(
+      header(loc) +
+      '<div class="scan-success" role="status">' +
+        '<div class="success-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg></div>' +
+        '<h1 class="success-title">Report sent</h1>' +
+        '<div class="success-sub">The maintenance team has your report for ' + esc(loc.name) + '.</div>' +
+        '<div class="scan-ref">' +
+          '<div class="scan-ref-id">' + esc(ticket.id.substring(0, 8).toUpperCase()) + '</div>' +
+          '<div class="scan-ref-lbl">Your reference number. Keep this if you ask about the problem.</div>' +
+        '</div>' +
+        '<div class="success-sub" style="margin-top:.75rem">If you gave your phone number, the team may contact you and ask you to confirm the fix.</div>' +
         '<div style="margin-top:1.5rem"><button class="btn btn-outline" onclick="location.reload()">Report Another Issue</button></div>' +
-      '</div>';
+      '</div>', 'Report sent');
   }
 })();
 </script>
